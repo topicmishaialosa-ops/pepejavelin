@@ -15,11 +15,9 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
 import tech.huihui.HuihuiClient;
-import tech.huihui.base.discord.DiscordManager;
 import tech.huihui.base.font.Fonts;
 import tech.huihui.base.font.MsdfRenderer;
 import tech.huihui.base.theme.Theme;
-import tech.huihui.utility.render.display.Render2DUtil;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
@@ -31,22 +29,12 @@ public class UserComponent {
    public void render(DrawContext context, float x, float y, float alpha) {
       CustomDrawContext drawContext = CustomDrawContext.of(context);
       Theme theme = HuihuiClient.getInstance().getThemeManager().getCurrentTheme();
-      DiscordManager discord = HuihuiClient.getInstance().getDiscordManager();
-      Identifier avatarId = discord != null ? discord.getAvatarId() : null;
       String username = mc.getSession().getUsername();
       float avatarSize = 10.2F;
       float avatarY = y - 15.0F;
-      float maxWidth;
-      if (avatarId != null) {
-         maxWidth = avatarSize + 6.0F;
-         int alphaValue = (int)(alpha * 255.0F);
-         int colorWithAlpha = alphaValue << 24 | 16777215;
-         Render2DUtil.drawTexture(context, avatarId, x - 4.1F, avatarY, maxWidth, maxWidth / 2.0F, 0, 128, 128, -1, colorWithAlpha);
-      } else {
-         drawContext.drawText(Fonts.ICONS.getFont(12.0F), "", x + 2.5F, avatarY + 2.5F, theme.getColor().withAlpha(alpha * 255.0F));
-      }
+      drawContext.drawText(Fonts.ICONS.getFont(12.0F), "", x + 2.5F, avatarY + 2.5F, theme.getColor().withAlpha(alpha * 255.0F));
 
-      maxWidth = 49.0F;
+      float maxWidth = 49.0F;
       MsdfRenderer.renderText(Fonts.REGULAR.getFont(8.0F).getFont(), username, 8.0F, theme.getColor().withAlpha(alpha * 255.0F).getRGB(), context.getMatrices().peek().getPositionMatrix(), x + 15.5F, avatarY + 2.25F, 0.0F, true, 0.7F, 1.0F, maxWidth);
       String currentDateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM HH:mm:ss"));
       drawContext.drawText(Fonts.REGULAR.getFont(6.0F), currentDateTime, x + 15.5F, avatarY + 10.5F, new ColorRGBA(155, 155, 155, alpha * 255.0F));

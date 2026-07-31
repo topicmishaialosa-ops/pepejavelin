@@ -67,6 +67,7 @@ import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.client.modules.impl.render.Menu;
 import tech.huihui.client.modules.impl.render.NoRender;
 import tech.huihui.client.modules.impl.render.Predictions;
+import tech.huihui.client.modules.impl.render.SupplyESP;
 import tech.huihui.client.modules.impl.render.SwingAnimation;
 import tech.huihui.client.modules.impl.render.TargetESP;
 import tech.huihui.client.modules.impl.render.TargetHud;
@@ -136,6 +137,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(EditClickGUI.INSTANCE);
       registerModule(EntityESP.INSTANCE);
       registerModule(TargetESP.INSTANCE);
+      registerModule(SupplyESP.INSTANCE);
       registerModule(TargetHud.INSTANCE);
    }
 

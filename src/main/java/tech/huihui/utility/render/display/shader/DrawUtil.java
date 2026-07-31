@@ -599,6 +599,22 @@ public final class DrawUtil implements IWindow {
       matrices.pop();
    }
 
+   public static void drawTexturedQuad(MatrixStack matrices, Identifier texture, float x1, float y1, float x2, float y2, float x3, float y3, float x4, float y4, float u1, float v1, float u2, float v2, ColorRGBA color) {
+      RenderSystem.enableBlend();
+      RenderSystem.defaultBlendFunc();
+      RenderSystem.setShaderTexture(0, texture);
+      RenderSystem.setShader(ShaderProgramKeys.POSITION_TEX_COLOR);
+      BufferBuilder buffer = Tessellator.getInstance().begin(DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
+      Matrix4f matrix4f = matrices.peek().getPositionMatrix();
+      buffer.vertex(matrix4f, x1, y1, 0.0F).texture(u1, v1).color(color.getRGB());
+      buffer.vertex(matrix4f, x2, y2, 0.0F).texture(u2, v1).color(color.getRGB());
+      buffer.vertex(matrix4f, x3, y3, 0.0F).texture(u2, v2).color(color.getRGB());
+      buffer.vertex(matrix4f, x4, y4, 0.0F).texture(u1, v2).color(color.getRGB());
+      BufferRenderer.drawWithGlobalProgram(buffer.end());
+      RenderSystem.setShaderTexture(0, 0);
+      RenderSystem.disableBlend();
+   }
+
    public static void drawSetup() {
       RenderSystem.enableBlend();
       RenderSystem.defaultBlendFunc();

@@ -13,7 +13,6 @@ import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.base.autobuy.AutoBuyManager;
 import tech.huihui.base.comand.CommandManager;
 import tech.huihui.base.config.ConfigManager;
-import tech.huihui.base.discord.DiscordManager;
 import tech.huihui.base.filemanager.impl.FriendManager;
 import tech.huihui.base.filemanager.impl.StaffManager;
 import tech.huihui.base.macro.MacroManager;
@@ -25,6 +24,7 @@ import tech.huihui.base.theme.ThemeManager;
 import tech.huihui.base.waypoint.WaypointManager;
 import tech.huihui.client.screens.clickgui.ClickGuiScreen;
 import tech.huihui.client.screens.menu.MenuScreen;
+import tech.huihui.client.screens.targethud.TargetHudPresetManager;
 import tech.huihui.utility.game.server.ServerHandler;
 import tech.huihui.utility.render.display.shader.DrawUtil;
 import tech.huihui.utility.render.display.shader.GlProgram;
@@ -46,14 +46,14 @@ public enum HuihuiClient implements ClientModInitializer {
    private FriendManager friendManager;
    private MacroManager macroManager;
    private StaffManager staffManager;
+   private TargetHudPresetManager targetHudPresetManager;
    private AutoBuyManager autoBuyManager;
    private WaypointManager waypointManager;
    private NotifyManager notifyManager;
    private CommandManager commandManager;
    private ConfigManager configManager;
-   private RCTRepository rctRepository;
-   private DiscordManager discordManager;
-   private boolean initialized = false;
+    private RCTRepository rctRepository;
+    private boolean initialized = false;
 
    @Override
    public void onInitializeClient() {
@@ -82,9 +82,10 @@ public enum HuihuiClient implements ClientModInitializer {
             getInstance().shutdown();
          }));
          
-         this.friendManager = new FriendManager();
-         this.macroManager = new MacroManager();
-         this.staffManager = new StaffManager();
+          this.friendManager = new FriendManager();
+          this.macroManager = new MacroManager();
+          this.staffManager = new StaffManager();
+          this.targetHudPresetManager = new TargetHudPresetManager();
          this.notifyManager = new NotifyManager();
          this.serverHandler = new ServerHandler();
          this.rctRepository = new RCTRepository();
@@ -94,11 +95,6 @@ public enum HuihuiClient implements ClientModInitializer {
          this.autoBuyManager = new AutoBuyManager();
          this.commandManager = new CommandManager();
          this.scriptManager = new ScriptManager();
-         try {
-            this.discordManager = new DiscordManager();
-         } catch (Throwable e) {
-            this.discordManager = null;
-         }
          this.waypointManager = new WaypointManager();
          this.menuScreen = new MenuScreen();
          this.clickGuiScreen = new ClickGuiScreen();
@@ -124,12 +120,9 @@ public enum HuihuiClient implements ClientModInitializer {
    public void shutdown() {
       this.friendManager.save();
       this.staffManager.save();
+      this.targetHudPresetManager.save();
       this.configManager.save();
       this.macroManager.save();
-      if (this.discordManager != null) {
-         this.discordManager.stopRPC();
-      }
-
    }
 
    public static Identifier id(String path) {
@@ -190,6 +183,11 @@ public enum HuihuiClient implements ClientModInitializer {
    }
 
    @Generated
+   public TargetHudPresetManager getTargetHudPresetManager() {
+      return this.targetHudPresetManager;
+   }
+
+   @Generated
    public AutoBuyManager getAutoBuyManager() {
       return this.autoBuyManager;
    }
@@ -212,11 +210,6 @@ public enum HuihuiClient implements ClientModInitializer {
    @Generated
    public ConfigManager getConfigManager() {
       return this.configManager;
-   }
-
-   @Generated
-   public DiscordManager getDiscordManager() {
-      return this.discordManager;
    }
 
 
