@@ -1,11 +1,19 @@
 package tech.huihui.client.modules.impl.render;
 
 import com.darkmagician6.eventapi.EventTarget;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.network.PlayerListEntry;
+import net.minecraft.client.texture.NativeImage;
+import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.client.util.DefaultSkinHelper;
 import net.minecraft.client.util.math.Vector2f;
 import net.minecraft.entity.LivingEntity;
@@ -31,6 +39,7 @@ import tech.huihui.client.modules.api.setting.impl.ButtonSetting;
 import tech.huihui.client.modules.api.setting.impl.ColorSetting;
 import tech.huihui.client.modules.api.setting.impl.ModeSetting;
 import tech.huihui.client.modules.api.setting.impl.NumberSetting;
+import tech.huihui.client.modules.api.setting.impl.StringSetting;
 import tech.huihui.client.modules.impl.combat.Aura;
 import tech.huihui.client.modules.impl.misc.NameProtect;
 import tech.huihui.client.modules.impl.misc.ScoreboardHealth;
@@ -67,16 +76,31 @@ public final class TargetHud extends Module {
    public final ColorSetting bgColor = new ColorSetting("Цвет фона", new ColorRGBA(0, 0, 0, 160));
    public final ColorSetting borderColor = new ColorSetting("Цвет рамки", new ColorRGBA(100, 100, 115, 255));
    public final ColorSetting textColor = new ColorSetting("Цвет текста", ColorRGBA.WHITE);
+   public final ColorSetting barColorSecond = new ColorSetting("Второй цвет полоски", new ColorRGBA(100, 100, 115, 255));
+   public final NumberSetting radius = new NumberSetting("Скругление", 5.0F, 1.0F, 10.0F, 0.5F);
+   public final NumberSetting borderThickness = new NumberSetting("Толщина рамки", 1.0F, 0.5F, 3.0F, 0.1F);
+   public final NumberSetting backgroundAlpha = new NumberSetting("Прозрачность фона", 120.0F, 0.0F, 255.0F, 5.0F);
+   public final NumberSetting animationSpeed = new NumberSetting("Скорость анимации", 1.0F, 0.1F, 3.0F, 0.1F);
+    public final BooleanSetting showArmor = new BooleanSetting("Показывать броню", true);
+    public final BooleanSetting showPing = new BooleanSetting("Показывать пинг", true);
+    public final BooleanSetting showEyes = new BooleanSetting("Глаза на голове", true);
+    public final NumberSetting eyeSize = new NumberSetting("Размер глаз", 1.0F, 0.5F, 2.0F, 0.05F);
+    public final ColorSetting eyeColor = new ColorSetting("Цвет глаз", new ColorRGBA(255, 255, 255, 255));
+    public final ColorSetting pupilColor = new ColorSetting("Цвет зрачка", new ColorRGBA(15, 15, 15, 255));
+    public final StringSetting bgImage = new StringSetting("Картинка фона", "");
+    public final StringSetting headImage = new StringSetting("Картинка головы", "");
    private final ButtonSetting openEditor = new ButtonSetting("открыть редактор таргетхуда", TargetHudEditScreen::openEditor);
    private final Animation visibleAnimation = new Animation(220L, Easing.CIRC_OUT);
    private final Animation healthAnimation = new Animation(250L, Easing.CUBIC_OUT);
    private final Animation outdatedHealthAnimation = new Animation(650L, Easing.CUBIC_OUT);
    private final Animation gappleAnimation = new Animation(250L, Easing.CUBIC_OUT);
    private final Animation toggleAnimationMetanoise = new Animation(1850L, Easing.CIRC_OUT);
-   private boolean dragging;
-   private float dragOffsetX;
-   private float dragOffsetY;
-   private LivingEntity target;
+    private boolean dragging;
+    private float dragOffsetX;
+    private float dragOffsetY;
+    private LivingEntity target;
+    private final Map<String, LoadedImage> imageCache = new HashMap();
+    private final Set<String> failedImages = new HashSet();
    private static final float[][] CUBE_CORNERS = new float[][]{{-1.0F, -1.0F, -1.0F}, {-1.0F, -1.0F, 1.0F}, {-1.0F, 1.0F, -1.0F}, {-1.0F, 1.0F, 1.0F}, {1.0F, -1.0F, -1.0F}, {1.0F, -1.0F, 1.0F}, {1.0F, 1.0F, -1.0F}, {1.0F, 1.0F, 1.0F}};
    private static final HeadFace[] HEAD_FACES = new HeadFace[]{
       new HeadFace(new float[][]{{-1.0F, 1.0F, 1.0F}, {1.0F, 1.0F, 1.0F}, {1.0F, -1.0F, 1.0F}, {-1.0F, -1.0F, 1.0F}}, 0.125F, 0.125F, 0.25F, 0.25F, 1.0F),
@@ -118,6 +142,7 @@ public final class TargetHud extends Module {
       boolean inChat = mc.currentScreen instanceof ChatScreen;
       LivingEntity current = inChat ? mc.player : this.getTarget();
       this.setTarget(current);
+      this.applyAnimationSpeed();
       if (this.visibleAnimation.getValue() == 0.0F || this.target == null) {
          if (inChat && this.visibleAnimation.getValue() == 0.0F) {
             this.renderPlaceholder(event.getContext());
@@ -136,6 +161,7 @@ public final class TargetHud extends Module {
       this.target = mc.player;
       this.visibleAnimation.setValue(1.0F);
       this.toggleAnimationMetanoise.setValue(1.0F);
+      this.applyAnimationSpeed();
       this.updateAnimations();
       this.renderCurrentType(ctx, 1.0F);
    }
@@ -213,6 +239,20 @@ public final class TargetHud extends Module {
       this.bgColor.setColor(preset.getBgColor());
       this.borderColor.setColor(preset.getBorderColor());
       this.textColor.setColor(preset.getTextColor());
+      this.barColorSecond.setColor(preset.getBarColorSecond());
+      this.radius.setCurrent(preset.getRadius());
+      this.borderThickness.setCurrent(preset.getBorderThickness());
+      this.backgroundAlpha.setCurrent(preset.getBackgroundAlpha());
+      this.animationSpeed.setCurrent(preset.getAnimationSpeed());
+      this.showArmor.setEnabled(preset.isShowArmor());
+      this.showPing.setEnabled(preset.isShowPing());
+      this.showEyes.setEnabled(preset.isShowEyes());
+      this.eyeSize.setCurrent(preset.getEyeSize());
+      this.eyeColor.setColor(preset.getEyeColor());
+      this.pupilColor.setColor(preset.getPupilColor());
+      this.bgImage.setValue(preset.getBgImage());
+      this.headImage.setValue(preset.getHeadImage());
+      this.clearImageCache();
    }
 
    public TargetHudPreset toPreset(String name) {
@@ -232,6 +272,19 @@ public final class TargetHud extends Module {
       preset.setBgColor(this.bgColor.getIntColor());
       preset.setBorderColor(this.borderColor.getIntColor());
       preset.setTextColor(this.textColor.getIntColor());
+      preset.setBarColorSecond(this.barColorSecond.getIntColor());
+      preset.setRadius(this.radius.getCurrent());
+      preset.setBorderThickness(this.borderThickness.getCurrent());
+      preset.setBackgroundAlpha(this.backgroundAlpha.getCurrent());
+      preset.setAnimationSpeed(this.animationSpeed.getCurrent());
+      preset.setShowArmor(this.showArmor.isEnabled());
+      preset.setShowPing(this.showPing.isEnabled());
+      preset.setShowEyes(this.showEyes.isEnabled());
+      preset.setEyeSize(this.eyeSize.getCurrent());
+      preset.setEyeColor(this.eyeColor.getIntColor());
+      preset.setPupilColor(this.pupilColor.getIntColor());
+      preset.setBgImage(this.bgImage.getValue());
+      preset.setHeadImage(this.headImage.getValue());
       return preset;
    }
 
@@ -326,13 +379,31 @@ public final class TargetHud extends Module {
    }
 
    private String infoText() {
+      String info;
       if (this.displayMode.is("Проценты")) {
-         return this.percentText();
+         info = this.percentText();
+      } else if (this.displayMode.is("HP")) {
+         info = "HP: " + this.hpText();
+      } else {
+         info = "HP: " + this.hpText() + " (" + this.percentText() + ")";
       }
-      if (this.displayMode.is("HP")) {
-         return "HP: " + this.hpText();
+      if (this.showPing.isEnabled()) {
+         String ping = this.ping();
+         if (ping != null) {
+            info = info + " · " + ping;
+         }
       }
-      return "HP: " + this.hpText() + " (" + this.percentText() + ")";
+      return info;
+   }
+
+   private String ping() {
+      if (this.target instanceof PlayerEntity player) {
+         PlayerListEntry entry = mc.getNetworkHandler().getPlayerListEntry(player.getUuid());
+         if (entry != null) {
+            return "Пинг: " + entry.getLatency() + "мс";
+         }
+      }
+      return null;
    }
 
    private boolean customColorsEnabled() {
@@ -344,7 +415,9 @@ public final class TargetHud extends Module {
    }
 
    private ColorRGBA bgColor(float alpha) {
-      return this.customColorsEnabled() ? this.bgColor.getColor().withAlpha(255.0F * alpha) : (new ColorRGBA(0, 0, 0)).withAlpha(120.0F * alpha);
+      float factor = this.backgroundAlpha.getCurrent() / 255.0F;
+      float a = 255.0F * alpha * factor;
+      return this.customColorsEnabled() ? this.bgColor.getColor().withAlpha(a) : (new ColorRGBA(0, 0, 0)).withAlpha(a);
    }
 
    private ColorRGBA borderColor(float alpha) {
@@ -365,8 +438,9 @@ public final class TargetHud extends Module {
 
    private ColorRGBA[] barColors(float alpha) {
       if (this.customColorsEnabled()) {
-         ColorRGBA c = this.barColor.getColor().withAlpha(255.0F * alpha);
-         return new ColorRGBA[]{c, c, c, c};
+         ColorRGBA a = this.barColor.getColor().withAlpha(255.0F * alpha);
+         ColorRGBA b = this.barColorSecond.getColor().withAlpha(255.0F * alpha);
+         return new ColorRGBA[]{a, b, a, b};
       }
       Theme theme = this.theme();
       return new ColorRGBA[]{theme.getSecondColor().withAlpha(255.0F * alpha), theme.getSecondColor().withAlpha(255.0F * alpha), theme.getColor().withAlpha(255.0F * alpha), theme.getColor().withAlpha(255.0F * alpha)};
@@ -394,6 +468,15 @@ public final class TargetHud extends Module {
       this.gappleAnimation.update(this.target.getAbsorptionAmount() / maxHp);
    }
 
+   private void applyAnimationSpeed() {
+      float speed = this.animationSpeed.getCurrent();
+      this.visibleAnimation.setDuration((long)(220.0F / speed));
+      this.healthAnimation.setDuration((long)(250.0F / speed));
+      this.outdatedHealthAnimation.setDuration((long)(650.0F / speed));
+      this.gappleAnimation.setDuration((long)(250.0F / speed));
+      this.toggleAnimationMetanoise.setDuration((long)(1300.0F / speed));
+   }
+
    private ColorRGBA[] hpColors(Theme theme, float alpha) {
       if (this.customColorsEnabled()) {
          ColorRGBA c = this.barColor.getColor().withAlpha(255.0F * alpha);
@@ -409,9 +492,16 @@ public final class TargetHud extends Module {
       }
    }
 
-   private void drawBackground(CustomDrawContext ctx, float x, float y, float width, float height, float radius, float alpha) {
-      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(radius), this.bgColor(alpha));
-      DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, width, height, 1.0F, BorderRadius.all(radius), this.borderColor(alpha));
+   private void drawBackground(CustomDrawContext ctx, float x, float y, float width, float height, float alpha) {
+      float radius = this.radius.getCurrent();
+      LoadedImage bg = this.loadImage(this.bgImage.getValue());
+      if (bg != null) {
+         this.drawImageCover(ctx, bg, x, y, width, height, radius, alpha);
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(radius), this.bgColor(alpha).withAlpha(255.0F * alpha * 0.4F));
+      } else {
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(radius), this.bgColor(alpha));
+      }
+      DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, width, height, this.borderThickness.getCurrent(), BorderRadius.all(radius), this.borderColor(alpha));
    }
 
    private void drawBar(CustomDrawContext ctx, float x, float y, float width, float height, float radius, float alpha) {
@@ -453,11 +543,100 @@ public final class TargetHud extends Module {
       if (this.headAutoRotate.isEnabled()) {
          yaw += (float)(System.currentTimeMillis() % 4000L) / 4000.0F * 360.0F;
       }
-      if (yaw == 0.0F && pitch == 0.0F) {
+      boolean flat = yaw == 0.0F && pitch == 0.0F;
+      LoadedImage customHead = this.loadImage(this.headImage.getValue());
+      if (customHead != null && flat) {
+         this.drawImageCover(ctx, customHead, x + offset, y + offset, scaled, scaled, 3.0F, alpha);
+      } else if (flat) {
          DrawUtil.drawPlayerHeadWithRoundedShader(ctx.getMatrices(), this.skinTexture(), x + offset, y + offset, scaled, BorderRadius.all(3.0F), ColorRGBA.WHITE.withAlpha(255.0F * alpha));
       } else {
          this.drawHead3D(ctx, x + offset, y + offset, scaled, alpha, yaw, pitch);
       }
+      if (this.showEyes.isEnabled() && flat) {
+         this.drawEyes(ctx, x + offset, y + offset, scaled, alpha);
+      }
+   }
+
+   private void drawEyes(CustomDrawContext ctx, float x, float y, float size, float alpha) {
+      float s = size * this.eyeSize.getCurrent();
+      float eyeW = s * 0.22F;
+      float eyeH = s * 0.24F;
+      long t = System.currentTimeMillis() % 4200L;
+      float blink = 1.0F;
+      if (t > 3800L) {
+         blink = Math.max(0.1F, 1.0F - (float)(t - 3800L) / 400.0F);
+      }
+      float eH = eyeH * blink;
+      float eyeY = y + size * 0.24F + (eyeH - eH) / 2.0F;
+      ColorRGBA white = this.eyeColor.getColor().withAlpha(255.0F * alpha);
+      ColorRGBA pupil = this.pupilColor.getColor().withAlpha(255.0F * alpha);
+      this.drawSingleEye(ctx, x + size * 0.16F, eyeY, eyeW, eH, white, pupil, alpha);
+      this.drawSingleEye(ctx, x + size * 0.62F, eyeY, eyeW, eH, white, pupil, alpha);
+   }
+
+   private void drawSingleEye(CustomDrawContext ctx, float x, float y, float w, float h, ColorRGBA white, ColorRGBA pupil, float alpha) {
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, w, h, BorderRadius.all(h / 2.0F), white);
+      float pupilW = w * 0.5F;
+      float pupilH = h * 0.6F;
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + w / 2.0F - pupilW / 2.0F, y + h / 2.0F - pupilH / 2.0F, pupilW, pupilH, BorderRadius.all(pupilH / 2.0F), pupil);
+      float highlight = pupilW * 0.4F;
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + w / 2.0F + pupilW * 0.15F, y + h / 2.0F - pupilH * 0.35F, highlight, highlight, BorderRadius.all(highlight / 2.0F), ColorRGBA.WHITE.withAlpha(200.0F * alpha));
+   }
+
+   private LoadedImage loadImage(String path) {
+      if (path == null || path.isEmpty()) {
+         return null;
+      }
+      LoadedImage cached = this.imageCache.get(path);
+      if (cached != null) {
+         return cached;
+      }
+      try {
+         NativeImage image = NativeImage.read(Files.newInputStream(Path.of(path)));
+         int width = image.getWidth();
+         int height = image.getHeight();
+         NativeImageBackedTexture texture = new NativeImageBackedTexture(image);
+         Identifier id = Identifier.of("huihui", "targethud_" + Integer.toHexString(path.hashCode()));
+         mc.getTextureManager().registerTexture(id, texture);
+         texture.upload();
+         LoadedImage loaded = new LoadedImage(id, width, height);
+         this.imageCache.put(path, loaded);
+         this.failedImages.remove(path);
+         return loaded;
+      } catch (Exception var9) {
+         if (this.failedImages.add(path)) {
+            var9.printStackTrace();
+         }
+         return null;
+      }
+   }
+
+   public void clearImageCache() {
+      this.imageCache.clear();
+      this.failedImages.clear();
+   }
+
+   public boolean hasImageError(String path) {
+      return path != null && !path.isEmpty() && this.failedImages.contains(path);
+   }
+
+   private void drawImageCover(CustomDrawContext ctx, LoadedImage image, float x, float y, float width, float height, float radius, float alpha) {
+      float imageAspect = (float)image.width / (float)image.height;
+      float boxAspect = width / height;
+      float u1 = 0.0F;
+      float u2 = 1.0F;
+      float v1 = 0.0F;
+      float v2 = 1.0F;
+      if (imageAspect > boxAspect) {
+         float crop = 1.0F - boxAspect / imageAspect;
+         u1 = crop / 2.0F;
+         u2 = 1.0F - crop / 2.0F;
+      } else {
+         float crop = 1.0F - imageAspect / boxAspect;
+         v1 = crop / 2.0F;
+         v2 = 1.0F - crop / 2.0F;
+      }
+      DrawUtil.drawRoundedTextureWithUV(ctx.getMatrices(), image.id, x, y, width, height, BorderRadius.all(radius), ColorRGBA.WHITE.withAlpha(255.0F * alpha), u1, v1, u2, v2);
    }
 
    private void drawHead3D(CustomDrawContext ctx, float x, float y, float size, float alpha, float yawDeg, float pitchDeg) {
@@ -546,14 +725,16 @@ public final class TargetHud extends Module {
       float y = this.y.getCurrent();
       float width = 132.0F;
       float height = 48.0F;
-      this.drawBackground(ctx, x, y, width, height, 5.0F, alpha);
+      this.drawBackground(ctx, x, y, width, height, alpha);
       this.drawHead(ctx, x + 5.0F, y + 5.0F, 32.0F, alpha);
       MsdfRenderer.renderText(Fonts.ROUND_BOLD, this.name(), 8.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 43.0F, y + 6.0F, 0.0F, true, 0.7F, 1.0F, 82.0F);
       String big = this.bigText();
       ctx.drawText(Fonts.REGULAR.getFont(6.5F), big, x + 43.0F, y + 18.0F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
       ctx.drawText(Fonts.REGULAR.getFont(6.5F), this.secondaryText(), x + 43.0F + Fonts.REGULAR.getWidth(big, 6.5F) + 3.0F, y + 18.0F, this.textColor(alpha));
       this.drawBar(ctx, x + 43.0F, y + 28.0F, 84.0F, 4.0F, 2.0F, alpha);
-      this.drawArmor(ctx, x + 4.0F, y + 37.0F, 10.0F, alpha);
+      if (this.showArmor.isEnabled()) {
+         this.drawArmor(ctx, x + 4.0F, y + 37.0F, 10.0F, alpha);
+      }
    }
 
    private void renderSmall(CustomDrawContext ctx, float alpha) {
@@ -562,7 +743,7 @@ public final class TargetHud extends Module {
       float y = this.y.getCurrent();
       float width = 84.0F;
       float height = 20.0F;
-      this.drawBackground(ctx, x, y, width, height, 4.0F, alpha);
+      this.drawBackground(ctx, x, y, width, height, alpha);
       this.drawHead(ctx, x + 3.0F, y + 3.0F, 14.0F, alpha);
       MsdfRenderer.renderText(Fonts.REGULAR, this.name(), 6.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 20.0F, y + 3.0F, 0.0F, true, 0.7F, 1.0F, 58.0F);
       ColorRGBA percentColor = this.hpColors(this.theme(), 1.0F)[0];
@@ -576,7 +757,7 @@ public final class TargetHud extends Module {
       float y = this.y.getCurrent();
       float width = 112.0F;
       float height = 42.0F;
-      this.drawBackground(ctx, x, y, width, height, 5.0F, alpha);
+      this.drawBackground(ctx, x, y, width, height, alpha);
       MsdfRenderer.renderText(Fonts.REGULAR, this.name(), 7.0F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 56.0F - Fonts.REGULAR.getWidth(this.name(), 7.0F) / 2.0F, y + 4.0F, 0.0F, true, 0.7F, 1.0F, 106.0F);
       ColorRGBA[] colors = this.hpColors(this.theme(), alpha);
       String big = this.bigText();
@@ -591,7 +772,7 @@ public final class TargetHud extends Module {
       float y = this.y.getCurrent();
       float width = 124.0F;
       float height = 34.0F;
-      this.drawBackground(ctx, x, y, width, height, 5.0F, alpha);
+      this.drawBackground(ctx, x, y, width, height, alpha);
       MsdfRenderer.renderText(Fonts.SEMIBOLD, this.name(), 7.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 6.0F, y + 3.0F, 0.0F, true, 0.7F, 1.0F, 112.0F);
       ctx.drawText(Fonts.REGULAR.getFont(6.0F), this.infoText(), x + 6.0F, y + 11.5F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
       this.drawBar(ctx, x + 6.0F, y + 20.0F, width - 12.0F, 10.0F, 2.0F, alpha);
@@ -605,7 +786,7 @@ public final class TargetHud extends Module {
       float y = this.y.getCurrent();
       float width = 74.0F;
       float height = 58.0F;
-      this.drawBackground(ctx, x, y, width, height, 5.0F, alpha);
+      this.drawBackground(ctx, x, y, width, height, alpha);
       float barHeight = 50.0F * this.barThickness.getCurrent();
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 4.0F, 8.0F, barHeight, BorderRadius.all(2.0F), this.trackColor(alpha));
       float outdatedH = MathHelper.clamp(barHeight * this.outdatedHealthAnimation.getValue(), 0.0F, barHeight);
@@ -644,7 +825,9 @@ public final class TargetHud extends Module {
       ctx.drawText(Fonts.REGULAR.getFont(6.5F), this.infoText(), x + 29.75F, y + 14.25F, this.textColor(alpha));
       this.drawBar(ctx, x + 29.0F, y + 22.0F, width - 33.0F, 3.25F, 0.25F, alpha);
       StencilUtil.pop();
-      this.drawArmor(ctx, x + 3.0F, y - 12.0F, 10.0F, alpha);
+      if (this.showArmor.isEnabled()) {
+         this.drawArmor(ctx, x + 3.0F, y - 12.0F, 10.0F, alpha);
+      }
    }
 
    private void renderMini(CustomDrawContext ctx, float alpha) {
@@ -653,7 +836,7 @@ public final class TargetHud extends Module {
       float y = this.y.getCurrent();
       float width = 64.0F;
       float height = 16.0F;
-      this.drawBackground(ctx, x, y, width, height, 3.0F, alpha);
+      this.drawBackground(ctx, x, y, width, height, alpha);
       MsdfRenderer.renderText(Fonts.REGULAR, this.name(), 6.0F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 4.0F, y + 1.5F, 0.0F, true, 0.7F, 1.0F, 38.0F);
       ctx.drawText(Fonts.REGULAR.getFont(5.5F), this.bigText(), x + 44.0F, y + 2.0F, this.hpColors(this.theme(), alpha)[0]);
       this.drawBar(ctx, x + 4.0F, y + 12.0F, 56.0F, 2.0F, 1.0F, alpha);
@@ -665,14 +848,19 @@ public final class TargetHud extends Module {
       float y = this.y.getCurrent();
       float width = 112.0F;
       float height = 38.0F;
+      LoadedImage bg = this.loadImage(this.bgImage.getValue());
+      if (bg != null) {
+         this.drawImageCover(ctx, bg, x, y, width, height, this.radius.getCurrent(), alpha);
+      }
       if (this.customColorsEnabled()) {
          ColorRGBA a = this.barColor.getColor();
-         DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(5.0F), a.withAlpha(40.0F * alpha), a.withAlpha(10.0F * alpha), a.withAlpha(10.0F * alpha), a.withAlpha(40.0F * alpha));
-         DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, width, height, 1.0F, BorderRadius.all(5.0F), this.borderColor(alpha));
+         ColorRGBA b = this.barColorSecond.getColor();
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(this.radius.getCurrent()), a.withAlpha(40.0F * alpha), b.withAlpha(10.0F * alpha), b.withAlpha(10.0F * alpha), a.withAlpha(40.0F * alpha));
+         DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, width, height, this.borderThickness.getCurrent(), BorderRadius.all(this.radius.getCurrent()), this.borderColor(alpha));
       } else {
          Theme theme = this.theme();
-         DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(5.0F), theme.getColor().withAlpha(40.0F * alpha), theme.getColor().withAlpha(10.0F * alpha), theme.getSecondColor().withAlpha(10.0F * alpha), theme.getSecondColor().withAlpha(40.0F * alpha));
-         DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, width, height, 1.0F, BorderRadius.all(5.0F), theme.getSecondColor().withAlpha(255.0F * alpha));
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(this.radius.getCurrent()), theme.getColor().withAlpha(40.0F * alpha), theme.getColor().withAlpha(10.0F * alpha), theme.getSecondColor().withAlpha(10.0F * alpha), theme.getSecondColor().withAlpha(40.0F * alpha));
+         DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, width, height, this.borderThickness.getCurrent(), BorderRadius.all(this.radius.getCurrent()), theme.getSecondColor().withAlpha(255.0F * alpha));
       }
       this.drawHead(ctx, x + 6.0F, y + 7.0F, 24.0F, alpha);
       MsdfRenderer.renderText(Fonts.SEMIBOLD, this.name(), 7.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 36.0F, y + 6.0F, 0.0F, true, 0.7F, 1.0F, 70.0F);
@@ -692,7 +880,7 @@ public final class TargetHud extends Module {
       float y = this.y.getCurrent();
       float width = 180.0F;
       float height = 34.0F;
-      this.drawBackground(ctx, x, y, width, height, 3.0F, alpha);
+      this.drawBackground(ctx, x, y, width, height, alpha);
       MsdfRenderer.renderText(Fonts.SEMIBOLD, this.name(), 7.0F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 6.0F, y + 3.0F, 0.0F, true, 0.7F, 1.0F, 168.0F);
       float barH = 8.0F * this.barThickness.getCurrent();
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 13.0F, width - 8.0F, barH, BorderRadius.all(2.0F), this.trackColor(alpha));
@@ -739,6 +927,18 @@ public final class TargetHud extends Module {
          this.u2 = u2;
          this.v2 = v2;
          this.scale = scale;
+      }
+   }
+
+   private static final class LoadedImage {
+      private final Identifier id;
+      private final int width;
+      private final int height;
+
+      private LoadedImage(Identifier id, int width, int height) {
+         this.id = id;
+         this.width = width;
+         this.height = height;
       }
    }
 }

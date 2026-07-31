@@ -29,8 +29,10 @@ import tech.huihui.client.modules.impl.combat.Aura;
 import tech.huihui.client.modules.impl.combat.AutoSwap;
 import tech.huihui.client.modules.impl.combat.AutoTotem;
 import tech.huihui.client.modules.impl.combat.ClickPearl;
+import tech.huihui.client.modules.impl.combat.TargetPearl;
 import tech.huihui.client.modules.impl.misc.AHHelper;
 import tech.huihui.client.modules.impl.misc.AutoAccept;
+import tech.huihui.client.modules.impl.misc.AutoKit;
 import tech.huihui.client.modules.impl.misc.AutoRespawn;
 import tech.huihui.client.modules.impl.misc.ClickAction;
 import tech.huihui.client.modules.impl.misc.ElytraHelper;
@@ -49,6 +51,7 @@ import tech.huihui.client.modules.impl.movement.ElytraRecast;
 import tech.huihui.client.modules.impl.movement.GuiWalk;
 import tech.huihui.client.modules.impl.movement.NoSlow;
 import tech.huihui.client.modules.impl.movement.NoWeb;
+import tech.huihui.client.modules.impl.movement.SpiderMatrix;
 import tech.huihui.client.modules.impl.movement.Speed;
 import tech.huihui.client.modules.impl.player.AutoArmor;
 import tech.huihui.client.modules.impl.player.AutoTool;
@@ -63,11 +66,14 @@ import tech.huihui.client.modules.impl.render.ClickGUI;
 import tech.huihui.client.modules.impl.render.EditClickGUI;
 import tech.huihui.client.modules.impl.render.EntityESP;
 import tech.huihui.client.modules.impl.render.FullBright;
+import tech.huihui.client.modules.impl.render.GlowHands;
 import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.client.modules.impl.render.Menu;
 import tech.huihui.client.modules.impl.render.NoRender;
+import tech.huihui.client.modules.impl.render.Optimization;
+import tech.huihui.client.modules.impl.render.ShulkerPreview;
 import tech.huihui.client.modules.impl.render.Predictions;
-import tech.huihui.client.modules.impl.render.SupplyESP;
+import tech.huihui.client.modules.impl.render.AresMinePvPWarpChest;
 import tech.huihui.client.modules.impl.render.SwingAnimation;
 import tech.huihui.client.modules.impl.render.TargetESP;
 import tech.huihui.client.modules.impl.render.TargetHud;
@@ -107,6 +113,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(AutoSwap.INSTANCE);
       registerModule(AutoTotem.INSTANCE);
       registerModule(ClickPearl.INSTANCE);
+      registerModule(TargetPearl.INSTANCE);
    }
 
    private void registerMovement() {
@@ -119,6 +126,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(AirStuck.INSTANCE);
       registerModule(ElytraMotion.INSTANCE);
       registerModule(NoWeb.INSTANCE);
+      registerModule(SpiderMatrix.INSTANCE);
    }
 
    private void registerRender() {
@@ -132,12 +140,15 @@ public final class ModuleManager implements IMinecraft {
       registerModule(ViewModel.INSTANCE);
       registerModule(CustomFog.INSTANCE);
       registerModule(FullBright.INSTANCE);
+      registerModule(GlowHands.INSTANCE);
+      registerModule(Optimization.INSTANCE);
+      registerModule(ShulkerPreview.INSTANCE);
       registerModule(WorldTime.INSTANCE);
       registerModule(ClickGUI.INSTANCE);
       registerModule(EditClickGUI.INSTANCE);
       registerModule(EntityESP.INSTANCE);
       registerModule(TargetESP.INSTANCE);
-      registerModule(SupplyESP.INSTANCE);
+      registerModule(AresMinePvPWarpChest.INSTANCE);
       registerModule(TargetHud.INSTANCE);
    }
 
@@ -160,6 +171,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(NoInteract.INSTANCE);
       registerModule(AutoAccept.INSTANCE);
       registerModule(AutoRespawn.INSTANCE);
+      registerModule(AutoKit.INSTANCE);
       registerModule(NameProtect.INSTANCE);
       registerModule(ScoreboardHealth.INSTANCE);
       registerModule(ElytraAccelerate.INSTANCE);

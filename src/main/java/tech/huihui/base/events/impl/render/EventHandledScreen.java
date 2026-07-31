@@ -10,6 +10,8 @@ public class EventHandledScreen implements Event {
    private final Slot slotHover;
    private final int backgroundWidth;
    private final int backgroundHeight;
+   private final int mouseX;
+   private final int mouseY;
 
    @Generated
    public DrawContext getDrawContext() {
@@ -32,10 +34,22 @@ public class EventHandledScreen implements Event {
    }
 
    @Generated
-   public EventHandledScreen(DrawContext drawContext, Slot slotHover, int backgroundWidth, int backgroundHeight) {
+   public int getMouseX() {
+      return this.mouseX;
+   }
+
+   @Generated
+   public int getMouseY() {
+      return this.mouseY;
+   }
+
+   @Generated
+   public EventHandledScreen(DrawContext drawContext, Slot slotHover, int backgroundWidth, int backgroundHeight, int mouseX, int mouseY) {
       this.drawContext = drawContext;
       this.slotHover = slotHover;
       this.backgroundWidth = backgroundWidth;
       this.backgroundHeight = backgroundHeight;
+      this.mouseX = mouseX;
+      this.mouseY = mouseY;
    }
 }

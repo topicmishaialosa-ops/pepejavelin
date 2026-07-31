@@ -1,5 +1,9 @@
 package tech.huihui.client.screens.targethud;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.gui.DrawContext;
@@ -10,8 +14,10 @@ import net.minecraft.util.math.MathHelper;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.font.Fonts;
 import tech.huihui.base.theme.Theme;
+import tech.huihui.client.modules.api.setting.impl.BooleanSetting;
 import tech.huihui.client.modules.api.setting.impl.ColorSetting;
 import tech.huihui.client.modules.api.setting.impl.NumberSetting;
+import tech.huihui.client.modules.api.setting.impl.StringSetting;
 import tech.huihui.client.modules.impl.render.TargetHud;
 import tech.huihui.utility.interfaces.IMinecraft;
 import tech.huihui.utility.math.MathUtil;
@@ -23,7 +29,17 @@ import tech.huihui.utility.render.display.shader.DrawUtil;
 public final class TargetHudEditScreen extends Screen implements IMinecraft {
    private static final String[] PRESETS = {"Крупный", "Маленький", "Проценты", "Большая полоса", "Вертикальный", "Метал", "Мини", "Градиент", "Боссбар", "Минимал"};
    private static final String[] MODES = {"Проценты и HP", "Проценты", "HP"};
-   private static final String[] COLOR_NAMES = {"Цвет полоски", "Цвет фона", "Цвет рамки", "Цвет текста"};
+   private static final String[] COLOR_NAMES = {"Цвет полоски", "Второй цвет полоски", "Цвет фона", "Цвет рамки", "Цвет текста"};
+   private static final String[] SLIDER_NAMES = {"Толщина полоски", "Размер иконки головы", "Поворот головы", "Наклон головы", "Скругление", "Толщина рамки", "Прозрачность фона", "Скорость анимации"};
+   private static final float[] SLIDER_LABEL_Y = {30.0F, 60.0F, 90.0F, 120.0F, 242.0F, 272.0F, 302.0F, 332.0F};
+   private static final float[] SLIDER_TRACK_Y = {44.0F, 74.0F, 104.0F, 134.0F, 256.0F, 286.0F, 316.0F, 346.0F};
+    private static final String[] TOGGLE_NAMES = {"Автоповорот головы", "Свои цвета", "Показывать броню", "Показывать пинг", "Глаза на голове"};
+    private static final float[] TOGGLE_Y = {146.0F, 218.0F, 364.0F, 390.0F, 416.0F};
+    private static final float COLOR_START_Y = 434.0F;
+    private static final float IMAGE_ROW_Y = 528.0F;
+    private static final float IMAGE_STATUS_Y = 547.0F;
+    private static final float IMAGE_ROW_2_Y = 566.0F;
+    private static final float IMAGE_STATUS_2_Y = 585.0F;
    private static final int EXIT_WIDTH = 50;
    private static final int EXIT_HEIGHT = 16;
    private static final int EXIT_OFFSET = 10;
@@ -38,18 +54,21 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
    private boolean dragging;
    private float dragOffsetX;
    private float dragOffsetY;
-   private DragTarget dragTarget = DragTarget.NONE;
+   private int dragSlider = -1;
    private ColorSetting activeColor;
    private final float[] hsb = new float[3];
    private boolean draggingPicker;
    private boolean draggingHue;
-   private float scroll;
-   private TextFieldWidget nameField;
-   private boolean initialized;
-
-   private enum DragTarget {
-      NONE, THICKNESS, HEAD_SIZE, HEAD_YAW, HEAD_PITCH
-   }
+    private float scroll;
+    private float panelScroll;
+    private TextFieldWidget nameField;
+    private boolean initialized;
+    private boolean importOpen;
+    private StringSetting importSetting;
+    private Path importDir;
+    private float importScroll;
+    private static final float IMPORT_WIDTH = 340.0F;
+    private static final float IMPORT_HEIGHT = 260.0F;
 
    public TargetHudEditScreen(TargetHud module) {
       super(Text.literal("Редактор таргетхуда"));
@@ -78,6 +97,18 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
       return this.nameField;
    }
 
+   private NumberSetting[] sliders() {
+      return new NumberSetting[]{this.module.barThickness, this.module.headSize, this.module.headYaw, this.module.headPitch, this.module.radius, this.module.borderThickness, this.module.backgroundAlpha, this.module.animationSpeed};
+   }
+
+    private BooleanSetting[] toggles() {
+       return new BooleanSetting[]{this.module.headAutoRotate, this.module.customColors, this.module.showArmor, this.module.showPing, this.module.showEyes};
+    }
+
+   private ColorSetting[] colors() {
+      return new ColorSetting[]{this.module.barColor, this.module.barColorSecond, this.module.bgColor, this.module.borderColor, this.module.textColor};
+   }
+
    private float panelX() {
       return this.width - PANEL_WIDTH - PANEL_OFFSET;
    }
@@ -86,12 +117,17 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
       return 20.0F;
    }
 
-   private float panelHeight() {
-      float h = this.colorStartY() + 72.0F;
-      if (this.activeColor != null) {
-         h += 66.0F;
-      }
-      return h + 10.0F - this.panelY();
+   private float panelBoxHeight() {
+      return Math.max(240.0F, this.height - this.panelY() - 24.0F);
+   }
+
+    private float panelContentHeight() {
+       float bottom = this.activeColor != null ? this.pickerYOffset() + PICKER_HEIGHT : IMAGE_STATUS_2_Y + 20.0F;
+       return bottom + 10.0F;
+    }
+
+   private float contentY(float offset) {
+      return this.panelY() + offset - this.panelScroll;
    }
 
    private float sliderTrackX() {
@@ -102,56 +138,16 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
       return PANEL_WIDTH - PANEL_PADDING * 2.0F;
    }
 
-   private float thicknessTrackY() {
-      return this.panelY() + 44.0F;
-   }
-
-   private float headSizeTrackY() {
-      return this.panelY() + 74.0F;
-   }
-
-   private float headYawTrackY() {
-      return this.panelY() + 104.0F;
-   }
-
-   private float headPitchTrackY() {
-      return this.panelY() + 134.0F;
-   }
-
-   private float autoRotateToggleY() {
-      return this.panelY() + 160.0F;
-   }
-
-   private float modeRowY() {
-      return this.panelY() + 190.0F;
-   }
-
-   private float modeButtonWidth() {
-      return (PANEL_WIDTH - PANEL_PADDING * 2.0F - 8.0F) / 3.0F;
-   }
-
-   private float modeButtonX(int index) {
-      return this.panelX() + PANEL_PADDING + index * (this.modeButtonWidth() + 4.0F);
-   }
-
-   private float customToggleY() {
-      return this.panelY() + 222.0F;
-   }
-
-   private float colorStartY() {
-      return this.panelY() + 244.0F;
-   }
-
    private float colorRowY(int index) {
-      return this.colorStartY() + index * 18.0F;
+      return COLOR_START_Y + (float)index * 18.0F;
    }
+
+    private float pickerYOffset() {
+       return COLOR_START_Y + 166.0F;
+    }
 
    private float pickerX() {
       return this.panelX() + PANEL_PADDING + 8.0F;
-   }
-
-   private float pickerY() {
-      return this.colorStartY() + 78.0F;
    }
 
    private float pickerWidth() {
@@ -178,6 +174,10 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
       return Math.max(this.bottomBarY() - this.listY() - 10.0F, 40.0F);
    }
 
+   private boolean inPanel(double mouseX, double mouseY) {
+      return mouseX >= this.panelX() && mouseX <= this.panelX() + PANEL_WIDTH && mouseY >= this.panelY() + 34.0F && mouseY <= this.panelY() + this.panelBoxHeight();
+   }
+
    @Override
    public void render(DrawContext context, int mouseX, int mouseY, float tickDelta) {
       super.render(context, mouseX, mouseY, tickDelta);
@@ -194,7 +194,7 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
       draw.drawText(Fonts.REGULAR.getFont(5.5F), "Выход", exitX + EXIT_WIDTH / 2.0F - Fonts.REGULAR.getWidth("Выход", 5.5F) / 2.0F, exitY + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
 
       draw.drawText(Fonts.REGULAR.getFont(6.0F), "Редактор таргетхуда", EXIT_OFFSET, EXIT_OFFSET, new ColorRGBA(222, 222, 222).withAlpha(255));
-      draw.drawText(Fonts.REGULAR.getFont(5.0F), "Тащи таргетхуд мышью — позиция. Колесо над списком — прокрутка", EXIT_OFFSET, EXIT_OFFSET + 12.0F, new ColorRGBA(153, 153, 153).withAlpha(255));
+      draw.drawText(Fonts.REGULAR.getFont(5.0F), "Тащи таргетхуд мышью — позиция. Колесо — прокрутка списка и панели", EXIT_OFFSET, EXIT_OFFSET + 12.0F, new ColorRGBA(153, 153, 153).withAlpha(255));
 
       this.renderPresetSelector(draw, theme, mouseX, mouseY);
       this.renderPresetList(draw, theme, mouseX, mouseY);
@@ -205,6 +205,10 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
          this.module.renderPreview(draw);
       } catch (Exception var13) {
          var13.printStackTrace();
+      }
+
+      if (this.importOpen) {
+         this.renderImportDialog(draw, theme, mouseX, mouseY);
       }
 
       String pos = "X: " + String.format(Locale.US, "%.0f", this.module.x.getCurrent()) + " · Y: " + String.format(Locale.US, "%.0f", this.module.y.getCurrent());
@@ -272,42 +276,53 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
    private void renderPanel(CustomDrawContext draw, Theme theme, float mouseX, float mouseY) {
       float x = this.panelX();
       float y = this.panelY();
-      DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, PANEL_WIDTH, this.panelHeight(), BorderRadius.all(5.0F), new ColorRGBA(15, 15, 15).withAlpha(200));
-      DrawUtil.drawRoundedBorder(draw.getMatrices(), x, y, PANEL_WIDTH, this.panelHeight(), 1.0F, BorderRadius.all(5.0F), theme.getSecondColor().darker(0.5F).withAlpha(180));
+      float boxH = this.panelBoxHeight();
+      this.panelScroll = MathHelper.clamp(this.panelScroll, 0.0F, Math.max(this.panelContentHeight() - boxH, 0.0F));
 
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, PANEL_WIDTH, boxH, BorderRadius.all(5.0F), new ColorRGBA(15, 15, 15).withAlpha(200));
+      DrawUtil.drawRoundedBorder(draw.getMatrices(), x, y, PANEL_WIDTH, boxH, 1.0F, BorderRadius.all(5.0F), theme.getSecondColor().darker(0.5F).withAlpha(180));
       draw.drawText(Fonts.REGULAR.getFont(6.0F), "Настройки", x + PANEL_PADDING, y + 12.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+      draw.drawText(Fonts.REGULAR.getFont(4.5F), "Колесо над панелью — прокрутка", x + PANEL_PADDING, y + 23.0F, new ColorRGBA(120, 120, 120).withAlpha(255));
 
-      this.renderSlider(draw, theme, y + 30.0F, this.thicknessTrackY(), "Толщина полоски", this.module.barThickness);
-      this.renderSlider(draw, theme, y + 60.0F, this.headSizeTrackY(), "Размер иконки головы", this.module.headSize);
-      this.renderSlider(draw, theme, y + 90.0F, this.headYawTrackY(), "Поворот головы", this.module.headYaw);
-      this.renderSlider(draw, theme, y + 120.0F, this.headPitchTrackY(), "Наклон головы", this.module.headPitch);
+      draw.enableScissor((int)x, (int)(y + 34.0F), (int)(x + PANEL_WIDTH), (int)(y + boxH));
+      this.renderPanelContent(draw, theme, mouseX, mouseY);
+      draw.disableScissor();
+   }
 
-      boolean auto = this.module.headAutoRotate.isEnabled();
-      draw.drawText(Fonts.REGULAR.getFont(5.5F), "Автоповорот головы", x + PANEL_PADDING, y + 150.0F, new ColorRGBA(153, 153, 153).withAlpha(255));
-      boolean autoHovered = MathUtil.isHovered(mouseX, mouseY, x + PANEL_WIDTH - PANEL_PADDING - 50.0F, this.autoRotateToggleY(), 50.0F, 16.0F);
-      DrawUtil.drawRoundedRect(draw.getMatrices(), x + PANEL_WIDTH - PANEL_PADDING - 50.0F, this.autoRotateToggleY(), 50.0F, 16.0F, BorderRadius.all(8.0F), auto ? theme.getColor().withAlpha(180) : new ColorRGBA(40, 40, 40).withAlpha(255));
-      draw.drawText(Fonts.REGULAR.getFont(5.0F), auto ? "Вкл" : "Выкл", x + PANEL_WIDTH - PANEL_PADDING - 25.0F - Fonts.REGULAR.getWidth(auto ? "Вкл" : "Выкл", 5.0F) / 2.0F, this.autoRotateToggleY() + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+   private void renderPanelContent(CustomDrawContext draw, Theme theme, float mouseX, float mouseY) {
+      float x = this.panelX();
 
-      draw.drawText(Fonts.REGULAR.getFont(5.5F), "Отображение", x + PANEL_PADDING, y + 180.0F, new ColorRGBA(153, 153, 153).withAlpha(255));
-      for (int i = 0; i < MODES.length; i++) {
-         boolean selected = this.module.displayMode.is(MODES[i]);
-         boolean hovered = MathUtil.isHovered(mouseX, mouseY, this.modeButtonX(i), this.modeRowY(), this.modeButtonWidth(), 16.0F);
-         ColorRGBA bg = selected ? theme.getColor().withAlpha(160) : hovered ? theme.getColor().withAlpha(90) : new ColorRGBA(40, 40, 40).withAlpha(255);
-         DrawUtil.drawRoundedRect(draw.getMatrices(), this.modeButtonX(i), this.modeRowY(), this.modeButtonWidth(), 16.0F, BorderRadius.all(3.0F), bg);
-         String label = MODES[i];
-         draw.drawText(Fonts.REGULAR.getFont(4.5F), label, this.modeButtonX(i) + this.modeButtonWidth() / 2.0F - Fonts.REGULAR.getWidth(label, 4.5F) / 2.0F, this.modeRowY() + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+      NumberSetting[] sliders = this.sliders();
+      for (int i = 0; i < sliders.length; i++) {
+         this.renderSlider(draw, theme, this.contentY(SLIDER_LABEL_Y[i]), this.contentY(SLIDER_TRACK_Y[i]), SLIDER_NAMES[i], sliders[i]);
       }
 
-      boolean custom = this.module.customColors.isEnabled();
-      draw.drawText(Fonts.REGULAR.getFont(5.5F), "Свои цвета", x + PANEL_PADDING, y + 211.0F, new ColorRGBA(153, 153, 153).withAlpha(255));
-      boolean customHovered = MathUtil.isHovered(mouseX, mouseY, x + PANEL_WIDTH - PANEL_PADDING - 50.0F, this.customToggleY(), 50.0F, 16.0F);
-      DrawUtil.drawRoundedRect(draw.getMatrices(), x + PANEL_WIDTH - PANEL_PADDING - 50.0F, this.customToggleY(), 50.0F, 16.0F, BorderRadius.all(8.0F), custom ? theme.getColor().withAlpha(180) : new ColorRGBA(40, 40, 40).withAlpha(255));
-      draw.drawText(Fonts.REGULAR.getFont(5.0F), custom ? "Вкл" : "Выкл", x + PANEL_WIDTH - PANEL_PADDING - 25.0F - Fonts.REGULAR.getWidth(custom ? "Вкл" : "Выкл", 5.0F) / 2.0F, this.customToggleY() + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+      BooleanSetting[] toggles = this.toggles();
+      for (int i = 0; i < toggles.length; i++) {
+         float ty = this.contentY(TOGGLE_Y[i]);
+         boolean enabled = toggles[i].isEnabled();
+         draw.drawText(Fonts.REGULAR.getFont(5.5F), TOGGLE_NAMES[i], x + PANEL_PADDING, ty, new ColorRGBA(153, 153, 153).withAlpha(255));
+         float tx = x + PANEL_WIDTH - PANEL_PADDING - 50.0F;
+         boolean hovered = MathUtil.isHovered(mouseX, mouseY, tx, ty, 50.0F, 16.0F);
+         DrawUtil.drawRoundedRect(draw.getMatrices(), tx, ty, 50.0F, 16.0F, BorderRadius.all(8.0F), enabled ? theme.getColor().withAlpha(hovered ? 210 : 180) : hovered ? new ColorRGBA(58, 58, 58).withAlpha(255) : new ColorRGBA(40, 40, 40).withAlpha(255));
+         draw.drawText(Fonts.REGULAR.getFont(5.0F), enabled ? "Вкл" : "Выкл", tx + 25.0F - Fonts.REGULAR.getWidth(enabled ? "Вкл" : "Выкл", 5.0F) / 2.0F, ty + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+      }
 
-      ColorSetting[] colors = {this.module.barColor, this.module.bgColor, this.module.borderColor, this.module.textColor};
-      float alpha = custom ? 1.0F : 0.35F;
+      draw.drawText(Fonts.REGULAR.getFont(5.5F), "Отображение", x + PANEL_PADDING, this.contentY(176.0F), new ColorRGBA(153, 153, 153).withAlpha(255));
+      float modeY = this.contentY(190.0F);
+      for (int i = 0; i < MODES.length; i++) {
+         boolean selected = this.module.displayMode.is(MODES[i]);
+         boolean hovered = MathUtil.isHovered(mouseX, mouseY, this.modeButtonX(i), modeY, this.modeButtonWidth(), 16.0F);
+         ColorRGBA bg = selected ? theme.getColor().withAlpha(160) : hovered ? theme.getColor().withAlpha(90) : new ColorRGBA(40, 40, 40).withAlpha(255);
+         DrawUtil.drawRoundedRect(draw.getMatrices(), this.modeButtonX(i), modeY, this.modeButtonWidth(), 16.0F, BorderRadius.all(3.0F), bg);
+         String label = MODES[i];
+         draw.drawText(Fonts.REGULAR.getFont(4.5F), label, this.modeButtonX(i) + this.modeButtonWidth() / 2.0F - Fonts.REGULAR.getWidth(label, 4.5F) / 2.0F, modeY + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+      }
+
+      ColorSetting[] colors = this.colors();
+      float alpha = this.module.customColors.isEnabled() ? 1.0F : 0.35F;
       for (int i = 0; i < colors.length; i++) {
-         float rowY = this.colorRowY(i);
+         float rowY = this.contentY(this.colorRowY(i));
          boolean hovered = MathUtil.isHovered(mouseX, mouseY, x + PANEL_PADDING, rowY, this.sliderTrackWidth(), 16.0F);
          DrawUtil.drawRoundedRect(draw.getMatrices(), x + PANEL_PADDING, rowY, this.sliderTrackWidth(), 16.0F, BorderRadius.all(3.0F), this.activeColor == colors[i] ? theme.getColor().withAlpha(120) : hovered ? new ColorRGBA(50, 50, 50).withAlpha(180) : new ColorRGBA(30, 30, 30).withAlpha(150));
          draw.drawText(Fonts.REGULAR.getFont(4.5F), COLOR_NAMES[i], x + PANEL_PADDING + 6.0F, rowY + 5.0F, (new ColorRGBA(222, 222, 222)).withAlpha(255.0F * alpha));
@@ -318,34 +333,91 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
       if (this.activeColor != null) {
          this.renderPicker(draw, theme, mouseX, mouseY, alpha);
       }
+
+      this.renderImageRow(draw, theme, mouseX, mouseY, IMAGE_ROW_Y, IMAGE_STATUS_Y, "Импорт фона", this.module.bgImage);
+      this.renderImageRow(draw, theme, mouseX, mouseY, IMAGE_ROW_2_Y, IMAGE_STATUS_2_Y, "Импорт головы", this.module.headImage);
+   }
+
+   private void renderImageRow(CustomDrawContext draw, Theme theme, float mouseX, float mouseY, float offset, float statusOffset, String label, StringSetting setting) {
+      float y = this.contentY(offset);
+      float x = this.panelX();
+      String value = setting.getValue();
+      boolean hasImage = !value.isEmpty();
+      boolean error = this.module.hasImageError(value);
+      boolean importHovered = MathUtil.isHovered(mouseX, mouseY, x + PANEL_PADDING, y, this.importButtonWidth(), 16.0F);
+      boolean clearHovered = MathUtil.isHovered(mouseX, mouseY, x + PANEL_PADDING + this.importButtonWidth() + 4.0F, y, this.clearButtonWidth(), 16.0F);
+      ColorRGBA importBg;
+      if (error) {
+         importBg = new ColorRGBA(200, 60, 60).withAlpha(importHovered ? 220 : 180);
+      } else if (hasImage) {
+         importBg = theme.getColor().withAlpha(importHovered ? 210 : 170);
+      } else {
+         importBg = importHovered ? theme.getColor().withAlpha(110) : new ColorRGBA(40, 40, 40).withAlpha(255);
+      }
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x + PANEL_PADDING, y, this.importButtonWidth(), 16.0F, BorderRadius.all(3.0F), importBg);
+      draw.drawText(Fonts.REGULAR.getFont(4.5F), label, x + PANEL_PADDING + this.importButtonWidth() / 2.0F - Fonts.REGULAR.getWidth(label, 4.5F) / 2.0F, y + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x + PANEL_PADDING + this.importButtonWidth() + 4.0F, y, this.clearButtonWidth(), 16.0F, BorderRadius.all(3.0F), clearHovered ? new ColorRGBA(255, 80, 80).withAlpha(200) : new ColorRGBA(40, 40, 40).withAlpha(255));
+      draw.drawText(Fonts.REGULAR.getFont(5.0F), "✕", x + PANEL_PADDING + this.importButtonWidth() + 4.0F + this.clearButtonWidth() / 2.0F - Fonts.REGULAR.getWidth("✕", 5.0F) / 2.0F, y + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+
+      String status;
+      ColorRGBA statusColor;
+      if (value.isEmpty()) {
+         status = "не выбрано";
+         statusColor = (new ColorRGBA(120, 120, 120)).withAlpha(255);
+      } else if (error) {
+         status = "ошибка загрузки: " + this.trimPath(value);
+         statusColor = (new ColorRGBA(255, 90, 90)).withAlpha(255);
+      } else {
+         status = this.trimPath(value);
+         statusColor = (new ColorRGBA(150, 220, 150)).withAlpha(255);
+      }
+      draw.drawText(Fonts.REGULAR.getFont(4.0F), status, x + PANEL_PADDING, this.contentY(statusOffset), statusColor);
+   }
+
+   private String trimPath(String path) {
+      String name = path;
+      int slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+      if (slash >= 0 && slash < path.length() - 1) {
+         name = path.substring(slash + 1);
+      }
+      return name.length() > 26 ? name.substring(0, 25) + "…" : name;
+   }
+
+   private float importButtonWidth() {
+      return 132.0F;
+   }
+
+   private float clearButtonWidth() {
+      return 32.0F;
    }
 
    private void renderPicker(CustomDrawContext draw, Theme theme, float mouseX, float mouseY, float alpha) {
+      float py = this.contentY(this.pickerYOffset());
       if (this.draggingPicker) {
          float saturation = MathHelper.clamp((mouseX - this.pickerX() - 4.0F) / (this.pickerWidth() - 8.0F), 0.0F, 1.0F);
-         float brightness = 1.0F - MathHelper.clamp((mouseY - this.pickerY() - 4.0F) / (PICKER_HEIGHT - 8.0F), 0.0F, 1.0F);
+         float brightness = 1.0F - MathHelper.clamp((mouseY - py - 4.0F) / (PICKER_HEIGHT - 8.0F), 0.0F, 1.0F);
          this.hsb[1] = saturation;
          this.hsb[2] = brightness;
          this.applyColor();
       }
       if (this.draggingHue) {
-         this.hsb[0] = MathHelper.clamp((mouseY - this.pickerY()) / PICKER_HEIGHT, 0.0F, 1.0F);
+         this.hsb[0] = MathHelper.clamp((mouseY - py) / PICKER_HEIGHT, 0.0F, 1.0F);
          this.applyColor();
       }
 
       ColorRGBA hue = ColorRGBA.fromHSB(this.hsb[0], 1.0F, 1.0F);
-      DrawUtil.drawRoundedRect(draw.getMatrices(), this.pickerX(), this.pickerY(), this.pickerWidth(), PICKER_HEIGHT, BorderRadius.all(6.0F), ColorRGBA.WHITE.withAlpha(255.0F * alpha), ColorRGBA.BLACK.withAlpha(255.0F * alpha), ColorRGBA.BLACK.withAlpha(255.0F * alpha), hue.withAlpha(255.0F * alpha));
+      DrawUtil.drawRoundedRect(draw.getMatrices(), this.pickerX(), py, this.pickerWidth(), PICKER_HEIGHT, BorderRadius.all(6.0F), ColorRGBA.WHITE.withAlpha(255.0F * alpha), ColorRGBA.BLACK.withAlpha(255.0F * alpha), ColorRGBA.BLACK.withAlpha(255.0F * alpha), hue.withAlpha(255.0F * alpha));
 
       float knobX = this.pickerX() + 4.0F + this.hsb[1] * (this.pickerWidth() - 8.0F);
-      float knobY = this.pickerY() + 4.0F + (1.0F - this.hsb[2]) * (PICKER_HEIGHT - 8.0F);
+      float knobY = py + 4.0F + (1.0F - this.hsb[2]) * (PICKER_HEIGHT - 8.0F);
       DrawUtil.drawRoundedRect(draw.getMatrices(), knobX - 4.0F, knobY - 4.0F, 8.0F, 8.0F, BorderRadius.all(4.0F), ColorRGBA.BLACK.withAlpha(255.0F * alpha));
       DrawUtil.drawRoundedRect(draw.getMatrices(), knobX - 3.0F, knobY - 3.0F, 6.0F, 6.0F, BorderRadius.all(3.0F), ColorRGBA.WHITE.withAlpha(255.0F * alpha));
 
       for (int i = 0; i < (int) PICKER_HEIGHT; i++) {
          float rowHue = (float) i / PICKER_HEIGHT;
-         DrawUtil.drawRect(draw.getMatrices(), this.hueSliderX(), this.pickerY() + (float) i, 4.0F, 1.0F, ColorRGBA.fromHSB(rowHue, 1.0F, 1.0F).withAlpha(255.0F * alpha));
+         DrawUtil.drawRect(draw.getMatrices(), this.hueSliderX(), py + (float) i, 4.0F, 1.0F, ColorRGBA.fromHSB(rowHue, 1.0F, 1.0F).withAlpha(255.0F * alpha));
       }
-      float knobY2 = this.pickerY() + this.hsb[0] * PICKER_HEIGHT;
+      float knobY2 = py + this.hsb[0] * PICKER_HEIGHT;
       DrawUtil.drawRoundedRect(draw.getMatrices(), this.hueSliderX() - 2.5F, knobY2 - 4.0F, 9.0F, 8.0F, BorderRadius.all(4.0F), ColorRGBA.BLACK.withAlpha(255.0F * alpha));
       DrawUtil.drawRoundedRect(draw.getMatrices(), this.hueSliderX() - 1.5F, knobY2 - 3.0F, 7.0F, 6.0F, BorderRadius.all(3.0F), ColorRGBA.WHITE.withAlpha(255.0F * alpha));
    }
@@ -395,11 +467,25 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
       DrawUtil.drawRoundedRect(draw.getMatrices(), this.sliderTrackX() + this.sliderTrackWidth() * percent - 4.0F, trackY - 3.0F, 8.0F, 8.0F, BorderRadius.all(4.0F), new ColorRGBA(222, 222, 222).withAlpha(255));
    }
 
-   @Override
-   public boolean mouseClicked(double mouseX, double mouseY, int button) {
-      if (button != 0) {
-         return super.mouseClicked(mouseX, mouseY, button);
-      }
+   private float modeButtonWidth() {
+      return (PANEL_WIDTH - PANEL_PADDING * 2.0F - 8.0F) / 3.0F;
+   }
+
+   private float modeButtonX(int index) {
+      return this.panelX() + PANEL_PADDING + (float)index * (this.modeButtonWidth() + 4.0F);
+   }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+       if (this.importOpen) {
+          if (button == 0) {
+             this.handleImportClick(mouseX, mouseY);
+          }
+          return true;
+       }
+       if (button != 0) {
+          return super.mouseClicked(mouseX, mouseY, button);
+       }
 
       float exitX = this.width - EXIT_OFFSET - EXIT_WIDTH;
       float exitY = EXIT_OFFSET;
@@ -439,65 +525,7 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
          return true;
       }
 
-      for (int i = 0; i < MODES.length; i++) {
-         if (MathUtil.isHovered(mouseX, mouseY, this.modeButtonX(i), this.modeRowY(), this.modeButtonWidth(), 16.0F)) {
-            this.module.displayMode.set(MODES[i]);
-            return true;
-         }
-      }
-
-      if (MathUtil.isHovered(mouseX, mouseY, this.panelX() + PANEL_WIDTH - PANEL_PADDING - 50.0F, this.autoRotateToggleY(), 50.0F, 16.0F)) {
-         this.module.headAutoRotate.setEnabled(!this.module.headAutoRotate.isEnabled());
-         return true;
-      }
-
-      if (MathUtil.isHovered(mouseX, mouseY, this.panelX() + PANEL_WIDTH - PANEL_PADDING - 50.0F, this.customToggleY(), 50.0F, 16.0F)) {
-         this.module.customColors.setEnabled(!this.module.customColors.isEnabled());
-         return true;
-      }
-
-      ColorSetting[] colors = {this.module.barColor, this.module.bgColor, this.module.borderColor, this.module.textColor};
-      for (int i = 0; i < colors.length; i++) {
-         if (MathUtil.isHovered(mouseX, mouseY, this.panelX() + PANEL_PADDING, this.colorRowY(i), this.sliderTrackWidth(), 16.0F)) {
-            if (this.activeColor == colors[i]) {
-               this.activeColor = null;
-            } else {
-               this.activeColor = colors[i];
-               this.initHsb(colors[i]);
-            }
-            return true;
-         }
-      }
-
-      if (this.activeColor != null) {
-         if (MathUtil.isHovered(mouseX, mouseY, this.hueSliderX() - 2.0F, this.pickerY(), 8.0F, PICKER_HEIGHT)) {
-            this.draggingHue = true;
-            return true;
-         }
-         if (MathUtil.isHovered(mouseX, mouseY, this.pickerX(), this.pickerY(), this.pickerWidth(), PICKER_HEIGHT)) {
-            this.draggingPicker = true;
-            return true;
-         }
-      }
-
-      if (MathUtil.isHovered(mouseX, mouseY, this.sliderTrackX(), this.thicknessTrackY() - 3.0F, this.sliderTrackWidth(), 8.0F)) {
-         this.dragTarget = DragTarget.THICKNESS;
-         this.updateSliderValue(mouseX);
-         return true;
-      }
-      if (MathUtil.isHovered(mouseX, mouseY, this.sliderTrackX(), this.headSizeTrackY() - 3.0F, this.sliderTrackWidth(), 8.0F)) {
-         this.dragTarget = DragTarget.HEAD_SIZE;
-         this.updateSliderValue(mouseX);
-         return true;
-      }
-      if (MathUtil.isHovered(mouseX, mouseY, this.sliderTrackX(), this.headYawTrackY() - 3.0F, this.sliderTrackWidth(), 8.0F)) {
-         this.dragTarget = DragTarget.HEAD_YAW;
-         this.updateSliderValue(mouseX);
-         return true;
-      }
-      if (MathUtil.isHovered(mouseX, mouseY, this.sliderTrackX(), this.headPitchTrackY() - 3.0F, this.sliderTrackWidth(), 8.0F)) {
-         this.dragTarget = DragTarget.HEAD_PITCH;
-         this.updateSliderValue(mouseX);
+      if (this.handlePanelContentClick(mouseX, mouseY)) {
          return true;
       }
 
@@ -511,6 +539,91 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
          return true;
       }
       return super.mouseClicked(mouseX, mouseY, button);
+   }
+
+   private boolean handlePanelContentClick(double mouseX, double mouseY) {
+      if (!this.inPanel(mouseX, mouseY)) {
+         return false;
+      }
+      float x = this.panelX();
+
+      float modeY = this.contentY(190.0F);
+      for (int i = 0; i < MODES.length; i++) {
+         if (MathUtil.isHovered(mouseX, mouseY, this.modeButtonX(i), modeY, this.modeButtonWidth(), 16.0F)) {
+            this.module.displayMode.set(MODES[i]);
+            return true;
+         }
+      }
+
+      BooleanSetting[] toggles = this.toggles();
+      for (int i = 0; i < toggles.length; i++) {
+         float ty = this.contentY(TOGGLE_Y[i]);
+         if (MathUtil.isHovered(mouseX, mouseY, x + PANEL_WIDTH - PANEL_PADDING - 50.0F, ty, 50.0F, 16.0F)) {
+            toggles[i].setEnabled(!toggles[i].isEnabled());
+            return true;
+         }
+      }
+
+      ColorSetting[] colors = this.colors();
+      for (int i = 0; i < colors.length; i++) {
+         float rowY = this.contentY(this.colorRowY(i));
+         if (MathUtil.isHovered(mouseX, mouseY, x + PANEL_PADDING, rowY, this.sliderTrackWidth(), 16.0F)) {
+            if (this.activeColor == colors[i]) {
+               this.activeColor = null;
+            } else {
+               this.activeColor = colors[i];
+               this.initHsb(colors[i]);
+               float pickerBottom = this.contentY(this.pickerYOffset()) + PICKER_HEIGHT;
+               if (pickerBottom > this.panelY() + this.panelBoxHeight()) {
+                  this.panelScroll += pickerBottom - (this.panelY() + this.panelBoxHeight());
+               }
+            }
+            return true;
+         }
+      }
+
+      if (this.activeColor != null) {
+         float py = this.contentY(this.pickerYOffset());
+         if (MathUtil.isHovered(mouseX, mouseY, this.hueSliderX() - 2.0F, py, 8.0F, PICKER_HEIGHT)) {
+            this.draggingHue = true;
+            return true;
+         }
+         if (MathUtil.isHovered(mouseX, mouseY, this.pickerX(), py, this.pickerWidth(), PICKER_HEIGHT)) {
+            this.draggingPicker = true;
+            return true;
+         }
+      }
+
+      if (MathUtil.isHovered(mouseX, mouseY, x + PANEL_PADDING, this.contentY(IMAGE_ROW_Y), this.importButtonWidth(), 16.0F)) {
+         this.openImport(this.module.bgImage);
+         return true;
+      }
+      if (MathUtil.isHovered(mouseX, mouseY, x + PANEL_PADDING + this.importButtonWidth() + 4.0F, this.contentY(IMAGE_ROW_Y), this.clearButtonWidth(), 16.0F)) {
+         this.module.bgImage.setValue("");
+         this.module.clearImageCache();
+         return true;
+      }
+      if (MathUtil.isHovered(mouseX, mouseY, x + PANEL_PADDING, this.contentY(IMAGE_ROW_2_Y), this.importButtonWidth(), 16.0F)) {
+         this.openImport(this.module.headImage);
+         return true;
+      }
+      if (MathUtil.isHovered(mouseX, mouseY, x + PANEL_PADDING + this.importButtonWidth() + 4.0F, this.contentY(IMAGE_ROW_2_Y), this.clearButtonWidth(), 16.0F)) {
+         this.module.headImage.setValue("");
+         this.module.clearImageCache();
+         return true;
+      }
+
+      NumberSetting[] sliders = this.sliders();
+      for (int i = 0; i < sliders.length; i++) {
+         float trackY = this.contentY(SLIDER_TRACK_Y[i]);
+         if (MathUtil.isHovered(mouseX, mouseY, this.sliderTrackX(), trackY - 3.0F, this.sliderTrackWidth(), 8.0F)) {
+            this.dragSlider = i;
+            this.updateSliderValue(mouseX);
+            return true;
+         }
+      }
+
+      return false;
    }
 
    private boolean handlePresetListClick(double mouseX, double mouseY) {
@@ -564,9 +677,12 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
       return false;
    }
 
-   @Override
-   public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-      if (this.dragTarget != DragTarget.NONE) {
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+       if (this.importOpen) {
+          return true;
+       }
+       if (this.dragSlider >= 0) {
          this.updateSliderValue(mouseX);
          return true;
       }
@@ -582,16 +698,20 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
 
    @Override
    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-      this.dragTarget = DragTarget.NONE;
+      this.dragSlider = -1;
       this.dragging = false;
       this.draggingPicker = false;
       this.draggingHue = false;
       return super.mouseReleased(mouseX, mouseY, button);
    }
 
-   @Override
-   public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-      if (mouseX >= this.listX() && mouseX <= this.listX() + LIST_WIDTH && mouseY >= this.listY() && mouseY <= this.listY() + this.listHeight()) {
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+       if (this.importOpen) {
+          this.importScroll -= (float) verticalAmount * 12.0F;
+          return true;
+       }
+       if (mouseX >= this.listX() && mouseX <= this.listX() + LIST_WIDTH && mouseY >= this.listY() && mouseY <= this.listY() + this.listHeight()) {
          this.scroll -= (float) verticalAmount * 12.0F;
          return true;
       }
@@ -601,28 +721,31 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
          this.cycleType(verticalAmount > 0.0D);
          return true;
       }
-      if (MathUtil.isHovered(mouseX, mouseY, this.sliderTrackX(), this.thicknessTrackY() - 3.0F, this.sliderTrackWidth(), 8.0F)) {
-         this.module.barThickness.setCurrent(MathHelper.clamp(this.module.barThickness.getCurrent() + (float) verticalAmount * this.module.barThickness.getIncrement(), this.module.barThickness.getMin(), this.module.barThickness.getMax()));
-         return true;
-      }
-      if (MathUtil.isHovered(mouseX, mouseY, this.sliderTrackX(), this.headSizeTrackY() - 3.0F, this.sliderTrackWidth(), 8.0F)) {
-         this.module.headSize.setCurrent(MathHelper.clamp(this.module.headSize.getCurrent() + (float) verticalAmount * this.module.headSize.getIncrement(), this.module.headSize.getMin(), this.module.headSize.getMax()));
-         return true;
-      }
-      if (MathUtil.isHovered(mouseX, mouseY, this.sliderTrackX(), this.headYawTrackY() - 3.0F, this.sliderTrackWidth(), 8.0F)) {
-         this.module.headYaw.setCurrent(MathHelper.clamp(this.module.headYaw.getCurrent() + (float) verticalAmount * this.module.headYaw.getIncrement(), this.module.headYaw.getMin(), this.module.headYaw.getMax()));
-         return true;
-      }
-      if (MathUtil.isHovered(mouseX, mouseY, this.sliderTrackX(), this.headPitchTrackY() - 3.0F, this.sliderTrackWidth(), 8.0F)) {
-         this.module.headPitch.setCurrent(MathHelper.clamp(this.module.headPitch.getCurrent() + (float) verticalAmount * this.module.headPitch.getIncrement(), this.module.headPitch.getMin(), this.module.headPitch.getMax()));
+      if (this.inPanel(mouseX, mouseY)) {
+         NumberSetting[] sliders = this.sliders();
+         for (int i = 0; i < sliders.length; i++) {
+            float trackY = this.contentY(SLIDER_TRACK_Y[i]);
+            if (MathUtil.isHovered(mouseX, mouseY, this.sliderTrackX(), trackY - 3.0F, this.sliderTrackWidth(), 8.0F)) {
+               NumberSetting setting = sliders[i];
+               setting.setCurrent(MathHelper.clamp(setting.getCurrent() + (float) verticalAmount * setting.getIncrement(), setting.getMin(), setting.getMax()));
+               return true;
+            }
+         }
+         this.panelScroll -= (float) verticalAmount * 12.0F;
          return true;
       }
       return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
    }
 
-   @Override
-   public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-      TextFieldWidget field = this.nameField();
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+       if (this.importOpen) {
+          if (keyCode == 256) {
+             this.importOpen = false;
+          }
+          return true;
+       }
+       TextFieldWidget field = this.nameField();
       if (field != null && field.isFocused()) {
          field.keyPressed(keyCode, scanCode, modifiers);
          if (keyCode == 257) {
@@ -652,6 +775,124 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
       this.presetManager.savePreset(this.module.toPreset(name));
    }
 
+   private void openImport(StringSetting setting) {
+      this.importSetting = setting;
+      this.importDir = mc.runDirectory.toPath();
+      this.importScroll = 0.0F;
+      this.importOpen = true;
+   }
+
+   private List<Path> importEntries() {
+      if (this.importDir == null) {
+         return List.of();
+      }
+      List<Path> dirs = new ArrayList();
+      List<Path> files = new ArrayList();
+      try (var stream = Files.list(this.importDir)) {
+         for (Path path : stream.toList()) {
+            if (Files.isDirectory(path)) {
+               if (!path.getFileName().toString().startsWith(".")) {
+                  dirs.add(path);
+               }
+            } else if (path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".png")) {
+               files.add(path);
+            }
+         }
+      } catch (Exception e) {
+      }
+      dirs.sort(Comparator.comparing((Path p) -> p.getFileName().toString()));
+      files.sort(Comparator.comparing((Path p) -> p.getFileName().toString()));
+      List<Path> result = new ArrayList();
+      result.addAll(dirs);
+      result.addAll(files);
+      return result;
+   }
+
+   private void renderImportDialog(CustomDrawContext draw, Theme theme, float mouseX, float mouseY) {
+      float x = (this.width - IMPORT_WIDTH) / 2.0F;
+      float y = (this.height - IMPORT_HEIGHT) / 2.0F;
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x - 6.0F, y - 6.0F, IMPORT_WIDTH + 12.0F, IMPORT_HEIGHT + 12.0F, BorderRadius.all(8.0F), new ColorRGBA(0, 0, 0).withAlpha(160));
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, IMPORT_WIDTH, IMPORT_HEIGHT, BorderRadius.all(6.0F), new ColorRGBA(20, 20, 22).withAlpha(255));
+      DrawUtil.drawRoundedBorder(draw.getMatrices(), x, y, IMPORT_WIDTH, IMPORT_HEIGHT, 1.0F, BorderRadius.all(6.0F), theme.getSecondColor().darker(0.5F).withAlpha(180));
+      draw.drawText(Fonts.REGULAR.getFont(6.0F), "Импорт изображения (PNG)", x + 12.0F, y + 10.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+      String dirText = this.importDir == null ? "" : this.importDir.toString();
+      draw.drawText(Fonts.REGULAR.getFont(4.5F), dirText, x + 12.0F, y + 24.0F, new ColorRGBA(120, 120, 120).withAlpha(255));
+
+      float listY = y + 38.0F;
+      float listH = IMPORT_HEIGHT - 38.0F - 34.0F;
+      List<Path> entries = this.importEntries();
+      float contentH = entries.size() * 16.0F + 16.0F;
+      this.importScroll = MathHelper.clamp(this.importScroll, 0.0F, Math.max(contentH - listH, 0.0F));
+      draw.enableScissor((int)x, (int)listY, (int)(x + IMPORT_WIDTH), (int)(listY + listH));
+      float rowY = listY - this.importScroll;
+      if (this.importDir.getParent() != null) {
+         this.renderImportRow(draw, theme, mouseX, mouseY, x, rowY, "..  (назад)");
+         rowY += 16.0F;
+      }
+      for (Path entry : entries) {
+         if (rowY + 14.0F < listY || rowY > listY + listH) {
+            rowY += 16.0F;
+         } else {
+            boolean isDir = Files.isDirectory(entry);
+            boolean hovered = mouseY >= rowY && mouseY <= rowY + 16.0F && mouseX >= x && mouseX <= x + IMPORT_WIDTH;
+            DrawUtil.drawRoundedRect(draw.getMatrices(), x + 4.0F, rowY, IMPORT_WIDTH - 8.0F, 15.0F, BorderRadius.all(3.0F), hovered ? theme.getColor().withAlpha(90) : new ColorRGBA(30, 30, 30).withAlpha(120));
+            String name = entry.getFileName().toString() + (isDir ? "/" : "");
+            draw.drawText(Fonts.REGULAR.getFont(4.5F), name, x + 12.0F, rowY + 5.0F, isDir ? (new ColorRGBA(160, 200, 255)).withAlpha(255) : (new ColorRGBA(222, 222, 222)).withAlpha(255));
+            rowY += 16.0F;
+         }
+      }
+      draw.disableScissor();
+
+      float buttonY = y + IMPORT_HEIGHT - 28.0F;
+      float cancelX = x + IMPORT_WIDTH - 88.0F;
+      boolean cancelHovered = MathUtil.isHovered(mouseX, mouseY, cancelX, buttonY, 80.0F, 16.0F);
+      DrawUtil.drawRoundedRect(draw.getMatrices(), cancelX, buttonY, 80.0F, 16.0F, BorderRadius.all(3.0F), cancelHovered ? new ColorRGBA(60, 60, 60).withAlpha(255) : new ColorRGBA(40, 40, 40).withAlpha(255));
+      draw.drawText(Fonts.REGULAR.getFont(5.0F), "Отмена", cancelX + 40.0F - Fonts.REGULAR.getWidth("Отмена", 5.0F) / 2.0F, buttonY + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+   }
+
+   private void renderImportRow(CustomDrawContext draw, Theme theme, float mouseX, float mouseY, float x, float rowY, String label) {
+      boolean hovered = mouseY >= rowY && mouseY <= rowY + 16.0F && mouseX >= x && mouseX <= x + IMPORT_WIDTH;
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x + 4.0F, rowY, IMPORT_WIDTH - 8.0F, 15.0F, BorderRadius.all(3.0F), hovered ? theme.getColor().withAlpha(90) : new ColorRGBA(30, 30, 30).withAlpha(120));
+      draw.drawText(Fonts.REGULAR.getFont(4.5F), label, x + 12.0F, rowY + 5.0F, new ColorRGBA(160, 200, 255).withAlpha(255));
+   }
+
+   private boolean handleImportClick(double mouseX, double mouseY) {
+      float x = (this.width - IMPORT_WIDTH) / 2.0F;
+      float y = (this.height - IMPORT_HEIGHT) / 2.0F;
+      float buttonY = y + IMPORT_HEIGHT - 28.0F;
+      if (MathUtil.isHovered(mouseX, mouseY, x + IMPORT_WIDTH - 88.0F, buttonY, 80.0F, 16.0F)) {
+         this.importOpen = false;
+         return true;
+      }
+      float listY = y + 38.0F;
+      float listH = IMPORT_HEIGHT - 38.0F - 34.0F;
+      if (mouseX >= x && mouseX <= x + IMPORT_WIDTH && mouseY >= listY && mouseY <= listY + listH) {
+         int index = (int)((mouseY - listY + this.importScroll) / 16.0F);
+         if (this.importDir.getParent() != null && index == 0) {
+            this.importDir = this.importDir.getParent();
+            this.importScroll = 0.0F;
+            return true;
+         }
+         if (this.importDir.getParent() != null) {
+            index--;
+         }
+         List<Path> entries = this.importEntries();
+         if (index >= 0 && index < entries.size()) {
+            Path entry = entries.get(index);
+            if (Files.isDirectory(entry)) {
+               this.importDir = entry;
+               this.importScroll = 0.0F;
+            } else {
+               this.importSetting.setValue(entry.toAbsolutePath().toString());
+               this.module.clearImageCache();
+               this.importOpen = false;
+            }
+         }
+         return true;
+      }
+      return false;
+   }
+
    private void cycleType(boolean next) {
       int index = 0;
       for (int i = 0; i < PRESETS.length; i++) {
@@ -678,16 +919,12 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
    }
 
    private void updateSliderValue(double mouseX) {
-      float percent = MathHelper.clamp((float) (mouseX - this.sliderTrackX()) / this.sliderTrackWidth(), 0.0F, 1.0F);
-      if (this.dragTarget == DragTarget.THICKNESS) {
-         this.setCurrent(this.module.barThickness, this.module.barThickness.getMin() + percent * (this.module.barThickness.getMax() - this.module.barThickness.getMin()));
-      } else if (this.dragTarget == DragTarget.HEAD_SIZE) {
-         this.setCurrent(this.module.headSize, this.module.headSize.getMin() + percent * (this.module.headSize.getMax() - this.module.headSize.getMin()));
-      } else if (this.dragTarget == DragTarget.HEAD_YAW) {
-         this.setCurrent(this.module.headYaw, this.module.headYaw.getMin() + percent * (this.module.headYaw.getMax() - this.module.headYaw.getMin()));
-      } else if (this.dragTarget == DragTarget.HEAD_PITCH) {
-         this.setCurrent(this.module.headPitch, this.module.headPitch.getMin() + percent * (this.module.headPitch.getMax() - this.module.headPitch.getMin()));
+      if (this.dragSlider < 0) {
+         return;
       }
+      NumberSetting setting = this.sliders()[this.dragSlider];
+      float percent = MathHelper.clamp((float) (mouseX - this.sliderTrackX()) / this.sliderTrackWidth(), 0.0F, 1.0F);
+      this.setCurrent(setting, setting.getMin() + percent * (setting.getMax() - setting.getMin()));
    }
 
    private void updatePosition(double mouseX, double mouseY) {
@@ -710,6 +947,20 @@ public final class TargetHudEditScreen extends Screen implements IMinecraft {
       this.module.headAutoRotate.setEnabled(false);
       this.module.displayMode.set("Проценты и HP");
       this.module.customColors.setEnabled(false);
+      this.module.radius.setCurrent(5.0F);
+      this.module.borderThickness.setCurrent(1.0F);
+      this.module.backgroundAlpha.setCurrent(120.0F);
+      this.module.animationSpeed.setCurrent(1.0F);
+      this.module.showArmor.setEnabled(true);
+      this.module.showPing.setEnabled(true);
+      this.module.showEyes.setEnabled(true);
+      this.module.eyeSize.setCurrent(1.0F);
+      this.module.eyeColor.setColor(new ColorRGBA(255, 255, 255, 255));
+      this.module.pupilColor.setColor(new ColorRGBA(15, 15, 15, 255));
+      this.module.bgImage.setValue("");
+      this.module.headImage.setValue("");
+      this.module.clearImageCache();
+      this.module.barColorSecond.setColor(new ColorRGBA(100, 100, 115, 255));
    }
 
    private static void setCurrent(NumberSetting setting, float value) {

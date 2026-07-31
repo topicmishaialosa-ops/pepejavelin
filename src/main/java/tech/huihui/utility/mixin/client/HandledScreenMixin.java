@@ -27,6 +27,6 @@ public abstract class HandledScreenMixin {
       at = {@At("RETURN")}
    )
    public void render(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
-      EventManager.call(new EventHandledScreen(context, this.field_2787, this.field_2792, this.field_2779));
+      EventManager.call(new EventHandledScreen(context, this.field_2787, this.field_2792, this.field_2779, mouseX, mouseY));
    }
 }

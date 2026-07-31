@@ -89,11 +89,39 @@ public class ModuleComponent extends Component {
       this.expandAnim.update(this.open ? 1.0F : 0.0F);
       this.module.getAnimation().update(this.module.isEnabled());
       float enabled = this.module.getAnimation().getValue();
-      float rowHeight = this.getCurrentHeight();
+      float expanded = this.expandAnim.getValue();
+      float settingsHeight = this.getSettingsHeight();
+      float settingsH = settingsHeight * expanded;
+      float rowHeight = ClickGuiScreen.MODULE_HEIGHT + settingsH;
 
-      ColorRGBA top = this.module.isEnabled() ? (new ColorRGBA(45, 46, 53)).withAlpha(65.0F * alpha) : (new ColorRGBA(153, 153, 153)).withAlpha(15.0F * alpha);
-      ColorRGBA bottom = this.module.isEnabled() ? (new ColorRGBA(25, 26, 31)).withAlpha(0.0F) : (new ColorRGBA(153, 153, 153)).withAlpha(0.0F);
-      DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + 0.7F, this.y + 1.0F, this.width - 2.0F, rowHeight - 2.0F, BorderRadius.all(5.0F), top, bottom, bottom, top);
+      boolean hovered = this.isHovered(mouseX, mouseY, rowHeight);
+      if (hovered) {
+         this.screen.setHoveredModule(this.module);
+      }
+
+      float radius = 5.0F;
+      boolean showContainer = expanded > 0.001F && settingsHeight > 0.0F;
+
+      ColorRGBA headerTop = this.module.isEnabled() ? (new ColorRGBA(45, 46, 53)).withAlpha((hovered ? 85.0F : 65.0F) * alpha) : (new ColorRGBA(153, 153, 153)).withAlpha((hovered ? 24.0F : 15.0F) * alpha);
+      ColorRGBA headerBottom = this.module.isEnabled() ? (new ColorRGBA(25, 26, 31)).withAlpha(0.0F) : (new ColorRGBA(153, 153, 153)).withAlpha(0.0F);
+      BorderRadius headerRadius = showContainer ? BorderRadius.top(radius, radius) : BorderRadius.all(radius);
+      DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + 0.7F, this.y + 1.0F, this.width - 2.0F, ClickGuiScreen.MODULE_HEIGHT - 2.0F, headerRadius, headerTop, headerBottom, headerBottom, headerTop);
+
+      if (this.module.isEnabled()) {
+         DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + 0.7F, this.y + 3.5F, 2.0F, ClickGuiScreen.MODULE_HEIGHT - 7.0F, BorderRadius.all(1.0F), theme.getColor().withAlpha(255.0F * alpha));
+      }
+
+      if (showContainer) {
+         float containerAlpha = Math.min(1.0F, expanded * 1.3F);
+         float cX = this.x + 1.7F;
+         float cY = this.y + ClickGuiScreen.MODULE_HEIGHT - 0.5F;
+         float cW = this.width - 3.4F;
+         float cH = settingsH - 1.0F;
+         BorderRadius containerRadius = BorderRadius.bottom(radius, radius);
+         DrawUtil.drawRoundedRect(draw.getMatrices(), cX, cY, cW, cH, containerRadius, (new ColorRGBA(9, 9, 11)).withAlpha((int)(containerAlpha * 200.0F * alpha)));
+         DrawUtil.drawRoundedBorder(draw.getMatrices(), cX, cY, cW, cH, 1.0F, containerRadius, (new ColorRGBA(30, 30, 34)).withAlpha((int)(containerAlpha * 120.0F * alpha)));
+         DrawUtil.drawRoundedRect(draw.getMatrices(), cX + 8.0F, cY + 0.5F, cW - 16.0F, 1.0F, BorderRadius.all(0.5F), theme.getColor().withAlpha((int)(containerAlpha * 70.0F * alpha)));
+      }
 
       ColorRGBA textColor = this.module.isEnabled() ? (new ColorRGBA(222, 222, 222)).withAlpha(255.0F * alpha) : (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha);
       draw.drawText(Fonts.REGULAR.getFont(6.5F), this.module.getName(), this.x + this.width / 12.0F, this.y + 6.5F, textColor);
@@ -105,18 +133,24 @@ public class ModuleComponent extends Component {
          String bindText = Keyboard.getKeyName(this.module.getKeyCode());
          draw.drawText(Fonts.REGULAR.getFont(5.5F), bindText, this.x + this.width - 4.0F - Fonts.REGULAR.getWidth(bindText, 5.5F), this.y + 7.0F, (new ColorRGBA(111, 111, 111)).withAlpha(255.0F * alpha));
       } else if (this.hasVisibleSettings()) {
-         ColorRGBA iconColor = ColorUtil.interpolate(theme.getColor().withAlpha(255.0F * alpha), (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha), enabled);
+         ColorRGBA iconColor = ColorUtil.interpolate((new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha), theme.getColor().withAlpha(255.0F * alpha), Math.max(enabled, expanded));
          draw.drawText(Fonts.ICONS.getFont(8.0F), "S", this.x + this.width - 14.0F, this.y + 5.5F, iconColor);
       }
 
-      if (this.expandAnim.getValue() > 0.0F) {
+      if (settingsH > 0.0F) {
          this.renderSettings(draw, theme, mouseX, mouseY, alpha);
       }
    }
 
    private void renderSettings(CustomDrawContext draw, Theme theme, float mouseX, float mouseY, float alpha) {
-      this.screen.scissor(draw, this.x + 0.5F, this.y + 0.5F, this.width - 1.0F, this.getCurrentHeight() - 1.0F);
+      float cX = this.x + 1.7F;
+      float cY = this.y + ClickGuiScreen.MODULE_HEIGHT - 0.5F;
+      float cW = this.width - 3.4F;
+      float cH = this.getSettingsHeight() * this.expandAnim.getValue() - 1.0F;
+      this.screen.scissor(draw, cX, cY, cW, cH);
       float settingY = this.y + ClickGuiScreen.MODULE_HEIGHT;
+      float settingX = this.x + 2.7F;
+      float settingW = this.width - 5.4F;
       for (Component component : this.components) {
          Setting setting = this.getSetting(component);
          setting.getAnimationAlpha().update(setting.isVisible());
@@ -124,11 +158,17 @@ public class ModuleComponent extends Component {
          if (componentAlpha <= 0.01F) {
             continue;
          }
-         component.setX(this.x);
+
+         float componentHeight = component.getHeight();
+         component.setX(settingX);
          component.setY(settingY);
-         component.setWidth(this.width);
+         component.setWidth(settingW);
+         if (component.isHovered(mouseX, mouseY)) {
+            DrawUtil.drawRoundedRect(draw.getMatrices(), settingX, settingY, settingW, componentHeight, BorderRadius.all(4.0F), (new ColorRGBA(255, 255, 255)).withAlpha((int)(6.0F * alpha)));
+         }
+
          component.render(draw, theme, mouseX, mouseY, componentAlpha);
-         settingY += component.getHeight();
+         settingY += componentHeight;
       }
       draw.disableScissor();
    }

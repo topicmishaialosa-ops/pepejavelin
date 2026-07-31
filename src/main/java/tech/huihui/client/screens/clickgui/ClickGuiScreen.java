@@ -10,6 +10,7 @@ import net.minecraft.util.math.MathHelper;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.animations.base.Animation;
 import tech.huihui.base.animations.base.Easing;
+import tech.huihui.base.font.Font;
 import tech.huihui.base.font.Fonts;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.modules.api.Category;
@@ -36,6 +37,7 @@ public class ClickGuiScreen extends Screen implements IClient {
    private String searchText = "";
    private boolean searchFocused;
    private float scale = 1.0F;
+   private Module hoveredModule;
 
    private static float transformScale = 1.0F;
    private static int screenWidth;
@@ -61,6 +63,10 @@ public class ClickGuiScreen extends Screen implements IClient {
    public void resetSearch() {
       this.searchText = "";
       this.searchFocused = false;
+   }
+
+   public void setHoveredModule(Module module) {
+      this.hoveredModule = module;
    }
 
    float panelWidth() {
@@ -174,6 +180,7 @@ public class ClickGuiScreen extends Screen implements IClient {
 
       CustomDrawContext draw = CustomDrawContext.of(context);
       this.renderSearch(draw, theme, anim);
+      this.hoveredModule = null;
 
       float width = this.panelWidth();
       float height = this.panelHeight();
@@ -188,7 +195,29 @@ public class ClickGuiScreen extends Screen implements IClient {
          draw.disableScissor();
       }
 
+      this.renderDescription(draw, theme, anim);
+
       context.getMatrices().pop();
+   }
+
+   private void renderDescription(CustomDrawContext draw, Theme theme, float alpha) {
+      Module module = this.hoveredModule;
+      if (module == null) {
+         return;
+      }
+      String description = module.getInfo().description();
+      if (description == null || description.isEmpty()) {
+         return;
+      }
+      Font font = Fonts.REGULAR.getFont(5.5F);
+      float textWidth = font.width(description);
+      float boxWidth = textWidth + 16.0F;
+      float boxHeight = 18.0F;
+      float x = ((float) screenWidth - boxWidth) / 2.0F;
+      float y = (float) screenHeight - boxHeight - 8.0F;
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, boxWidth, boxHeight, BorderRadius.all(6.0F), (new ColorRGBA(15, 15, 15)).withAlpha(200.0F * alpha));
+      DrawUtil.drawRoundedBorder(draw.getMatrices(), x, y, boxWidth, boxHeight, 1.0F, BorderRadius.all(6.0F), theme.getColor().withAlpha(90.0F * alpha));
+      draw.drawText(font, description, x + 8.0F, y + 6.0F, (new ColorRGBA(222, 222, 222)).withAlpha(255.0F * alpha));
    }
 
    private void renderSearch(CustomDrawContext draw, Theme theme, float alpha) {

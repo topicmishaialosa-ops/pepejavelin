@@ -18,7 +18,20 @@ public class TargetHudPreset {
    private String displayMode = "Проценты и HP";
    private boolean customColors;
    private int barColor = -8384257;
+   private int barColorSecond = -10197901;
    private int bgColor = -1610612736;
    private int borderColor = -7106445;
    private int textColor = -1;
+   private float radius = 5.0F;
+   private float borderThickness = 1.0F;
+   private float backgroundAlpha = 120.0F;
+    private float animationSpeed = 1.0F;
+    private boolean showArmor = true;
+    private boolean showPing = true;
+    private boolean showEyes = true;
+    private float eyeSize = 1.0F;
+    private int eyeColor = -1;
+    private int pupilColor = -16777216;
+    private String bgImage = "";
+    private String headImage = "";
 }

@@ -46,8 +46,10 @@ public class SliderComponent extends Component {
       }
 
       DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + 5.0F, this.y + 12.0F, trackWidth, 2.0F, BorderRadius.all(1.0F), (new ColorRGBA(55, 55, 55)).withAlpha(100.0F * alpha));
-      DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + 5.0F, this.y + 12.0F, this.anim, 2.0F, BorderRadius.all(1.0F), (new ColorRGBA(123, 123, 123)).withAlpha(200.0F * alpha));
-      DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + 5.0F + this.anim - 4.0F, this.y + 9.5F, 8.0F, 8.0F, BorderRadius.all(4.0F), (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
+      DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + 5.0F, this.y + 12.0F, this.anim, 2.0F, BorderRadius.all(1.0F), theme.getColor().withAlpha(220.0F * alpha));
+      DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + 5.0F + this.anim - 6.0F, this.y + 7.5F, 12.0F, 12.0F, BorderRadius.all(6.0F), theme.getColor().withAlpha((int)(35.0F * alpha)));
+      DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + 5.0F + this.anim - 4.0F, this.y + 9.5F, 8.0F, 8.0F, BorderRadius.all(4.0F), theme.getColor().withAlpha(255.0F * alpha));
+      DrawUtil.drawRoundedBorder(draw.getMatrices(), this.x + 5.0F + this.anim - 4.0F, this.y + 9.5F, 8.0F, 8.0F, 1.0F, BorderRadius.all(4.0F), (new ColorRGBA(255, 255, 255)).withAlpha((int)(40.0F * alpha)));
    }
 
    private String formatValue() {

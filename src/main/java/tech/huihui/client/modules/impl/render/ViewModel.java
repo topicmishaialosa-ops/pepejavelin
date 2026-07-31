@@ -21,14 +21,18 @@ public final class ViewModel extends Module {
    public static float leftHandScreenY;
    public static float rightHandScreenX;
    public static float rightHandScreenY;
-   public final NumberSetting leftX = new NumberSetting("Левая рука X", 0.0F, -1.0F, 1.0F, 0.1F);
-   public final NumberSetting leftY = new NumberSetting("Левая рука Y", 0.0F, -1.0F, 1.0F, 0.1F);
-   public final NumberSetting leftZ = new NumberSetting("Левая рука Z", 0.0F, -1.0F, 1.0F, 0.1F);
-   public final NumberSetting leftScale = new NumberSetting("Левая рука размер", 1.0F, 0.5F, 1.5F, 0.05F);
-   public final NumberSetting rightX = new NumberSetting("Правая рука X", 0.0F, -1.0F, 1.0F, 0.1F);
-   public final NumberSetting rightY = new NumberSetting("Правая рука Y", 0.0F, -1.0F, 1.0F, 0.1F);
-   public final NumberSetting rightZ = new NumberSetting("Правая рука Z", 0.0F, -1.0F, 1.0F, 0.1F);
-   public final NumberSetting rightScale = new NumberSetting("Правая рука размер", 1.0F, 0.5F, 1.5F, 0.05F);
+   public static float leftHandPxPerWorldX;
+   public static float leftHandPxPerWorldY;
+   public static float rightHandPxPerWorldX;
+   public static float rightHandPxPerWorldY;
+   public final NumberSetting leftX = new NumberSetting("Левая рука X", 0.0F, -10.0F, 10.0F, 0.01F);
+   public final NumberSetting leftY = new NumberSetting("Левая рука Y", 0.0F, -10.0F, 10.0F, 0.01F);
+   public final NumberSetting leftZ = new NumberSetting("Левая рука Z", 0.0F, -10.0F, 10.0F, 0.01F);
+   public final NumberSetting leftScale = new NumberSetting("Левая рука размер", 1.0F, 0.05F, 3.0F, 0.01F);
+   public final NumberSetting rightX = new NumberSetting("Правая рука X", 0.0F, -10.0F, 10.0F, 0.01F);
+   public final NumberSetting rightY = new NumberSetting("Правая рука Y", 0.0F, -10.0F, 10.0F, 0.01F);
+   public final NumberSetting rightZ = new NumberSetting("Правая рука Z", 0.0F, -10.0F, 10.0F, 0.01F);
+   public final NumberSetting rightScale = new NumberSetting("Правая рука размер", 1.0F, 0.05F, 3.0F, 0.01F);
    public final ButtonSetting openEditor = new ButtonSetting("Открыть редактор", ViewModelEditScreen::openEditor);
 
    private ViewModel() {
@@ -69,12 +73,18 @@ public final class ViewModel extends Module {
       }
       float screenX = (position.x / w * 0.5F + 0.5F) * mw.getScaledWidth();
       float screenY = (0.5F - position.y / w * 0.5F) * mw.getScaledHeight();
+      float pxX = mw.getScaledWidth() * 0.5F / w;
+      float pxY = mw.getScaledHeight() * 0.5F / w;
       if (arm == Arm.RIGHT) {
          rightHandScreenX = screenX;
          rightHandScreenY = screenY;
+         rightHandPxPerWorldX = pxX;
+         rightHandPxPerWorldY = pxY;
       } else {
          leftHandScreenX = screenX;
          leftHandScreenY = screenY;
+         leftHandPxPerWorldX = pxX;
+         leftHandPxPerWorldY = pxY;
       }
    }
 }
