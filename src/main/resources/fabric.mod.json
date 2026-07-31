@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "huihui",
+  "version": "1.0-SNAPSHOT",
+  "name": "Huihui Client",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/huihui/icons/avatar.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      {
+        "adapter": "default",
+        "value": "tech.huihui.HuihuiClient::INSTANCE"
+      }
+    ]
+  },
+  "mixins": [
+    "huihui.mixins.json"
+  ],
+  "accessWidener": "huihui.accesswidener",
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "fabric": "*",
+    "minecraft": "1.21.4"
+  }
+}
