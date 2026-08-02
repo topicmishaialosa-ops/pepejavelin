@@ -291,6 +291,13 @@ public abstract class DraggableHudElement implements IMinecraft {
       this.y = y;
    }
 
+   public void resetTo(float widthScreen, float heightScreen, DraggableHudElement.Align align, float offsetX, float offsetY) {
+      this.align = align;
+      this.offsetX = offsetX;
+      this.offsetY = offsetY;
+      this.windowResized(widthScreen, heightScreen);
+   }
+
    @Generated
    public String getName() {
       return this.name;

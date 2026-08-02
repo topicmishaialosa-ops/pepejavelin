@@ -24,7 +24,9 @@ import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
+import tech.huihui.client.modules.api.setting.impl.ButtonSetting;
 import tech.huihui.client.modules.api.setting.impl.MultiBooleanSetting;
+import tech.huihui.client.screens.hud.EditHudScreen;
 import tech.huihui.utility.math.MathUtil;
 import tech.huihui.utility.render.display.Render2DUtil;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
@@ -37,11 +39,18 @@ import tech.huihui.utility.render.display.base.GuiUtil;
 )
 public final class Interface extends Module {
    public static final Interface INSTANCE = new Interface();
+   private static final DraggableHudElement.Align[] DEFAULT_ALIGNS = new DraggableHudElement.Align[]{
+      DraggableHudElement.Align.TOP_LEFT, DraggableHudElement.Align.TOP_LEFT, DraggableHudElement.Align.TOP_LEFT,
+      DraggableHudElement.Align.CENTER, DraggableHudElement.Align.TOP_LEFT, DraggableHudElement.Align.TOP_RIGHT
+   };
+   private static final float[] DEFAULT_OFFSET_X = new float[]{10.0F, 119.15234F, 10.0F, 157.03516F, 10.0F, -122.0F};
+   private static final float[] DEFAULT_OFFSET_Y = new float[]{10.0F, 73.0F, 73.0F, -72.5F, 41.5F, 73.0F};
    private final MultiBooleanSetting elementsSetting = MultiBooleanSetting.create("Элементы", List.of("Ватермарка", "Эффекты", "Модераторы", "Уведомления", "Информация", "Бинды"));
    private final List<DraggableHudElement> elements = new ArrayList();
    private DraggableHudElement draggingElement = null;
    private float dragOffsetX;
    private float dragOffsetY;
+   public final ButtonSetting openEditor = new ButtonSetting("Редактор HUD", EditHudScreen::openEditor);
    long init = 0L;
 
    private Interface() {
@@ -97,6 +106,9 @@ public final class Interface extends Module {
 
    @EventTarget
    public void onRender(EventHudRender event) {
+      if (mc.currentScreen instanceof EditHudScreen) {
+         return;
+      }
       if (!(mc.currentScreen instanceof ChatScreen) && this.draggingElement != null) {
          this.draggingElement.release();
          this.draggingElement = null;
@@ -140,9 +152,14 @@ public final class Interface extends Module {
 
    @EventTarget
    public void onMouse(EventMouse event) {
+      if (mc.currentScreen instanceof EditHudScreen) {
+         return;
+      }
       if (!(mc.currentScreen instanceof ChatScreen)) {
-         this.draggingElement.release();
-         this.draggingElement = null;
+         if (this.draggingElement != null) {
+            this.draggingElement.release();
+            this.draggingElement = null;
+         }
       } else {
          Vector2f mousePos = GuiUtil.getMouse((double)this.getCustomScale());
          double mouseX = (double)mousePos.getX();
@@ -162,8 +179,10 @@ public final class Interface extends Module {
                }
             }
          } else if (event.getAction() == 0) {
-            this.draggingElement.release();
-            this.draggingElement = null;
+            if (this.draggingElement != null) {
+               this.draggingElement.release();
+               this.draggingElement = null;
+            }
          }
 
       }
@@ -171,6 +190,26 @@ public final class Interface extends Module {
 
    public float getCustomScale() {
       return 2.0F;
+   }
+
+   public List<DraggableHudElement> getElements() {
+      return this.elements;
+   }
+
+   public MultiBooleanSetting getElementsSetting() {
+      return this.elementsSetting;
+   }
+
+   public void setDraggingElement(DraggableHudElement element) {
+      this.draggingElement = element;
+   }
+
+   public void resetElementPositions(float width, float height) {
+      for (int i = 0; i < this.elements.size(); i++) {
+         if (i < DEFAULT_OFFSET_X.length) {
+            this.elements.get(i).resetTo(width, height, DEFAULT_ALIGNS[i], DEFAULT_OFFSET_X[i], DEFAULT_OFFSET_Y[i]);
+         }
+      }
    }
 
    public org.joml.Vector2f getNearest(float x, float y) {

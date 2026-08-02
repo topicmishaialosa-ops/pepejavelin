@@ -4,6 +4,7 @@ import com.darkmagician6.eventapi.EventTarget;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.projectile.thrown.EnderPearlEntity;
 import net.minecraft.item.Items;
+import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.util.math.Vec3d;
 import tech.huihui.base.events.impl.other.EventSpawnEntity;
 import tech.huihui.base.events.impl.player.EventUpdate;
@@ -29,6 +30,7 @@ public final class TargetPearl extends Module {
    private final NumberSetting delay = new NumberSetting("Задержка", 1.0F, 0.1F, 5.0F, 0.1F, "Пауза между бросками (в секундах)");
    private final BooleanSetting rotate = new BooleanSetting("Ротация", true);
    private final Timer timer = new Timer();
+   private final Timer aimTimer = new Timer();
    private EnderPearlEntity target;
 
    @EventTarget
@@ -53,14 +55,20 @@ public final class TargetPearl extends Module {
          return;
       }
 
-      Rotation aim = this.calculatePearlRotation(this.target.getBoundingBox().getCenter());
+      if (!this.aimTimer.finished(100L)) {
+         return;
+      }
+
+      Rotation aim = this.calculatePearlRotation(this.target);
       if (aim == null) {
          return;
       }
+      this.aimTimer.reset();
 
       if (this.rotate.isEnabled()) {
          mc.player.setYaw(aim.getYaw());
          mc.player.setPitch(aim.getPitch());
+         mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(aim.getYaw(), aim.getPitch(), mc.player.isOnGround(), mc.player.horizontalCollision));
       }
 
       if (this.mode.is("Хвх")) {
@@ -103,7 +111,9 @@ public final class TargetPearl extends Module {
             || PlayerInventoryUtil.find(Items.ENDER_PEARL, 0, 45) != -1;
    }
 
-   private Rotation calculatePearlRotation(Vec3d targetPos) {
+   private Rotation calculatePearlRotation(EnderPearlEntity pearl) {
+      Vec3d targetPos = pearl.getBoundingBox().getCenter();
+      Vec3d targetVel = pearl.getVelocity();
       Vec3d eye = mc.player.getEyePos();
       double dx = targetPos.x - eye.x;
       double dy = targetPos.y - eye.y;
@@ -115,43 +125,34 @@ public final class TargetPearl extends Module {
 
       float yaw = (float)(Math.toDegrees(Math.atan2(-dx, dz)));
       double yawRad = Math.toRadians((double)yaw);
-      float bestPitch = 0.0F;
-      double bestDistance = Double.MAX_VALUE;
 
-      for (float pitch = -70.0F; pitch <= 90.0F; pitch += 0.5F) {
+      for (float pitch = -80.0F; pitch <= 90.0F; pitch += 0.5F) {
          double pitchRad = Math.toRadians((double)pitch);
          Vec3d direction = new Vec3d(
             -Math.sin(yawRad) * Math.cos(pitchRad),
             -Math.sin(pitchRad),
             Math.cos(yawRad) * Math.cos(pitchRad)
          );
-         Vec3d velocity = direction.multiply(1.5D);
-         Vec3d position = eye;
-         double closest = Double.MAX_VALUE;
+         Vec3d ourPos = eye;
+         Vec3d ourVel = direction.multiply(1.5D);
+         Vec3d enemyPos = targetPos;
+         Vec3d enemyVel = targetVel;
 
-         for (int tick = 0; tick < 200; ++tick) {
-            velocity = velocity.add(0.0D, -0.03D, 0.0D).multiply(0.99D);
-            position = position.add(velocity);
-            double distanceSq = position.squaredDistanceTo(targetPos);
-            if (distanceSq < closest) {
-               closest = distanceSq;
+         for (int tick = 0; tick < 120; ++tick) {
+            ourVel = ourVel.add(0.0D, -0.03D, 0.0D).multiply(0.99D);
+            ourPos = ourPos.add(ourVel);
+            enemyVel = enemyVel.add(0.0D, -0.03D, 0.0D).multiply(0.99D);
+            enemyPos = enemyPos.add(enemyVel);
+            if (ourPos.squaredDistanceTo(enemyPos) < 2.25D) {
+               return new Rotation(yaw, pitch);
             }
 
-            if (position.y < targetPos.y - 4.0D) {
+            if (ourPos.y < enemyPos.y - 8.0D) {
                break;
             }
          }
-
-         if (closest < bestDistance) {
-            bestDistance = closest;
-            bestPitch = pitch;
-         }
       }
 
-      if (bestDistance > 9.0D) {
-         return null;
-      }
-
-      return new Rotation(yaw, bestPitch);
+      return null;
    }
 }

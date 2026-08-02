@@ -65,6 +65,10 @@ public final class Aura extends Module {
    private final ModeSetting.Value lonyJir;
    private final ModeSetting.Value cake;
    private final ModeSetting.Value legendsGrief;
+   private final ModeSetting.Value snapNone;
+   private final ModeSetting.Value snap;
+   private final ModeSetting.Value snapNormal;
+   private final NumberSetting snapSpeed;
    private final ModeSetting correction;
    private final ModeSetting.Value correctionFocus;
    private final ModeSetting.Value correctionGood;
@@ -91,12 +95,16 @@ public final class Aura extends Module {
       this.lonyJir = (new ModeSetting.Value(this.rotationMode, "LonyGrief")).select();
       this.cake = (new ModeSetting.Value(this.rotationMode, "CakeWorld")).select();
       this.legendsGrief = (new ModeSetting.Value(this.rotationMode, "LegendsGrief")).select();
+      this.snapNone = new ModeSetting.Value(this.rotationMode, "Нет");
+      this.snap = new ModeSetting.Value(this.rotationMode, "Снап");
+      this.snapNormal = new ModeSetting.Value(this.rotationMode, "Нормал");
+      this.snapSpeed = new NumberSetting("Скорость снапа", 180.0F, 10.0F, 360.0F, 10.0F);
       this.correction = new ModeSetting("Коррекция", new String[0]);
       this.correctionFocus = new ModeSetting.Value(this.correction, "Фокус");
       this.correctionGood = (new ModeSetting.Value(this.correction, "Свободная")).select();
       this.correctionNone = new ModeSetting.Value(this.correction, "Нет");
       this.distance = new NumberSetting("Дистанция", 3.0F, 0.5F, 6.0F, 0.1F, "Дистанция атаки");
-      this.distanceRotation = new NumberSetting("Дистанция аима", 0.1F, 0.0F, 6.0F, 0.1F);
+      this.distanceRotation = new NumberSetting("Дистанция аима", 0.1F, 0.0F, 15.0F, 0.1F);
       this.shieldBreak = new BooleanSetting("Ломать щит", true);
       BooleanSetting var10005 = this.shieldBreak;
       Objects.requireNonNull(var10005);
@@ -234,6 +242,20 @@ public final class Aura extends Module {
          }
 
          Rotation angle = RotationUtil.fromVec3d(point.subtract(eyes));
+         if (this.snapNone.isSelected()) {
+            return;
+         }
+
+         if (this.snap.isSelected()) {
+            RotationComponent.update(new Rotation(angle.getYaw(), angle.getPitch()), 360.0F, 360.0F, 360.0F, 360.0F, 0, 1, false);
+            return;
+         }
+
+         if (this.snapNormal.isSelected()) {
+            RotationComponent.update(new Rotation(angle.getYaw(), angle.getPitch()), this.snapSpeed.getCurrent(), this.snapSpeed.getCurrent(), 360.0F, 360.0F, 0, 1, false);
+            return;
+         }
+
          float deltaYaw;
          float deltaPitch;
          float smooth;

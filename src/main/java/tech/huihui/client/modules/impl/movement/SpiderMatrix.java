@@ -3,6 +3,8 @@ package tech.huihui.client.modules.impl.movement;
 import com.darkmagician6.eventapi.EventTarget;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Items;
+import net.minecraft.network.packet.c2s.play.HandSwingC2SPacket;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import tech.huihui.base.events.impl.player.EventUpdate;
@@ -25,6 +27,8 @@ public final class SpiderMatrix extends Module {
    private final ModeSetting method = new ModeSetting("Способ", this::isWaterMode, new String[]{"Легитный", "Пакетный"});
    private final NumberSetting speed = new NumberSetting("Скорость", 0.42F, 0.1F, 1.0F, 0.02F, "Скорость подъёма");
    private final BooleanSetting forwardOnly = new BooleanSetting("Только вперёд", true);
+   private final BooleanSetting noSwap = new BooleanSetting("No Swap", "Не возвращать слот обратно", false);
+   private final BooleanSetting matrixBypass = new BooleanSetting("Matrix Bypass", "Не ставить скорость без прыжка", false);
 
    @EventTarget
    private void onUpdate(EventUpdate ignored) {
@@ -67,10 +71,34 @@ public final class SpiderMatrix extends Module {
          PlayerInventoryUtil.swapAndUseHvH(Items.WATER_BUCKET);
          this.hidePlacedWater();
          this.rise();
-      } else if (!mc.player.isTouchingWater()) {
-         PlayerInventoryUtil.swapAndUseLegit(Items.WATER_BUCKET);
       } else {
-         this.rise();
+         this.legitClimb();
+      }
+   }
+
+   private void legitClimb() {
+      int waterSlot = PlayerInventoryUtil.find(Items.WATER_BUCKET, 0, 8);
+      int previousSlot = mc.player.getInventory().selectedSlot;
+      boolean inHand = mc.player.getMainHandStack().getItem() == Items.WATER_BUCKET;
+
+      if (waterSlot != -1 && !inHand) {
+         mc.player.getInventory().selectedSlot = waterSlot;
+      }
+
+      if (mc.player.getMainHandStack().getItem() == Items.WATER_BUCKET) {
+         mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(Hand.MAIN_HAND));
+         mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+      }
+
+      if (mc.player.isTouchingWater()) {
+         Vec3d velocity = mc.player.getVelocity();
+         double target = mc.options.jumpKey.isPressed() ? 0.3D
+               : (this.matrixBypass.isEnabled() ? velocity.y : 0.4D);
+         mc.player.setVelocity(velocity.x, Math.max(velocity.y, target), velocity.z);
+      }
+
+      if (!this.noSwap.isEnabled() && waterSlot != -1 && mc.player.getInventory().selectedSlot != previousSlot) {
+         mc.player.getInventory().selectedSlot = previousSlot;
       }
    }
 

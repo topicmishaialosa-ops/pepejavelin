@@ -20,21 +20,48 @@ public class Theme {
    private int color2;
    private int fromColor1;
    private int fromColor2;
+   private int defaultColor1;
+   private int defaultColor2;
+   private boolean preset;
 
    public Theme(String name, int color1, int color2) {
+      this(name, color1, color2, true);
+   }
+
+   public Theme(String name, int color1, int color2, boolean saturate) {
       this.animation = new Animation(250L, Easing.CUBIC_OUT);
       this.checkAnimation = new Animation(250L, Easing.CUBIC_OUT);
       this.name = name;
-      this.color1 = this.saturateColor(color1);
-      this.color2 = this.saturateColor(color2);
+      this.color1 = saturate ? this.saturateColor(color1) : color1;
+      this.color2 = saturate ? this.saturateColor(color2) : color2;
       this.fromColor1 = this.color1;
       this.fromColor2 = this.color2;
+      this.defaultColor1 = this.color1;
+      this.defaultColor2 = this.color2;
+      this.preset = true;
    }
 
    public void startAnimation(int oldColor1, int oldColor2) {
       this.fromColor1 = oldColor1;
       this.fromColor2 = oldColor2;
       this.animation = new Animation(250L, Easing.CUBIC_OUT);
+   }
+
+   public void setColorRaw1(int color) {
+      this.fromColor1 = color;
+      this.color1 = color;
+   }
+
+   public void setColorRaw2(int color) {
+      this.fromColor2 = color;
+      this.color2 = color;
+   }
+
+   public void resetToDefault() {
+      this.fromColor1 = this.defaultColor1;
+      this.fromColor2 = this.defaultColor2;
+      this.color1 = this.defaultColor1;
+      this.color2 = this.defaultColor2;
    }
 
    public ColorRGBA getColor() {
@@ -136,10 +163,40 @@ public class Theme {
       return this.fromColor1;
    }
 
-   @Generated
-   public int getFromColor2() {
-      return this.fromColor2;
-   }
+    @Generated
+    public int getFromColor2() {
+       return this.fromColor2;
+    }
+
+    @Generated
+    public int getDefaultColor1() {
+       return this.defaultColor1;
+    }
+
+    @Generated
+    public int getDefaultColor2() {
+       return this.defaultColor2;
+    }
+
+    @Generated
+    public boolean isPreset() {
+       return this.preset;
+    }
+
+    @Generated
+    public void setDefaultColor1(int defaultColor1) {
+       this.defaultColor1 = defaultColor1;
+    }
+
+    @Generated
+    public void setDefaultColor2(int defaultColor2) {
+       this.defaultColor2 = defaultColor2;
+    }
+
+    @Generated
+    public void setPreset(boolean preset) {
+       this.preset = preset;
+    }
 
    @Generated
    public void setAnimation(Animation animation) {

@@ -7,16 +7,19 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec2f;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.animations.base.Animation;
 import tech.huihui.base.animations.base.Easing;
 import tech.huihui.base.font.Font;
 import tech.huihui.base.font.Fonts;
 import tech.huihui.base.theme.Theme;
+import tech.huihui.base.theme.ThemeManager;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.impl.render.ClickGUI;
 import tech.huihui.client.modules.impl.render.EditClickGUI;
+import tech.huihui.client.screens.theme.ThemeEditorScreen;
 import tech.huihui.utility.game.other.ReplaceUtil;
 import tech.huihui.utility.interfaces.IClient;
 import tech.huihui.utility.math.MathUtil;
@@ -30,10 +33,16 @@ public class ClickGuiScreen extends Screen implements IClient {
    public static final float MODULE_HEIGHT = 20.0F;
    private static final float SEARCH_WIDTH = 140.0F;
    private static final float SEARCH_HEIGHT = 18.0F;
+   private static final float THEME_WIDTH = 150.0F;
+   private static final float THEME_HEIGHT = 18.0F;
+   private static final float THEME_ROW_HEIGHT = 16.0F;
+   private static final float EDIT_BTN_SIZE = 18.0F;
 
    private final List<Panel> panels = new ArrayList();
    private final Animation openAnimation = new Animation(300L, Easing.EXPO_OUT);
+   private final Animation themeAnim = new Animation(180L, Easing.CUBIC_OUT);
    private boolean closing;
+   private boolean themeOpen;
    private String searchText = "";
    private boolean searchFocused;
    private float scale = 1.0F;
@@ -63,6 +72,7 @@ public class ClickGuiScreen extends Screen implements IClient {
    public void resetSearch() {
       this.searchText = "";
       this.searchFocused = false;
+      this.themeOpen = false;
    }
 
    public void setHoveredModule(Module module) {
@@ -115,6 +125,61 @@ public class ClickGuiScreen extends Screen implements IClient {
 
    private float searchY() {
       return (float) screenHeight / 2.0F - this.panelHeight() / 2.0F - 26.0F;
+   }
+
+   private float themeX() {
+      return this.searchX() - THEME_WIDTH - 8.0F;
+   }
+
+   private float editBtnX() {
+      return this.themeX() - EDIT_BTN_SIZE - 4.0F;
+   }
+
+   private float editBtnY() {
+      return this.themeY();
+   }
+
+   private boolean isEditBtnHovered(float mouseX, float mouseY) {
+      return MathUtil.isHovered(mouseX, mouseY, this.editBtnX(), this.editBtnY(), EDIT_BTN_SIZE, EDIT_BTN_SIZE);
+   }
+
+   private float themeY() {
+      return this.searchY();
+   }
+
+   private float themeListY() {
+      return this.themeY() + THEME_HEIGHT + 4.0F;
+   }
+
+   private float themeListHeight() {
+      return (float) HuihuiClient.getInstance().getThemeManager().getThemes().size() * THEME_ROW_HEIGHT;
+   }
+
+   private boolean isThemeBoxHovered(float mouseX, float mouseY) {
+      return MathUtil.isHovered(mouseX, mouseY, this.themeX(), this.themeY(), THEME_WIDTH, THEME_HEIGHT);
+   }
+
+   private Theme themeAt(float mouseX, float mouseY) {
+      float x = this.themeX();
+      float y = this.themeListY();
+      if (mouseX < x || mouseX > x + THEME_WIDTH || mouseY < y) {
+         return null;
+      }
+      int index = (int) ((mouseY - y) / THEME_ROW_HEIGHT);
+      if (index < 0 || index >= HuihuiClient.getInstance().getThemeManager().getThemes().size()) {
+         return null;
+      }
+      return HuihuiClient.getInstance().getThemeManager().getThemes().get(index);
+   }
+
+   private void selectTheme(Theme theme) {
+      ThemeManager themeManager = HuihuiClient.getInstance().getThemeManager();
+      if (themeManager.getCurrentTheme() != theme) {
+         theme.getAnimation().setValue(0.0F);
+         theme.startAnimation(themeManager.getCurrentTheme().getColor1(), themeManager.getCurrentTheme().getColor2());
+         themeManager.setCurrentTheme(theme);
+      }
+      this.themeOpen = false;
    }
 
    private boolean isSearchHovered(float mouseX, float mouseY) {
@@ -180,6 +245,7 @@ public class ClickGuiScreen extends Screen implements IClient {
 
       CustomDrawContext draw = CustomDrawContext.of(context);
       this.renderSearch(draw, theme, anim);
+      this.renderTheme(draw, theme, anim, mouseX, mouseY);
       this.hoveredModule = null;
 
       float width = this.panelWidth();
@@ -239,13 +305,92 @@ public class ClickGuiScreen extends Screen implements IClient {
       }
    }
 
+   private void renderTheme(CustomDrawContext draw, Theme theme, float alpha, int rawMouseX, int rawMouseY) {
+      this.themeAnim.update(this.themeOpen);
+      float x = this.themeX();
+      float y = this.themeY();
+      float mx = this.inverseX(rawMouseX);
+      float my = this.inverseY(rawMouseY);
+      ThemeManager themeManager = HuihuiClient.getInstance().getThemeManager();
+      Theme current = themeManager.getCurrentTheme();
+
+      boolean hovered = this.isThemeBoxHovered(mx, my);
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, THEME_WIDTH, THEME_HEIGHT, BorderRadius.all(6.0F), (new ColorRGBA(15, 15, 15)).withAlpha(200.0F * alpha));
+      DrawUtil.drawRoundedBorder(draw.getMatrices(), x, y, THEME_WIDTH, THEME_HEIGHT, 1.0F, BorderRadius.all(6.0F), theme.getColor().withAlpha(hovered ? 130.0F : 90.0F).withAlpha(255.0F * alpha));
+
+      float ebx = this.editBtnX();
+      float eby = this.editBtnY();
+      boolean editHovered = this.isEditBtnHovered(mx, my);
+      DrawUtil.drawRoundedRect(draw.getMatrices(), ebx, eby, EDIT_BTN_SIZE, EDIT_BTN_SIZE, BorderRadius.all(6.0F), editHovered ? theme.getColor().withAlpha(120.0F * alpha) : (new ColorRGBA(15, 15, 15)).withAlpha(200.0F * alpha));
+      DrawUtil.drawRoundedBorder(draw.getMatrices(), ebx, eby, EDIT_BTN_SIZE, EDIT_BTN_SIZE, 1.0F, BorderRadius.all(6.0F), theme.getColor().withAlpha(editHovered ? 200.0F : 90.0F).withAlpha(255.0F * alpha));
+      ColorRGBA pencil = (new ColorRGBA(222, 222, 222)).withAlpha(255.0F * alpha);
+      DrawUtil.drawLine(draw.getMatrices(), new Vec2f(ebx + 11.5F, eby + 4.5F), new Vec2f(ebx + 5.0F, eby + 11.0F), pencil);
+      DrawUtil.drawLine(draw.getMatrices(), new Vec2f(ebx + 5.0F, eby + 11.0F), new Vec2f(ebx + 7.5F, eby + 13.5F), pencil);
+      DrawUtil.drawLine(draw.getMatrices(), new Vec2f(ebx + 12.5F, eby + 5.5F), new Vec2f(ebx + 9.5F, eby + 8.5F), pencil);
+
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x + 5.0F, y + 5.0F, 8.0F, 8.0F, BorderRadius.all(2.0F), current.getColor().withAlpha(255.0F * alpha), current.getColor().withAlpha(255.0F * alpha), current.getSecondColor().withAlpha(255.0F * alpha), current.getSecondColor().withAlpha(255.0F * alpha));
+      draw.drawText(Fonts.REGULAR.getFont(5.5F), current.getName(), x + 17.0F, y + 6.0F, (new ColorRGBA(222, 222, 222)).withAlpha(255.0F * alpha));
+
+      float cxp = x + THEME_WIDTH - 13.0F;
+      float cyp = y + THEME_HEIGHT / 2.0F;
+      ColorRGBA chevron = (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha);
+      DrawUtil.drawLine(draw.getMatrices(), new Vec2f(cxp - 3.0F, cyp - 2.0F), new Vec2f(cxp, cyp + 1.0F), chevron);
+      DrawUtil.drawLine(draw.getMatrices(), new Vec2f(cxp, cyp + 1.0F), new Vec2f(cxp + 3.0F, cyp - 2.0F), chevron);
+
+      if (this.themeOpen) {
+         float listY = this.themeListY();
+         float listH = this.themeListHeight() * this.themeAnim.getValue();
+         DrawUtil.drawRoundedRect(draw.getMatrices(), x, listY, THEME_WIDTH, Math.max(listH, 2.0F), BorderRadius.all(6.0F), (new ColorRGBA(15, 15, 15)).withAlpha(225.0F * alpha));
+         DrawUtil.drawRoundedBorder(draw.getMatrices(), x, listY, THEME_WIDTH, Math.max(listH, 2.0F), 1.0F, BorderRadius.all(6.0F), theme.getColor().withAlpha(70.0F * alpha));
+         this.scissor(draw, x, listY, THEME_WIDTH, listH);
+         int row = 0;
+         for (Theme candidate : themeManager.getThemes()) {
+            float ry = listY + (float) row * THEME_ROW_HEIGHT;
+            boolean selected = candidate == current;
+            boolean rowHovered = MathUtil.isHovered(mx, my, x, ry, THEME_WIDTH, THEME_ROW_HEIGHT);
+            if (selected) {
+               DrawUtil.drawRoundedRect(draw.getMatrices(), x + 2.0F, ry, THEME_WIDTH - 4.0F, THEME_ROW_HEIGHT, BorderRadius.all(4.0F), theme.getColor().withAlpha(60.0F * alpha));
+            } else if (rowHovered) {
+               DrawUtil.drawRoundedRect(draw.getMatrices(), x + 2.0F, ry, THEME_WIDTH - 4.0F, THEME_ROW_HEIGHT, BorderRadius.all(4.0F), (new ColorRGBA(60, 60, 60)).withAlpha(120.0F * alpha));
+            }
+            DrawUtil.drawRoundedRect(draw.getMatrices(), x + 5.0F, ry + 4.0F, 8.0F, 8.0F, BorderRadius.all(2.0F), candidate.getColor(), candidate.getColor(), candidate.getSecondColor(), candidate.getSecondColor());
+            draw.drawText(Fonts.REGULAR.getFont(5.0F), candidate.getName(), x + 17.0F, ry + 5.0F, (new ColorRGBA(selected ? 255 : 200, selected ? 255 : 200, selected ? 255 : 200)).withAlpha(255.0F * alpha));
+            row++;
+         }
+         draw.disableScissor();
+      }
+   }
+
    @Override
    public boolean mouseClicked(double mouseX, double mouseY, int button) {
       float mx = this.inverseX(mouseX);
       float my = this.inverseY(mouseY);
       if (this.isSearchHovered(mx, my)) {
          this.searchFocused = true;
+         this.themeOpen = false;
          return true;
+      }
+      if (this.isThemeBoxHovered(mx, my)) {
+         this.themeOpen = !this.themeOpen;
+         this.searchFocused = false;
+         return true;
+      }
+      if (this.isEditBtnHovered(mx, my)) {
+         this.themeOpen = false;
+         this.searchFocused = false;
+         ThemeEditorScreen.openEditor();
+         return true;
+      }
+      if (this.themeOpen) {
+         Theme theme = this.themeAt(mx, my);
+         if (theme != null) {
+            this.selectTheme(theme);
+            return true;
+         }
+         this.themeOpen = false;
+         if (MathUtil.isHovered(mx, my, this.themeX(), this.themeListY(), THEME_WIDTH, this.themeListHeight())) {
+            return true;
+         }
       }
       this.searchFocused = false;
       for (Panel panel : this.panels) {
@@ -310,6 +455,10 @@ public class ClickGuiScreen extends Screen implements IClient {
          }
       }
       if (keyCode == 256) {
+         if (this.themeOpen) {
+            this.themeOpen = false;
+            return true;
+         }
          this.closing = true;
          this.openAnimation.animateTo(0.0F);
          return true;

@@ -32,6 +32,7 @@ import tech.huihui.client.modules.impl.combat.ClickPearl;
 import tech.huihui.client.modules.impl.combat.TargetPearl;
 import tech.huihui.client.modules.impl.misc.AHHelper;
 import tech.huihui.client.modules.impl.misc.AutoAccept;
+import tech.huihui.client.modules.impl.misc.AutoDuel;
 import tech.huihui.client.modules.impl.misc.AutoKit;
 import tech.huihui.client.modules.impl.misc.AutoRespawn;
 import tech.huihui.client.modules.impl.misc.ClickAction;
@@ -43,7 +44,7 @@ import tech.huihui.client.modules.impl.misc.NoInteract;
 import tech.huihui.client.modules.impl.misc.ScoreboardHealth;
 import tech.huihui.client.modules.impl.misc.ServerHelper;
 import tech.huihui.client.modules.impl.movement.AirStuck;
-import tech.huihui.client.modules.impl.movement.AutoSprint;
+import tech.huihui.client.modules.impl.movement.AntiElytraTarget;import tech.huihui.client.modules.impl.movement.AutoSprint;
 import tech.huihui.client.modules.impl.movement.ElytraAccelerate;
 import tech.huihui.client.modules.impl.movement.ElytraBooster;
 import tech.huihui.client.modules.impl.movement.ElytraMotion;
@@ -51,8 +52,10 @@ import tech.huihui.client.modules.impl.movement.ElytraRecast;
 import tech.huihui.client.modules.impl.movement.GuiWalk;
 import tech.huihui.client.modules.impl.movement.NoSlow;
 import tech.huihui.client.modules.impl.movement.NoWeb;
+import tech.huihui.client.modules.impl.movement.Scaffold;
 import tech.huihui.client.modules.impl.movement.SpiderMatrix;
 import tech.huihui.client.modules.impl.movement.Speed;
+import tech.huihui.client.modules.impl.movement.TargetStrafe;
 import tech.huihui.client.modules.impl.player.AutoArmor;
 import tech.huihui.client.modules.impl.player.AutoTool;
 import tech.huihui.client.modules.impl.player.Blink;
@@ -60,6 +63,8 @@ import tech.huihui.client.modules.impl.player.FastBreak;
 import tech.huihui.client.modules.impl.player.NoDelay;
 import tech.huihui.client.modules.impl.player.NoPush;
 import tech.huihui.client.modules.impl.render.AntiInvisible;
+import tech.huihui.client.modules.impl.render.BlockESP;
+import tech.huihui.client.modules.impl.render.ChunkAnimator;
 import tech.huihui.client.modules.impl.render.Crosshair;
 import tech.huihui.client.modules.impl.render.CustomFog;
 import tech.huihui.client.modules.impl.render.ClickGUI;
@@ -68,6 +73,7 @@ import tech.huihui.client.modules.impl.render.EntityESP;
 import tech.huihui.client.modules.impl.render.FullBright;
 import tech.huihui.client.modules.impl.render.GlowHands;
 import tech.huihui.client.modules.impl.render.Interface;
+import tech.huihui.client.modules.impl.render.InventoryAnimator;
 import tech.huihui.client.modules.impl.render.Menu;
 import tech.huihui.client.modules.impl.render.NoRender;
 import tech.huihui.client.modules.impl.render.Optimization;
@@ -78,6 +84,7 @@ import tech.huihui.client.modules.impl.render.SwingAnimation;
 import tech.huihui.client.modules.impl.render.TargetESP;
 import tech.huihui.client.modules.impl.render.TargetHud;
 import tech.huihui.client.modules.impl.render.ViewModel;
+import tech.huihui.client.modules.impl.render.Watermark;
 import tech.huihui.client.modules.impl.render.WorldTime;
 import tech.huihui.client.screens.menu.MenuScreen;
 import tech.huihui.utility.component.RotationComponent;
@@ -124,10 +131,13 @@ public final class ModuleManager implements IMinecraft {
       registerModule(NoSlow.INSTANCE);
       registerModule(Speed.INSTANCE);
       registerModule(AirStuck.INSTANCE);
+      registerModule(AntiElytraTarget.INSTANCE);
       registerModule(ElytraMotion.INSTANCE);
-      registerModule(NoWeb.INSTANCE);
-      registerModule(SpiderMatrix.INSTANCE);
-   }
+       registerModule(NoWeb.INSTANCE);
+        registerModule(SpiderMatrix.INSTANCE);
+        registerModule(Scaffold.INSTANCE);
+        registerModule(TargetStrafe.INSTANCE);
+     }
 
    private void registerRender() {
       registerModule(Interface.INSTANCE);
@@ -146,11 +156,15 @@ public final class ModuleManager implements IMinecraft {
       registerModule(WorldTime.INSTANCE);
       registerModule(ClickGUI.INSTANCE);
       registerModule(EditClickGUI.INSTANCE);
-      registerModule(EntityESP.INSTANCE);
-      registerModule(TargetESP.INSTANCE);
-      registerModule(AresMinePvPWarpChest.INSTANCE);
-      registerModule(TargetHud.INSTANCE);
-   }
+       registerModule(EntityESP.INSTANCE);
+       registerModule(TargetESP.INSTANCE);
+       registerModule(BlockESP.INSTANCE);
+       registerModule(AresMinePvPWarpChest.INSTANCE);
+       registerModule(TargetHud.INSTANCE);
+       registerModule(Watermark.INSTANCE);
+       registerModule(ChunkAnimator.INSTANCE);
+       registerModule(InventoryAnimator.INSTANCE);
+    }
 
    private void registerPlayer() {
       registerModule(AutoTool.INSTANCE);
@@ -170,6 +184,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(AHHelper.INSTANCE);
       registerModule(NoInteract.INSTANCE);
       registerModule(AutoAccept.INSTANCE);
+      registerModule(AutoDuel.INSTANCE);
       registerModule(AutoRespawn.INSTANCE);
       registerModule(AutoKit.INSTANCE);
       registerModule(NameProtect.INSTANCE);

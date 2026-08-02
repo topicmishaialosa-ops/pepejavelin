@@ -14,6 +14,7 @@ import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
 import tech.huihui.client.modules.api.setting.impl.ModeSetting;
+import tech.huihui.client.modules.api.setting.impl.NumberSetting;
 import tech.huihui.client.modules.impl.combat.Aura;
 import tech.huihui.utility.game.player.MovingUtil;
 import tech.huihui.utility.predict.PredictUtils;
@@ -25,17 +26,26 @@ import tech.huihui.utility.predict.PredictUtils;
 )
 public class Speed extends Module {
    public static final Speed INSTANCE = new Speed();
-   private final ModeSetting mode = new ModeSetting("Mode", "Collision", "Metahvh");
+   private final ModeSetting mode = new ModeSetting("Mode", "Collision", "Metahvh", "Ванила");
+   public final NumberSetting speed = new NumberSetting("Скорость", 0.36F, 0.0F, 20.0F, 0.01F);
    private final float melonBallSpeed = 0.36F;
 
    @EventTarget
    private void onUpdate(EventUpdate ignored) {
       if (mc.player != null && mc.world != null) {
-         if (this.mode.is("Metahvh")) {
+         if (this.mode.is("Ванила")) {
+            this.vanillaSpeed();
+         } else if (this.mode.is("Metahvh")) {
             this.metahvhSpeed();
          } else {
             this.collisionSpeed();
          }
+      }
+   }
+
+   private void vanillaSpeed() {
+      if (MovingUtil.hasPlayerMovement()) {
+         MovingUtil.setVelocity(this.speed.getCurrent());
       }
    }
 

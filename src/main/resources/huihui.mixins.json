@@ -17,6 +17,7 @@
     "minecraft.text.TextVisitFactoryMixin"
   ],
   "client": [
+    "accessors.BuiltChunkAccessor",
     "accessors.CameraAccessor",
     "accessors.DrawContextAccessor",
     "accessors.HandledScreenAccessor",
@@ -42,10 +43,13 @@
     "client.render.ScreenMixin",
     "client.render.WindowMixin",
     "client.render.WorldRendererMixin",
+    "client.render.WorldRendererChunkAnimatorMixin",
+    "client.render.chunk.BuiltChunkMixin",
     "client.render.gui.hud.GameOverlayRendererMixin",
     "client.render.gui.hud.InGameHudMixin",
     "client.render.gui.screen.ChatScreenMixin",
     "client.render.gui.screen.HandledScreenMixin",
+    "client.render.gui.screen.InventoryAnimatorMixin",
     "minecraft.network.ClientPlayNetworkHandlerMixin",
     "minecraft.render.ClientWorldPropertiesMixin",
     "minecraft.render.FeatureRendererMixin",

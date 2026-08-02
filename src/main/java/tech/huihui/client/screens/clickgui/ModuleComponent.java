@@ -198,9 +198,14 @@ public class ModuleComponent extends Component {
       return ((ButtonComponent) component).getSetting();
    }
 
-   @Override
-   public boolean mouseClick(float mouseX, float mouseY, int button) {
-      if (this.isHovered(mouseX, mouseY, ClickGuiScreen.MODULE_HEIGHT)) {
+    @Override
+    public boolean mouseClick(float mouseX, float mouseY, int button) {
+       if (this.bind) {
+          this.module.setKeyCode(button);
+          this.bind = false;
+          return true;
+       }
+       if (this.isHovered(mouseX, mouseY, ClickGuiScreen.MODULE_HEIGHT)) {
          if (button == 0) {
             this.module.toggle();
             return true;

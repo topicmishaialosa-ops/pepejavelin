@@ -272,8 +272,10 @@ public final class PlayerInventoryUtil implements IClient {
          mc.interactionManager.interactItem(mc.player, Hand.OFF_HAND);
       } else {
          if (slotHotbar != -1) {
+            mc.player.getInventory().selectedSlot = slotHotbar;
             mc.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(slotHotbar));
             mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+            mc.player.getInventory().selectedSlot = previousSlot;
             mc.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(previousSlot));
          }
 
@@ -308,8 +310,10 @@ public final class PlayerInventoryUtil implements IClient {
 
                mc.interactionManager.clickSlot(0, slot, 8, SlotActionType.SWAP, mc.player);
                mc.getNetworkHandler().sendPacket(new CloseHandledScreenC2SPacket(0));
+               mc.player.getInventory().selectedSlot = 8;
                mc.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(8));
                mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+               mc.player.getInventory().selectedSlot = previousSlot;
                mc.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(previousSlot));
                if (wasSprinting) {
                   mc.getNetworkHandler().sendPacket(new PlayerInputC2SPacket(mc.player.input.playerInput));
@@ -329,8 +333,10 @@ public final class PlayerInventoryUtil implements IClient {
 
                mc.interactionManager.clickSlot(0, slot, slotCorrectable, SlotActionType.SWAP, mc.player);
                mc.getNetworkHandler().sendPacket(new CloseHandledScreenC2SPacket(0));
+               mc.player.getInventory().selectedSlot = slotCorrectable;
                mc.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(slotCorrectable));
                mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+               mc.player.getInventory().selectedSlot = previousSlot;
                mc.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(previousSlot));
                mc.interactionManager.clickSlot(0, slot, slotCorrectable, SlotActionType.SWAP, mc.player);
                mc.getNetworkHandler().sendPacket(new CloseHandledScreenC2SPacket(0));

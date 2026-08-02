@@ -51,12 +51,17 @@ public class BindComponent extends Component {
       return false;
    }
 
-   @Override
-   public boolean mouseClick(float mouseX, float mouseY, int button) {
-      if (this.isHovered(mouseX, mouseY) && button == 0) {
-         this.activated = !this.activated;
-         return true;
-      }
-      return false;
-   }
+    @Override
+    public boolean mouseClick(float mouseX, float mouseY, int button) {
+       if (this.activated) {
+          this.setting.setKeyCode(button);
+          this.activated = false;
+          return true;
+       }
+       if (this.isHovered(mouseX, mouseY) && button == 0) {
+          this.activated = !this.activated;
+          return true;
+       }
+       return false;
+    }
 }

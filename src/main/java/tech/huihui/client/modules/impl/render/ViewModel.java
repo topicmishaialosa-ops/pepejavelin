@@ -7,6 +7,7 @@ import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
 import tech.huihui.client.modules.api.setting.impl.ButtonSetting;
+import tech.huihui.client.modules.api.setting.impl.BooleanSetting;
 import tech.huihui.client.modules.api.setting.impl.NumberSetting;
 import tech.huihui.client.screens.viewmodel.ViewModelEditScreen;
 
@@ -32,8 +33,9 @@ public final class ViewModel extends Module {
    public final NumberSetting rightX = new NumberSetting("Правая рука X", 0.0F, -10.0F, 10.0F, 0.01F);
    public final NumberSetting rightY = new NumberSetting("Правая рука Y", 0.0F, -10.0F, 10.0F, 0.01F);
    public final NumberSetting rightZ = new NumberSetting("Правая рука Z", 0.0F, -10.0F, 10.0F, 0.01F);
-   public final NumberSetting rightScale = new NumberSetting("Правая рука размер", 1.0F, 0.05F, 3.0F, 0.01F);
-   public final ButtonSetting openEditor = new ButtonSetting("Открыть редактор", ViewModelEditScreen::openEditor);
+    public final NumberSetting rightScale = new NumberSetting("Правая рука размер", 1.0F, 0.05F, 3.0F, 0.01F);
+    public final BooleanSetting scaleHand = new BooleanSetting("Уменьшать руку", false);
+    public final ButtonSetting openEditor = new ButtonSetting("Открыть редактор", ViewModelEditScreen::openEditor);
 
    private ViewModel() {
    }
@@ -62,6 +64,13 @@ public final class ViewModel extends Module {
          matrices.translate(0.0F, 0.0F, 0.0F);
       }
 
+   }
+
+   public void applyHandTransform(MatrixStack matrices, Arm arm) {
+      if (this.isEnabled()) {
+         this.applyHandPosition(matrices, arm);
+         this.applyHandScale(matrices, arm);
+      }
    }
 
    public static void captureHandScreenPosition(MatrixStack matrices, Arm arm) {
