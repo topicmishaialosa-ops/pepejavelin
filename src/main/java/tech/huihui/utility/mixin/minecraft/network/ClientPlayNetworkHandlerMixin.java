@@ -8,6 +8,7 @@ import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
+import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
 import net.minecraft.network.packet.s2c.play.ItemPickupAnimationS2CPacket;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.Mixin;
@@ -16,6 +17,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.events.impl.player.EventPickupItem;
+import tech.huihui.base.events.impl.server.EventChatReceive;
 
 @Mixin({ClientPlayNetworkHandler.class})
 public class ClientPlayNetworkHandlerMixin {
@@ -34,6 +36,14 @@ public class ClientPlayNetworkHandlerMixin {
          ci.cancel();
       }
 
+   }
+
+   @Inject(
+      method = {"onGameMessage"},
+      at = {@At("HEAD")}
+   )
+   private void onGameMessage(GameMessageS2CPacket packet, CallbackInfo ci) {
+      EventManager.call(new EventChatReceive(packet.content()));
    }
 
    @Inject(

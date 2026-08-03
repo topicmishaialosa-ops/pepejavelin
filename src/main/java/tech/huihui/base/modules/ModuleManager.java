@@ -26,6 +26,7 @@ import tech.huihui.client.modules.api.setting.impl.MultiBooleanSetting;
 import tech.huihui.client.modules.api.setting.impl.ModeSetting.Value;
 import tech.huihui.client.modules.impl.combat.AntiBot;
 import tech.huihui.client.modules.impl.combat.Aura;
+import tech.huihui.client.modules.impl.combat.AutoGapple;
 import tech.huihui.client.modules.impl.combat.AutoSwap;
 import tech.huihui.client.modules.impl.combat.AutoTotem;
 import tech.huihui.client.modules.impl.combat.ClickPearl;
@@ -33,9 +34,12 @@ import tech.huihui.client.modules.impl.combat.TargetPearl;
 import tech.huihui.client.modules.impl.misc.AHHelper;
 import tech.huihui.client.modules.impl.misc.AutoAccept;
 import tech.huihui.client.modules.impl.misc.AutoDuel;
+import tech.huihui.client.modules.impl.misc.AutoJoiner;
 import tech.huihui.client.modules.impl.misc.AutoKit;
 import tech.huihui.client.modules.impl.misc.AutoRespawn;
+import tech.huihui.client.modules.impl.misc.Autofarm;
 import tech.huihui.client.modules.impl.misc.ClickAction;
+import tech.huihui.client.modules.impl.misc.CreeperFarm;
 import tech.huihui.client.modules.impl.misc.ElytraHelper;
 import tech.huihui.client.modules.impl.misc.FreeCam;
 import tech.huihui.client.modules.impl.misc.ItemScroller;
@@ -43,6 +47,7 @@ import tech.huihui.client.modules.impl.misc.NameProtect;
 import tech.huihui.client.modules.impl.misc.NoInteract;
 import tech.huihui.client.modules.impl.misc.ScoreboardHealth;
 import tech.huihui.client.modules.impl.misc.ServerHelper;
+import tech.huihui.client.modules.impl.misc.ZarabotokReallyWorld;
 import tech.huihui.client.modules.impl.movement.AirStuck;
 import tech.huihui.client.modules.impl.movement.AntiElytraTarget;import tech.huihui.client.modules.impl.movement.AutoSprint;
 import tech.huihui.client.modules.impl.movement.ElytraAccelerate;
@@ -73,7 +78,6 @@ import tech.huihui.client.modules.impl.render.EntityESP;
 import tech.huihui.client.modules.impl.render.FullBright;
 import tech.huihui.client.modules.impl.render.GlowHands;
 import tech.huihui.client.modules.impl.render.Interface;
-import tech.huihui.client.modules.impl.render.InventoryAnimator;
 import tech.huihui.client.modules.impl.render.Menu;
 import tech.huihui.client.modules.impl.render.NoRender;
 import tech.huihui.client.modules.impl.render.Optimization;
@@ -86,6 +90,7 @@ import tech.huihui.client.modules.impl.render.TargetHud;
 import tech.huihui.client.modules.impl.render.ViewModel;
 import tech.huihui.client.modules.impl.render.Watermark;
 import tech.huihui.client.modules.impl.render.WorldTime;
+import tech.huihui.client.modules.impl.render.XRay;
 import tech.huihui.client.screens.menu.MenuScreen;
 import tech.huihui.utility.component.RotationComponent;
 import tech.huihui.utility.game.player.rotation.Rotation;
@@ -119,6 +124,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(Aura.INSTANCE);
       registerModule(AutoSwap.INSTANCE);
       registerModule(AutoTotem.INSTANCE);
+      registerModule(AutoGapple.INSTANCE);
       registerModule(ClickPearl.INSTANCE);
       registerModule(TargetPearl.INSTANCE);
    }
@@ -163,7 +169,7 @@ public final class ModuleManager implements IMinecraft {
        registerModule(TargetHud.INSTANCE);
        registerModule(Watermark.INSTANCE);
        registerModule(ChunkAnimator.INSTANCE);
-       registerModule(InventoryAnimator.INSTANCE);
+       registerModule(XRay.INSTANCE);
     }
 
    private void registerPlayer() {
@@ -186,10 +192,14 @@ public final class ModuleManager implements IMinecraft {
       registerModule(AutoAccept.INSTANCE);
       registerModule(AutoDuel.INSTANCE);
       registerModule(AutoRespawn.INSTANCE);
+      registerModule(Autofarm.INSTANCE);
       registerModule(AutoKit.INSTANCE);
+      registerModule(CreeperFarm.INSTANCE);
       registerModule(NameProtect.INSTANCE);
       registerModule(ScoreboardHealth.INSTANCE);
       registerModule(ElytraAccelerate.INSTANCE);
+      registerModule(ZarabotokReallyWorld.INSTANCE);
+      registerModule(AutoJoiner.INSTANCE);
    }
 
    private void registerModule(Module module) {

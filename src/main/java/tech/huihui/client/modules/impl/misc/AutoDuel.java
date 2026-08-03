@@ -8,9 +8,11 @@ import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
 import net.minecraft.client.network.PlayerListEntry;
+import net.minecraft.item.ItemStack;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.base.events.impl.player.EventUpdate;
 import tech.huihui.client.modules.api.Category;
@@ -32,6 +34,7 @@ public final class AutoDuel extends Module {
    private static final String TITLE_KIT_SELECT = "Выбор набора";
    private static final String TITLE_DUEL_SETUP = "Настройка поединка";
    private static final long MENU_DELAY_MS = 150L;
+   private static final int MAX_BET_RETRIES = 3;
 
    private final ModeSetting priority = new ModeSetting("Приоритет", "Random", "По алфавиту");
    private final ModeSetting kit = new ModeSetting("Кит", "Щит", "Шипы 3", "Лук", "Тотем", "НоуДебаф", "Шары", "Классик", "Читерский рай", "Незер");
@@ -44,9 +47,13 @@ public final class AutoDuel extends Module {
    private final List<String> sentPlayers = new ArrayList<>();
    private final Timer actionTimer = new Timer();
    private final Timer menuTimer = new Timer();
+   private final Timer graceTimer = new Timer();
    private final SecureRandom random = new SecureRandom();
    private boolean wasInMenu;
    private Vec3d lastTickPos;
+   private World lastWorld;
+   private String lastTarget;
+   private int betAttempts;
 
    private AutoDuel() {
    }
@@ -57,8 +64,12 @@ public final class AutoDuel extends Module {
       this.sentPlayers.clear();
       this.wasInMenu = false;
       this.lastTickPos = null;
+      this.lastWorld = null;
+      this.lastTarget = null;
+      this.betAttempts = 0;
       this.actionTimer.reset();
       this.menuTimer.reset();
+      this.graceTimer.reset();
    }
 
    @EventTarget
@@ -69,8 +80,14 @@ public final class AutoDuel extends Module {
          return;
       }
 
+      if (this.lastWorld != mc.world) {
+         this.lastWorld = mc.world;
+         this.lastTickPos = null;
+         this.graceTimer.reset();
+      }
+
       Vec3d currentPos = mc.player.getPos();
-      if (this.lastTickPos != null && currentPos.distanceTo(this.lastTickPos) > 10.0D) {
+      if (this.lastTickPos != null && currentPos.distanceTo(this.lastTickPos) > 10.0D && this.graceTimer.finished(2000L)) {
          this.setToggled(false);
          return;
       }
@@ -97,12 +114,15 @@ public final class AutoDuel extends Module {
       }
 
       String command = "duel " + target;
-      if (this.betToggle.isEnabled() && !this.betAmount.getValue().isEmpty()) {
-         command = command + " " + this.betAmount.getValue();
+      String amount = this.normalizedBet();
+      if (this.betToggle.isEnabled() && !amount.isEmpty()) {
+         command = command + " " + amount;
       }
 
       mc.getNetworkHandler().sendChatCommand(command);
+      this.lastTarget = target;
       this.sentPlayers.add(target);
+      this.betAttempts = 0;
       this.actionTimer.reset();
    }
 
@@ -120,9 +140,68 @@ public final class AutoDuel extends Module {
             this.menuTimer.reset();
          }
       } else if (title.contains(TITLE_DUEL_SETUP)) {
+         if (this.betToggle.isEnabled() && !this.normalizedBet().isEmpty()) {
+            String signBet = this.findBetOnSign(screen);
+            if (!signBet.isEmpty() && !signBet.equals(this.normalizedBet())) {
+               this.betAttempts++;
+               if (this.betAttempts < MAX_BET_RETRIES) {
+                  this.retryDuel();
+               } else {
+                  this.cancelDuel();
+               }
+               return;
+            }
+         }
          this.click(screen, 0);
          this.menuTimer.reset();
       }
+   }
+
+   private String findBetOnSign(GenericContainerScreen screen) {
+      Slot slot = screen.getScreenHandler().slots.get(4);
+      if (!slot.hasStack()) {
+         return "";
+      }
+      ItemStack stack = slot.getStack();
+      String name = stack.getName().getString().replaceAll("§[0-9a-fk-orA-FK-OR]", "");
+      return name.replaceAll("[^0-9]", "");
+   }
+
+   private void cancelDuel() {
+      this.wasInMenu = false;
+      if (this.lastTarget != null) {
+         this.sentPlayers.add(this.lastTarget);
+      }
+      if (mc.player != null) {
+         mc.player.closeHandledScreen();
+      }
+   }
+
+   private void retryDuel() {
+      this.wasInMenu = false;
+      if (this.lastTarget == null || mc.getNetworkHandler() == null) {
+         this.cancelDuel();
+         return;
+      }
+      if (mc.player != null) {
+         mc.player.closeHandledScreen();
+      }
+      String command = "duel " + this.lastTarget;
+      String amount = this.normalizedBet();
+      if (!amount.isEmpty()) {
+         command = command + " " + amount;
+      }
+      mc.getNetworkHandler().sendChatCommand(command);
+      this.actionTimer.reset();
+      this.menuTimer.reset();
+   }
+
+   private String normalizedBet() {
+      String value = this.betAmount.getValue();
+      if (value == null) {
+         return "";
+      }
+      return value.trim().replaceAll("[^0-9]", "");
    }
 
    private String pickTarget() {

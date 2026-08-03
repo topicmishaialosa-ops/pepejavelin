@@ -12,10 +12,13 @@ import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.base.comand.api.CommandAbstract;
 import tech.huihui.base.comand.impl.ClipCommand;
 import tech.huihui.base.comand.impl.ConfigCommand;
+import tech.huihui.base.comand.impl.FarmCommand;
 import tech.huihui.base.comand.impl.FriendCommand;
 import tech.huihui.base.comand.impl.GPSCommand;
+import tech.huihui.base.comand.impl.HelpCommand;
 import tech.huihui.base.comand.impl.MacroCommand;
 import tech.huihui.base.comand.impl.RCTCommand;
+import tech.huihui.base.comand.impl.StopCommand;
 
 public class CommandManager {
    private String prefix = ".";
@@ -35,6 +38,9 @@ public class CommandManager {
       this.registerCommand(new ConfigCommand());
       this.registerCommand(new RCTCommand());
       this.registerCommand(new GPSCommand());
+      this.registerCommand(new FarmCommand());
+      this.registerCommand(new StopCommand());
+      this.registerCommand(new HelpCommand());
    }
 
    @Native

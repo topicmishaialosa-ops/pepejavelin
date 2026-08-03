@@ -73,6 +73,7 @@ public final class Aura extends Module {
    private final ModeSetting.Value correctionFocus;
    private final ModeSetting.Value correctionGood;
    private final ModeSetting.Value correctionNone;
+   private final ModeSetting.Value correctionSpin;
    private final NumberSetting distance;
    private final NumberSetting distanceRotation;
    private final BooleanSetting shieldBreak;
@@ -87,8 +88,8 @@ public final class Aura extends Module {
    private final Timer hurtTimer;
    private final ScriptManager.ScriptTask script;
    private int lastSlot;
-   public float lastYaw;
-   public float lastPitch;
+    public float lastYaw;
+    public float lastPitch;
 
    private Aura() {
       this.hvh = new ModeSetting.Value(this.rotationMode, "Vanilla");
@@ -103,6 +104,7 @@ public final class Aura extends Module {
       this.correctionFocus = new ModeSetting.Value(this.correction, "Фокус");
       this.correctionGood = (new ModeSetting.Value(this.correction, "Свободная")).select();
       this.correctionNone = new ModeSetting.Value(this.correction, "Нет");
+      this.correctionSpin = new ModeSetting.Value(this.correction, "Крутилка");
       this.distance = new NumberSetting("Дистанция", 3.0F, 0.5F, 6.0F, 0.1F, "Дистанция атаки");
       this.distanceRotation = new NumberSetting("Дистанция аима", 0.1F, 0.0F, 15.0F, 0.1F);
       this.shieldBreak = new BooleanSetting("Ломать щит", true);
@@ -242,6 +244,11 @@ public final class Aura extends Module {
          }
 
          Rotation angle = RotationUtil.fromVec3d(point.subtract(eyes));
+         if (this.correctionSpin.isSelected()) {
+            RotationComponent.update(new Rotation(angle.getYaw(), angle.getPitch()), 360.0F, 360.0F, 360.0F, 360.0F, 0, 1, false);
+            return;
+         }
+
          if (this.snapNone.isSelected()) {
             return;
          }
@@ -457,6 +464,10 @@ public final class Aura extends Module {
 
    @EventTarget
    private void setCorrection(EventMoveInput eventMoveInput) {
+      if (this.correctionSpin.isSelected()) {
+         MovingUtil.fixMovementFocus(eventMoveInput, mc.player.getYaw());
+         return;
+      }
       if (!this.correctionNone.isSelected() && this.target != null) {
          if (this.correctionFocus.isSelected()) {
             MovingUtil.fixMovementFocus(eventMoveInput, mc.player.getYaw());
