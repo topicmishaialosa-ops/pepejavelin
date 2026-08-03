@@ -752,7 +752,7 @@ public final class ZarabotokReallyWorld extends Module {
             MessageUtil.displayInfo("Собрано " + this.collectedCount + " шт — складываю и останавливаюсь");
             this.setToggled(false);
          } else {
-            MessageUtil.displayInfo("Паутина сложена в сундук — телепортируюсь (/rtp)");
+            MessageUtil.displayInfo("Собрано паутины: " + this.collectedCount + " шт — сложена в сундук, телепортируюсь (/rtp)");
             this.stage = Stage.RTP;
          }
       } else {
@@ -777,7 +777,7 @@ public final class ZarabotokReallyWorld extends Module {
             MessageUtil.displayInfo("Собрано " + this.collectedCount + " шт — нет сундука, останавливаюсь");
             this.setToggled(false);
          } else {
-            MessageUtil.displayInfo("Выбросил паутину — телепортируюсь (/rtp)");
+            MessageUtil.displayInfo("Собрано паутины: " + this.collectedCount + " шт — нет сундука, выбросил и телепортируюсь (/rtp)");
             this.stage = Stage.RTP;
          }
       }
