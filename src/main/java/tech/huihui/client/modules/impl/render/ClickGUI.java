@@ -1,9 +1,11 @@
 package tech.huihui.client.modules.impl.render;
 
+import net.minecraft.client.gui.screen.Screen;
 import tech.huihui.HuihuiClient;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
+import tech.huihui.client.screens.dropdowngui.Dropdown2Screen;
 
 @ModuleAnnotation(
    name = "ClickGUI",
@@ -21,9 +23,15 @@ public final class ClickGUI extends Module {
       if (mc.world == null) {
          this.setEnabled(false);
       } else {
-         HuihuiClient.getInstance().getClickGuiScreen().resetSearch();
-         if (mc.currentScreen != HuihuiClient.getInstance().getClickGuiScreen()) {
-            mc.setScreen(HuihuiClient.getInstance().getClickGuiScreen());
+         Screen screen;
+         if (EditClickGUI.INSTANCE.isDropdown2()) {
+            screen = Dropdown2Screen.getInstance();
+         } else {
+            HuihuiClient.getInstance().getClickGuiScreen().resetSearch();
+            screen = HuihuiClient.getInstance().getClickGuiScreen();
+         }
+         if (mc.currentScreen != screen) {
+            mc.setScreen(screen);
             super.onEnable();
          }
       }

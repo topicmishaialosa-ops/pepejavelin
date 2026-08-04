@@ -26,6 +26,7 @@ import tech.huihui.client.modules.api.setting.impl.MultiBooleanSetting;
 import tech.huihui.client.modules.api.setting.impl.ModeSetting.Value;
 import tech.huihui.client.modules.impl.combat.AntiBot;
 import tech.huihui.client.modules.impl.combat.Aura;
+import tech.huihui.client.modules.impl.combat.AutoCrystal;
 import tech.huihui.client.modules.impl.combat.AutoGapple;
 import tech.huihui.client.modules.impl.combat.AutoSwap;
 import tech.huihui.client.modules.impl.combat.AutoTotem;
@@ -44,6 +45,7 @@ import tech.huihui.client.modules.impl.misc.CreeperFarm;
 import tech.huihui.client.modules.impl.misc.ElytraHelper;
 import tech.huihui.client.modules.impl.misc.FreeCam;
 import tech.huihui.client.modules.impl.misc.ItemScroller;
+import tech.huihui.client.modules.impl.misc.MineHelper;
 import tech.huihui.client.modules.impl.misc.NameProtect;
 import tech.huihui.client.modules.impl.misc.NoInteract;
 import tech.huihui.client.modules.impl.misc.PilotSettings;
@@ -51,13 +53,15 @@ import tech.huihui.client.modules.impl.misc.ScoreboardHealth;
 import tech.huihui.client.modules.impl.misc.ServerHelper;
 import tech.huihui.client.modules.impl.misc.ZarabotokReallyWorld;
 import tech.huihui.client.modules.impl.movement.AirStuck;
-import tech.huihui.client.modules.impl.movement.AntiElytraTarget;import tech.huihui.client.modules.impl.movement.AutoSprint;
+import tech.huihui.client.modules.impl.movement.AntiElytraTarget;
+import tech.huihui.client.modules.impl.movement.AutoSprint;
 import tech.huihui.client.modules.impl.movement.ElytraAccelerate;
 import tech.huihui.client.modules.impl.movement.ElytraBooster;
 import tech.huihui.client.modules.impl.movement.ElytraMotion;
 import tech.huihui.client.modules.impl.movement.ElytraRecast;
 import tech.huihui.client.modules.impl.movement.Fly;
 import tech.huihui.client.modules.impl.movement.GuiWalk;
+import tech.huihui.client.modules.impl.movement.Jesus;
 import tech.huihui.client.modules.impl.movement.NoSlow;
 import tech.huihui.client.modules.impl.movement.NoWeb;
 import tech.huihui.client.modules.impl.movement.Scaffold;
@@ -125,6 +129,7 @@ public final class ModuleManager implements IMinecraft {
    private void registerCombat() {
       registerModule(AntiBot.INSTANCE);
       registerModule(Aura.INSTANCE);
+      registerModule(AutoCrystal.INSTANCE);
       registerModule(AutoSwap.INSTANCE);
       registerModule(AutoTotem.INSTANCE);
       registerModule(AutoGapple.INSTANCE);
@@ -139,6 +144,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(ElytraRecast.INSTANCE);
       registerModule(GuiWalk.INSTANCE);
       registerModule(NoSlow.INSTANCE);
+      registerModule(Jesus.INSTANCE);
       registerModule(Speed.INSTANCE);
       registerModule(AirStuck.INSTANCE);
       registerModule(AntiElytraTarget.INSTANCE);
@@ -204,9 +210,10 @@ public final class ModuleManager implements IMinecraft {
       registerModule(ScoreboardHealth.INSTANCE);
       registerModule(ElytraAccelerate.INSTANCE);
       registerModule(ZarabotokReallyWorld.INSTANCE);
-      registerModule(AutoJoiner.INSTANCE);
-      registerModule(BaseFinder.INSTANCE);
-   }
+       registerModule(AutoJoiner.INSTANCE);
+       registerModule(BaseFinder.INSTANCE);
+       registerModule(MineHelper.INSTANCE);
+    }
 
    private void registerModule(Module module) {
       modules.add(module);
