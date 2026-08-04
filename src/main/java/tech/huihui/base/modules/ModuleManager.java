@@ -34,6 +34,7 @@ import tech.huihui.client.modules.impl.combat.TargetPearl;
 import tech.huihui.client.modules.impl.misc.AHHelper;
 import tech.huihui.client.modules.impl.misc.AutoAccept;
 import tech.huihui.client.modules.impl.misc.AutoDuel;
+import tech.huihui.client.modules.impl.misc.BaseFinder;
 import tech.huihui.client.modules.impl.misc.AutoJoiner;
 import tech.huihui.client.modules.impl.misc.AutoKit;
 import tech.huihui.client.modules.impl.misc.AutoRespawn;
@@ -45,6 +46,7 @@ import tech.huihui.client.modules.impl.misc.FreeCam;
 import tech.huihui.client.modules.impl.misc.ItemScroller;
 import tech.huihui.client.modules.impl.misc.NameProtect;
 import tech.huihui.client.modules.impl.misc.NoInteract;
+import tech.huihui.client.modules.impl.misc.PilotSettings;
 import tech.huihui.client.modules.impl.misc.ScoreboardHealth;
 import tech.huihui.client.modules.impl.misc.ServerHelper;
 import tech.huihui.client.modules.impl.misc.ZarabotokReallyWorld;
@@ -54,6 +56,7 @@ import tech.huihui.client.modules.impl.movement.ElytraAccelerate;
 import tech.huihui.client.modules.impl.movement.ElytraBooster;
 import tech.huihui.client.modules.impl.movement.ElytraMotion;
 import tech.huihui.client.modules.impl.movement.ElytraRecast;
+import tech.huihui.client.modules.impl.movement.Fly;
 import tech.huihui.client.modules.impl.movement.GuiWalk;
 import tech.huihui.client.modules.impl.movement.NoSlow;
 import tech.huihui.client.modules.impl.movement.NoWeb;
@@ -131,6 +134,7 @@ public final class ModuleManager implements IMinecraft {
 
    private void registerMovement() {
       registerModule(AutoSprint.INSTANCE);
+      registerModule(Fly.INSTANCE);
       registerModule(ElytraBooster.INSTANCE);
       registerModule(ElytraRecast.INSTANCE);
       registerModule(GuiWalk.INSTANCE);
@@ -183,8 +187,9 @@ public final class ModuleManager implements IMinecraft {
 
    private void registerMisc() {
       registerModule(ServerHelper.INSTANCE);
-      registerModule(ElytraHelper.INSTANCE);
-      registerModule(ItemScroller.INSTANCE);
+       registerModule(ElytraHelper.INSTANCE);
+       registerModule(PilotSettings.INSTANCE);
+       registerModule(ItemScroller.INSTANCE);
       registerModule(ClickAction.INSTANCE);
       registerModule(FreeCam.INSTANCE);
       registerModule(AHHelper.INSTANCE);
@@ -200,6 +205,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(ElytraAccelerate.INSTANCE);
       registerModule(ZarabotokReallyWorld.INSTANCE);
       registerModule(AutoJoiner.INSTANCE);
+      registerModule(BaseFinder.INSTANCE);
    }
 
    private void registerModule(Module module) {

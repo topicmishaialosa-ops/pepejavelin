@@ -80,6 +80,7 @@ public final class Aura extends Module {
    private final BooleanSetting legitSwap;
    private final BooleanSetting raycastCheck;
    private final BooleanSetting predictOnElytra;
+   private final BooleanSetting elytraTarget;
    public final NumberSetting predict;
    public final BooleanSetting critsOnlyWithSpace;
    private LivingEntity target;
@@ -113,6 +114,7 @@ public final class Aura extends Module {
       this.legitSwap = new BooleanSetting("Легитно ломать", true, var10005::isEnabled);
       this.raycastCheck = new BooleanSetting("Проверка на наведение", false);
       this.predictOnElytra = new BooleanSetting("Перегонять противника", true);
+      this.elytraTarget = new BooleanSetting("Элитра-таргет", false);
       this.predict = new NumberSetting("Насколько перегонять", 2.0F, 1.0F, 4.0F, 0.1F);
       this.critsOnlyWithSpace = new BooleanSetting("Только с пробелом", true);
       this.target = null;
@@ -443,7 +445,11 @@ public final class Aura extends Module {
 
             if (!(entity instanceof PassiveEntity) && !(entity instanceof FishEntity) || this.targetTypeSetting.isEnable("Животных") && !HuihuiClient.getInstance().getServerHandler().isPvp()) {
                if (!(entity instanceof HostileEntity) && !(entity instanceof AmbientEntity) || this.targetTypeSetting.isEnable("Мобов") && !HuihuiClient.getInstance().getServerHandler().isPvp()) {
-                  if (mc.player.getEyePos().distanceTo(MultipointUtils.getNearestPoint(entity, (double)(this.distance.getCurrent() + this.distanceRotation.getCurrent()))) > (double)(mc.player.isGliding() ? 20.0F : this.distance.getCurrent() + this.distanceRotation.getCurrent())) {
+                  float reach = this.distance.getCurrent() + this.distanceRotation.getCurrent();
+                  if (this.elytraTarget.isEnabled() && entity instanceof PlayerEntity && entity.isGliding()) {
+                     reach = Math.max(reach, 20.0F);
+                  }
+                  if (mc.player.getEyePos().distanceTo(MultipointUtils.getNearestPoint(entity, (double)reach)) > (double)(mc.player.isGliding() ? 20.0F : reach)) {
                      return false;
                   } else {
                      return !(entity instanceof ArmorStandEntity);

@@ -108,7 +108,7 @@ public class ClickGuiScreen extends Screen implements IClient {
       float rowWidth = (float) this.panels.size() * (width + gap) - gap;
       float fitScale = Math.min((float) (screenWidth - 16) / rowWidth, (float) (screenHeight / 2 - 2) / (height / 2.0F + 26.0F));
       fitScale = MathHelper.clamp(fitScale, 0.5F, 1.0F);
-      this.scale = MathHelper.clamp(fitScale * EditClickGUI.INSTANCE.getScale().getCurrent(), 0.35F, 1.5F);
+      this.scale = MathHelper.clamp(fitScale * EditClickGUI.INSTANCE.getScale().getCurrent(), 0.35F, fitScale);
 
       float panelX = ((float) screenWidth - rowWidth) / 2.0F;
       float panelY = (float) screenHeight / 2.0F - height / 2.0F;

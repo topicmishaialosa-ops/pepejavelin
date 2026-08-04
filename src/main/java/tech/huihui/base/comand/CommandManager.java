@@ -17,6 +17,7 @@ import tech.huihui.base.comand.impl.FriendCommand;
 import tech.huihui.base.comand.impl.GPSCommand;
 import tech.huihui.base.comand.impl.HelpCommand;
 import tech.huihui.base.comand.impl.MacroCommand;
+import tech.huihui.base.comand.impl.PilotCommand;
 import tech.huihui.base.comand.impl.RCTCommand;
 import tech.huihui.base.comand.impl.StopCommand;
 
@@ -30,18 +31,19 @@ public class CommandManager {
       this.register();
    }
 
-   @Native
-   private void register() {
-      this.registerCommand(new FriendCommand());
-      this.registerCommand(new MacroCommand());
-      this.registerCommand(new ClipCommand());
-      this.registerCommand(new ConfigCommand());
-      this.registerCommand(new RCTCommand());
-      this.registerCommand(new GPSCommand());
-      this.registerCommand(new FarmCommand());
-      this.registerCommand(new StopCommand());
-      this.registerCommand(new HelpCommand());
-   }
+    @Native
+    private void register() {
+       this.registerCommand(new FriendCommand());
+       this.registerCommand(new MacroCommand());
+       this.registerCommand(new ClipCommand());
+       this.registerCommand(new ConfigCommand());
+       this.registerCommand(new RCTCommand());
+       this.registerCommand(new GPSCommand());
+       this.registerCommand(new FarmCommand());
+       this.registerCommand(new StopCommand());
+       this.registerCommand(new HelpCommand());
+       this.registerCommand(new PilotCommand());
+    }
 
    @Native
    public void registerCommand(CommandAbstract command) {
