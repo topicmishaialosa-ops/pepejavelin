@@ -35,6 +35,7 @@ import tech.huihui.client.modules.impl.combat.TargetPearl;
 import tech.huihui.client.modules.impl.misc.AHHelper;
 import tech.huihui.client.modules.impl.misc.AutoAccept;
 import tech.huihui.client.modules.impl.misc.AutoDuel;
+import tech.huihui.client.modules.impl.misc.AutoWarden;
 import tech.huihui.client.modules.impl.misc.BaseFinder;
 import tech.huihui.client.modules.impl.misc.AutoJoiner;
 import tech.huihui.client.modules.impl.misc.AutoKit;
@@ -213,7 +214,8 @@ public final class ModuleManager implements IMinecraft {
        registerModule(AutoJoiner.INSTANCE);
        registerModule(BaseFinder.INSTANCE);
        registerModule(MineHelper.INSTANCE);
-    }
+        registerModule(AutoWarden.INSTANCE);
+     }
 
    private void registerModule(Module module) {
       modules.add(module);

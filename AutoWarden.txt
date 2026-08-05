@@ -1,0 +1,2750 @@
+public class AutoWarden extends ModuleBase {
+    private static final String Clan = "clan home ";
+    private final SettingString warehouse = new SettingString("Хом стежа", "").mode("home").mode(1).max(64);
+    private final SettingString House = new SettingString("Хом склада", "").mode("st").mode(1).max(64);
+    private final SettingString Loot = new SettingString("Хом лута", "").mode("warden").mode(1).max(64);
+    private final SettingBool autoLoot = new SettingBool("", "").mode(true);
+    private final SettingBool autoDeposit = new SettingBool("", "").mode(true);
+    private final SettingBool autoSupplies = new SettingBool("", "").mode(true);
+    private final SettingString supplySign = new SettingString("Название таблички", "").mode("инвиз,еда").mode(1).max(64).mode(this.autoSupplies::get);
+    private final SettingSlider openRetryDelay = new SettingSlider("Задержка открытия", "").mode(150.0f).range(50, 1500);
+    private final SettingSlider rejoinLead = new SettingSlider("Заходить за (мс)", "").mode(3000.0f).range(500, 15000);
+    private final SettingString zaxdod = new SettingString("Выходить меньше чем", "").mode("60").mode(1).max(9999).mode();
+    private final Timer stateTimer = new Timer();
+    private final Timer foodUseTimer = new Timer();
+    private final Timer invisibilityUseTimer = new Timer();
+    private final Map<BlockPos, Long> ignoredChests = new ConcurrentHashMap<BlockPos, Long>();
+    private static final int SUPPLY_SEARCH_RADIUS = 32;
+    private static final int SUPPLY_SEARCH_Y_RANGE = 1;
+    private static final int MIN_INVISIBILITY_POTIONS = 1;
+    private static final int MIN_FOOD_ITEMS = 8;
+    private static final long SUPPLY_RETRY_DELAY_MS = 15000L;
+    private static final long SUPPLY_TIMEOUT_MS = 45000L;
+    private static final long SCAN_FIND_TIMEOUT_MS = 750L;
+    private static final long CHEST_OPEN_TIMEOUT_MS = 20000L;
+    private static final long OPEN_MISSED_TIMEOUT_MS = 10000L;
+    private static final long OPEN_CONFIRM_TIMEOUT_MS = 5000L;
+    private static final long LOOT_EMPTY_CHECK_DELAY_MS = 500L;
+    private static final long TIMED_CHEST_LOOT_GRACE_MS = 3000L;
+    private static final long HOLOGRAM_TIMER_SAFETY_MS = 1000L;
+    private static final long BARITONE_NO_PATH_RESET_MS = 4000L;
+    private static final int LOOT_EMPTY_REQUIRED_CHECKS = 2;
+    private static final long MIN_HUB_WAIT_MS = 10000L;
+    private static final long HOME_TELEPORT_WAIT_MS = 6000L;
+    private static final long ARENA_RETURN_LEAD_MS = 9000L;
+    private static final long LAST_KNOWN_CHEST_FALLBACK_MS = 300000L;
+    private static final double CHEST_OPEN_RANGE = 3.0;
+    private static final double CHEST_OPEN_RANGE_SQ = 9.0;
+    private static final double HOLOGRAM_READ_RADIUS_SQ = 4.0;
+    private static final String[] DEFAULT_SUPPLY_SIGN_KEYWORDS = new String[]{"инвиз", "невид", "еда", "invis", "food"};
+    private static final String[] LOOT_ITEMS = new String[]{"Totem", "Netherite Helmet", "Netherite Chestplate", "Netherite Leggings", "Netherite Boots", "Netherite Sword", "Netherite Pickaxe", "Enchanted Golden Apple", "Player Head", "ENDER_EYE", "Shulker Box", "Netherite Ingot", "Dragon Head", "Elytra", "Snowball", "Splash Potion", "Tripwire Hook", "Netherite Scrap", "Beacon", "Villager Spawn Egg", "DRAGON_HEAD", "NETHERITE_SCRAP", "Paper", "FIREWORK_ROCKET", "PHANTOM_MEMBRANE", "Diamond", "phantom_membrane", "TOTEM_OF_UNDYING", " Golden Apple", "Golden Carrot", "tnt"};
+    private static final String[] STRICT_LOOT_ITEM_IDS = new String[]{"totem of undying", "netherite helmet", "netherite chestplate", "netherite leggings", "netherite boots", "netherite sword", "netherite pickaxe", "enchanted golden apple", "shulker box", "netherite ingot", "dragon head", "elytra", "snowball", "splash potion", "phantom_membrane", "tripwire hook", "netherite scrap", "beacon", "ender_eye", "villager spawn egg", "paper", "firework rocket", "phantom membrane", "diamond", "golden apple", "golden carrot", "tnt"};
+    private State state = State.IDLE;
+    private int targetAnarchy = -1;
+    private BlockPos targetChest;
+    private BlockPos lastKnownLootChest;
+    private long lastKnownLootChestAt = -1L;
+    private long targetOpenTime = -1L;
+    private long targetFoundOpenTime = -1L;
+    private long scannedChestOpenTime = -1L;
+    private int scanIndex = 0;
+    private int depositSlotIndex = 0;
+    private boolean lootedCurrentChest = false;
+    private boolean openedCurrentChest = false;
+    private boolean aimedCurrentChest = false;
+    private boolean checkingUntimedChest = false;
+    private boolean openingTimedChestImmediately = false;
+    private boolean pendingDeposit = false;
+    private boolean warehouseHomeCommandSent = false;
+    private boolean pendingClanStorageWithdraw = false;
+    private boolean farmHomeCommandSent = false;
+    private boolean supplyHomeCommandSent = false;
+    private boolean returnCommandSent = false;
+    private long lootContainerOpenedAt = -1L;
+    private int emptyLootChecks = 0;
+    private boolean pausedByTeleportBossBar = false;
+    private long baritoneNoPathSince = -1L;
+    private boolean pausedByHomeTeleport = false;
+    private long homeTeleportPauseUntil = 0L;
+    private State openTimeoutState = null;
+    private long openTimeoutStartedAt = -1L;
+    private BlockPos lastOpenAttemptChest;
+    private long lastOpenAttemptAt = -1L;
+    private BlockPos pendingOpenedChest;
+    private int openAttemptSyncId = -1;
+    private long openAttemptStartedAt = -1L;
+    private int chestOpenRecoveries = 0;
+    private BlockPos supplyChest;
+    private State supplyReturnState = State.RUSH_JOIN;
+    private long supplyStartedAt = -1L;
+    private long supplyRetryAfter = 0L;
+    private boolean aimedSupplyChest = false;
+    private boolean initialSupplyPending = false;
+    private boolean forceSupplyPending = false;
+    private boolean supplyTookInvisibility = false;
+    private boolean supplyTookFood = false;
+    private boolean autoEatingFood = false;
+    private int previousFoodSlot = -1;
+    private int foodHotbarSlot = -1;
+    private int foodUseDelayTicks = 0;
+    private boolean autoDrinkingInvisibility = false;
+    private int previousInvisibilitySlot = -1;
+    private int invisibilityHotbarSlot = -1;
+    private int invisibilityUseDelayTicks = 0;
+    private Boolean previousBaritoneFreeLook;
+    private Boolean previousBaritoneRightClickContainerOnArrival;
+    private static final Pattern TIME_PATTERN = Pattern.compile("(?<!\\d)(\\d{1,2})\\s*[:\\uFF1A]\\s*(\\d{1,2})(?:\\s*[:\\uFF1A]\\s*(\\d{1,2}))?(?!\\d)");
+    private static final Pattern SECONDS_PATTERN = Pattern.compile("(?<![:\\d])(\\d{1,3})\\s*(?:секунд(?:а|ы)?|сек\\.?|sec(?:\\.|ond)?s?|seconds?|с\\.?|s\\.?|c\\.?)");
+    private static final Pattern MIN_SEC_PATTERN = Pattern.compile("(?<!\\d)(\\d{1,3})\\s*(?:мин(?:\\.|ут(?:а|ы)?)?|м\\.?|min(?:\\.|ute)?s?|m\\.?)\\s*(?:(\\d{1,2})\\s*(?:секунд(?:а|ы)?|сек\\.?|sec(?:\\.|ond)?s?|seconds?|с\\.?|s\\.?|c\\.?))?");
+
+    public AutoWarden() {
+        super("AutoWarden", "Auto Warden", ModuleCategory.PLAYER);
+        this.settings(this.House, this.Loot, this.openRetryDelay, this.rejoinLead, this.zaxdod, this.supplySign);
+    }
+
+    @Override
+    public void onEnable() {
+        super.onEnable();
+        this.state = State.IDLE;
+        this.stateTimer.reset();
+        this.initialSupplyPending = this.autoSupplies.get();
+        this.supplyRetryAfter = 0L;
+        this.resetAllState();
+    }
+
+    @Override
+    public void onDisable() {
+        super.onDisable();
+        this.cleanupAll();
+        IBaritone iBaritone = this.getBaritone();
+        if (iBaritone != null) {
+            iBaritone.getPathingBehavior().cancelEverything();
+        }
+        this.restoreBaritoneSettings();
+    }
+
+    @SubscribeEvent
+    public void onChat(ClientChatReceivedEvent event) {
+        if (event.isCancelled() || !(event.getMessage() instanceof Text)) {
+            return;
+        }
+        Text text = (Text)event.getMessage();
+        String message = this.cleanString(text.getString());
+        if (!message.contains("помянем. вы погибли!")) {
+            return;
+        }
+        IBaritone iBaritone = this.getBaritone();
+        if (iBaritone != null) {
+            iBaritone.getPathingBehavior().cancelEverything();
+        }
+        if (AutoWarden.mc.player != null && AutoWarden.mc.world != null) {
+            AutoWarden.mc.player.stopRiding();
+        }
+        this.cleanupAll();
+        this.goHomeForSupplies();
+    }
+
+    @SubscribeEvent
+    public void onTick(TickEvent event) {
+        try {
+            this.processTick(event);
+        } catch (Throwable throwable) {
+            this.handleTickError();
+        }
+    }
+
+    private void processTick(TickEvent event) {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.world == null || AutoWarden.mc.interactionManager == null) {
+            return;
+        }
+        IBaritone iBaritone = this.getBaritone();
+        if (this.shouldSkipTick(iBaritone)) {
+            return;
+        }
+        if (this.isPlayerDead()) {
+            this.stateTimer.reset();
+            return;
+        }
+        if (this.isTeleportingToHub()) {
+            this.pausedByTeleportBossBar = true;
+            this.stopEatingAndDrinking();
+            this.cancelPathing();
+            this.resetMovementKeys();
+            if (iBaritone != null) {
+                iBaritone.getPathingBehavior().cancelEverything();
+            }
+            this.disableAutoJump();
+            if (AutoWarden.mc.world != null) {
+                AutoWarden.mc.player.stopRiding();
+            }
+            this.stateTimer.reset();
+            return;
+        }
+        if (this.pausedByTeleportBossBar) {
+            this.pausedByTeleportBossBar = false;
+            this.stateTimer.reset();
+        }
+        if (this.pausedByHomeTeleport) {
+            if (System.currentTimeMillis() < this.homeTeleportPauseUntil) {
+                return;
+            }
+            this.pausedByHomeTeleport = false;
+            this.stateTimer.reset();
+        }
+        int supplyStatus = this.getSupplyStatus();
+        this.handleBaritonePathingTimeout(iBaritone);
+        this.handleAutoEatAndDrink();
+        if (this.shouldHandleSupplies(supplyStatus)) {
+            if (iBaritone != null) {
+                iBaritone.getPathingBehavior().cancelEverything();
+            }
+            this.disableAutoJump();
+            this.stateTimer.reset();
+            return;
+        }
+        switch (this.state.ordinal()) {
+            case 0: {
+                if (this.initialSupplyPending || this.forceSupplyPending) {
+                    if (!this.autoSupplies.get()) {
+                        this.initialSupplyPending = false;
+                        this.forceSupplyPending = false;
+                    } else {
+                        if (this.goToSupply(State.SCAN_NEXT, supplyStatus, this.forceSupplyPending)) {
+                            return;
+                        }
+                        if (this.forceSupplyPending) {
+                            this.stateTimer.reset();
+                            return;
+                        }
+                        this.initialSupplyPending = false;
+                    }
+                }
+                this.scanIndex = 0;
+                this.state = this.isInHub() ? State.HUB_WAITING : State.SCAN_NEXT;
+                break;
+            }
+            case 1: {
+                this.stateTimer.reset();
+                this.state = State.SCAN_FIND_HOLOGRAM;
+                break;
+            }
+            case 2: {
+                this.stateTimer.reset();
+                this.state = State.SCAN_FIND_HOLOGRAM;
+                break;
+            }
+            case 3: {
+                boolean hasTimedChest;
+                if (supplyStatus == -1) {
+                    this.state = this.isInHub() ? State.HUB_WAITING : State.IDLE;
+                    this.stateTimer.reset();
+                    return;
+                }
+                BlockPos nearestHolo = this.findNearestHologram();
+                long scannedOpenTime = this.scannedChestOpenTime;
+                BlockPos timedChest = this.findTimedChest();
+                BlockPos nearestChest = this.findNearestChest();
+                BlockPos bestChest = this.pickBestChest(nearestChest, this.pickBestChest(timedChest, nearestHolo));
+                boolean bl = hasTimedChest = nearestHolo != null && nearestHolo.equals(bestChest);
+                if (bestChest != null) {
+                    this.targetChest = bestChest;
+                    this.rememberChest(bestChest);
+                    this.targetFoundOpenTime = hasTimedChest ? scannedOpenTime : -1L;
+                    this.lootedCurrentChest = false;
+                    this.openedCurrentChest = false;
+                    this.aimedCurrentChest = false;
+                    this.checkingUntimedChest = !hasTimedChest;
+                    this.chestOpenRecoveries = 0;
+                    if (iBaritone != null) {
+                        iBaritone.getCustomGoalProcess().setGoalAndPath(new GoalNear(this.targetChest, 1));
+                    }
+                    this.stateTimer.reset();
+                    this.state = State.SCAN_PATHING;
+                    break;
+                }
+                if (!this.stateTimer.passed(750.0)) break;
+                BlockPos lastKnownChest = this.getLastKnownChest();
+                if (lastKnownChest != null) {
+                    this.targetChest = lastKnownChest;
+                    this.targetFoundOpenTime = -1L;
+                    this.lootedCurrentChest = false;
+                    this.openedCurrentChest = false;
+                    this.aimedCurrentChest = false;
+                    this.checkingUntimedChest = true;
+                    this.chestOpenRecoveries = 0;
+                    if (iBaritone != null) {
+                        iBaritone.getCustomGoalProcess().setGoalAndPath(new GoalNear(this.targetChest, 1));
+                    }
+                    this.state = State.SCAN_PATHING;
+                    this.stateTimer.reset();
+                    return;
+                }
+                ++this.scanIndex;
+                this.state = State.SCAN_NEXT;
+                this.stateTimer.reset();
+                break;
+            }
+            case 4: {
+                if (supplyStatus == -1) {
+                    this.state = this.isInHub() ? State.HUB_WAITING : State.IDLE;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (this.targetChest == null) {
+                    this.targetChest = null;
+                    this.state = State.SCAN_FIND_HOLOGRAM;
+                    return;
+                }
+                double distance = AutoWarden.mc.player.getPos().distanceTo(this.targetChest);
+                if (this.isNearChest(this.targetChest) || distance <= 4.0 && (iBaritone == null || !iBaritone.getPathingBehavior().isPathing())) {
+                    if (iBaritone != null) {
+                        iBaritone.getPathingBehavior().cancelEverything();
+                    }
+                    this.stateTimer.reset();
+                    this.state = State.SCAN_READ_HOLOGRAM;
+                    break;
+                }
+                if (iBaritone == null || iBaritone.getPathingBehavior().isPathing() || !this.stateTimer.passed(2000.0)) break;
+                iBaritone.getCustomGoalProcess().setGoalAndPath(new GoalNear(this.targetChest, 1));
+                this.stateTimer.reset();
+                break;
+            }
+            case 5: {
+                if (supplyStatus == -1) {
+                    this.state = this.isInHub() ? State.HUB_WAITING : State.IDLE;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (this.targetChest == null) {
+                    this.state = State.SCAN_FIND_HOLOGRAM;
+                    return;
+                }
+                long timeLeft = this.readChestTime(this.targetChest);
+                long timedOpenTime = -1L;
+                long timedOpenAt = -1L;
+                if (this.targetFoundOpenTime > System.currentTimeMillis()) {
+                    timedOpenAt = Math.max(0L, (this.targetFoundOpenTime - System.currentTimeMillis() + 999L) / 1000L);
+                }
+                if (timeLeft >= 0L) {
+                    timedOpenTime = this.calculateOpenTime(timeLeft);
+                }
+                if (timedOpenAt >= 0L && (timeLeft < 0L || timedOpenAt < timeLeft)) {
+                    timeLeft = timedOpenAt;
+                    timedOpenTime = this.targetFoundOpenTime;
+                }
+                if (timeLeft < 0L && this.targetFoundOpenTime != -1L) {
+                    timeLeft = timedOpenAt;
+                    timedOpenTime = this.targetFoundOpenTime;
+                }
+                if (timeLeft >= 0L && timedOpenTime != -1L) {
+                    long timeUntilOpen = timedOpenTime - System.currentTimeMillis();
+                    this.targetAnarchy = supplyStatus;
+                    this.returnCommandSent = false;
+                    this.lootedCurrentChest = false;
+                    this.openedCurrentChest = false;
+                    this.aimedCurrentChest = false;
+                    if (timeUntilOpen > this.getMaxWaitTime()) {
+                        this.targetOpenTime = -1L;
+                        this.checkingUntimedChest = true;
+                        this.openingTimedChestImmediately = false;
+                        this.state = State.WAIT_OPEN;
+                        this.stateTimer.reset();
+                        return;
+                    }
+                    this.targetOpenTime = timedOpenTime;
+                    this.checkingUntimedChest = false;
+                    this.openingTimedChestImmediately = false;
+                    this.state = this.shouldSetArenaHome(timeUntilOpen) ? State.ARENA_SET_HOME : State.WAIT_OPEN;
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (timeLeft < 0L) {
+                    this.targetOpenTime = -1L;
+                    this.checkingUntimedChest = true;
+                    this.lootedCurrentChest = false;
+                    this.openedCurrentChest = false;
+                    this.aimedCurrentChest = false;
+                    this.state = State.WAIT_OPEN;
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (!this.stateTimer.passed(4000.0)) break;
+                this.ignoredChests.put(this.targetChest.toImmutable(), System.currentTimeMillis() + 300000L);
+                this.targetChest = null;
+                this.checkingUntimedChest = false;
+                this.state = State.SCAN_FIND_HOLOGRAM;
+                this.stateTimer.reset();
+                break;
+            }
+            case 6: {
+                if (this.targetAnarchy == -1 || this.targetOpenTime == -1L) {
+                    return;
+                }
+                long timeLeft = this.targetOpenTime - System.currentTimeMillis();
+                if (timeLeft < -10000L) {
+                    this.resetChestState();
+                    this.state = State.SCAN_NEXT;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (timeLeft > this.getRejoinLead()) break;
+                this.state = State.RUSH_JOIN;
+                this.stateTimer.reset();
+                break;
+            }
+            case 7: {
+                if (this.targetChest == null || this.targetOpenTime == -1L) {
+                    this.resetChestState();
+                    this.state = State.SCAN_NEXT;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (!this.isNearChest(this.targetChest)) {
+                    this.state = State.RUSH_PATH;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (AutoWarden.mc.world != null) {
+                    AutoWarden.mc.player.stopRiding();
+                }
+                this.disableAutoJump();
+                this.sendCommand(this.getWarehouseHome());
+                this.state = State.ARENA_OPEN;
+                this.stateTimer.reset();
+                break;
+            }
+            case 8: {
+                if (this.targetOpenTime == -1L) {
+                    this.resetChestState();
+                    this.state = State.SCAN_NEXT;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (this.targetOpenTime - System.currentTimeMillis() <= 9000L) {
+                    this.state = State.ARENA_RETURN;
+                    this.stateTimer.reset();
+                    return;
+                }
+                Inventory inventory = AutoWarden.mc.player.getInventory();
+                if (inventory instanceof PlayerInventory) {
+                    PlayerInventory playerInv = (PlayerInventory)inventory;
+                    if (this.isInventoryOpen()) {
+                        if (!this.isChestOpen(playerInv)) break;
+                        this.state = State.ARENA_WAIT_RETURN;
+                        this.stateTimer.reset();
+                        break;
+                    }
+                }
+                if (!this.stateTimer.passed(800.0)) break;
+                this.sendCommand("darena");
+                this.stateTimer.reset();
+                break;
+            }
+            case 9: {
+                long timeUntilOpen;
+                if (this.targetOpenTime == -1L) {
+                    this.resetChestState();
+                    this.state = State.SCAN_NEXT;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (AutoWarden.mc.world != null) {
+                    AutoWarden.mc.player.stopRiding();
+                }
+                if ((timeUntilOpen = this.targetOpenTime - System.currentTimeMillis()) > 9000L) break;
+                this.state = State.ARENA_RETURN;
+                this.stateTimer.reset();
+                break;
+            }
+            case 10: {
+                if (AutoWarden.mc.world != null) {
+                    AutoWarden.mc.player.stopRiding();
+                }
+                this.sendCommand(this.getWarehouseHomeCommand());
+                this.state = State.ARENA_RETURN_WAIT;
+                this.stateTimer.reset();
+                break;
+            }
+            case 11: {
+                if (!this.stateTimer.passed(6000.0)) break;
+                this.aimedCurrentChest = false;
+                this.state = this.isNearChest(this.targetChest) ? State.WAIT_OPEN : State.RUSH_PATH;
+                this.stateTimer.reset();
+                break;
+            }
+            case 12: {
+                if (this.isNearChest(this.targetChest)) {
+                    this.aimedCurrentChest = false;
+                    this.state = State.WAIT_OPEN;
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (this.targetChest != null && iBaritone != null) {
+                    iBaritone.getCustomGoalProcess().setGoalAndPath(new GoalNear(this.targetChest, 1));
+                }
+                this.state = State.RUSH_PATH;
+                break;
+            }
+            case 13: {
+                if (this.targetChest == null) {
+                    this.targetChest = null;
+                    this.state = State.SCAN_FIND_HOLOGRAM;
+                    return;
+                }
+                if (this.isNearChest(this.targetChest)) {
+                    if (iBaritone != null) {
+                        iBaritone.getPathingBehavior().cancelEverything();
+                    }
+                    this.aimedCurrentChest = false;
+                    this.state = State.WAIT_OPEN;
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (iBaritone == null || iBaritone.getPathingBehavior().isPathing() || !this.stateTimer.passed(2000.0)) break;
+                iBaritone.getCustomGoalProcess().setGoalAndPath(new GoalNear(this.targetChest, 1));
+                this.stateTimer.reset();
+                break;
+            }
+            case 14: {
+                BlockPos currentChest;
+                if (iBaritone != null) {
+                    iBaritone.getPathingBehavior().cancelEverything();
+                }
+                if ((currentChest = this.getCurrentChest()) == null) {
+                    this.clearCurrentChest();
+                    this.resetOpenAttempts();
+                    this.state = State.RUSH_PATH;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (!this.isNearChest(currentChest)) {
+                    this.clearCurrentChest();
+                    this.resetOpenAttempts();
+                    this.aimedCurrentChest = false;
+                    this.state = State.RUSH_PATH;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (this.isChestOpen(currentChest)) {
+                    this.resetOpenAttempts();
+                    this.clearCurrentChest();
+                    this.rememberChest(currentChest);
+                    this.openedCurrentChest = true;
+                    this.aimedCurrentChest = false;
+                    this.chestOpenRecoveries = 0;
+                    this.lootContainerOpenedAt = System.currentTimeMillis();
+                    this.emptyLootChecks = 0;
+                    this.state = State.LOOTING;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (this.isInventoryOpen()) {
+                    this.clearCurrentChest();
+                    KeyBindingUtils.setKeyPressed(false);
+                    this.resetOpenAttempts();
+                    this.aimedCurrentChest = false;
+                    this.state = State.RUSH_PATH;
+                    this.stateTimer.reset();
+                    return;
+                }
+                long timeLeft = this.targetOpenTime > 0L ? this.targetOpenTime - System.currentTimeMillis() : 0L;
+                if (this.targetOpenTime > 0L && timeLeft > 0L && !this.openingTimedChestImmediately) {
+                    this.clearCurrentChest();
+                    this.resetOpenAttempts();
+                    this.prepareChestOpen(currentChest);
+                    return;
+                }
+                if (this.targetOpenTime > 0L && timeLeft < -10000L && !this.openingTimedChestImmediately) {
+                    this.clearCurrentChest();
+                    this.resetChestState();
+                    this.state = State.SCAN_NEXT;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (this.isTimedOut(State.WAIT_OPEN)) {
+                    this.retryChestOpen(State.WAIT_OPEN);
+                    return;
+                }
+                if (this.aimedCurrentChest && !this.isChestStillThere(currentChest)) break;
+                if (!this.attemptChestOpen(currentChest, true)) {
+                    return;
+                }
+                this.aimedCurrentChest = true;
+                this.stateTimer.reset();
+                break;
+            }
+            case 15: {
+                Inventory inventory = AutoWarden.mc.player.getInventory();
+                if (inventory instanceof PlayerInventory) {
+                    PlayerInventory playerInv = (PlayerInventory)inventory;
+                    if (!this.stateTimer.passed(60.0)) break;
+                    this.lootChest(playerInv);
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (!this.lootedCurrentChest) {
+                    if (this.isTimedChestLootGrace()) {
+                        this.openedCurrentChest = false;
+                        this.aimedCurrentChest = false;
+                        this.state = State.WAIT_OPEN;
+                        this.stateTimer.reset();
+                        return;
+                    }
+                    if (this.openedCurrentChest || this.checkingUntimedChest) {
+                        if (this.targetChest != null) {
+                            this.ignoredChests.put(this.targetChest.toImmutable(), System.currentTimeMillis() + 300000L);
+                        }
+                        this.targetChest = null;
+                        this.openedCurrentChest = false;
+                        this.aimedCurrentChest = false;
+                        this.checkingUntimedChest = false;
+                        this.state = State.SCAN_FIND_HOLOGRAM;
+                        this.stateTimer.reset();
+                        return;
+                    }
+                    this.state = State.WAIT_OPEN;
+                    this.stateTimer.reset();
+                    return;
+                }
+                this.checkingUntimedChest = false;
+                this.openedCurrentChest = false;
+                this.aimedCurrentChest = false;
+                if (this.shouldDepositLoot()) {
+                    return;
+                }
+                if (this.autoDeposit.get() && (this.pendingDeposit || this.hasLootToDeposit())) {
+                    this.stateTimer.reset();
+                    this.state = State.CLAN_STORAGE_OPEN;
+                    break;
+                }
+                this.pendingDeposit = false;
+                this.resetChestState();
+                this.scanIndex = 0;
+                this.state = State.SCAN_NEXT;
+                this.stateTimer.reset();
+                break;
+            }
+            case 20: {
+                if (!this.hasLootToDeposit()) {
+                    this.returnToScanning();
+                    return;
+                }
+                if (this.isInventoryOpen()) {
+                    this.depositSlotIndex = 0;
+                    this.state = State.CLAN_STORAGE_DEPOSIT;
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (!this.stateTimer.passed(800.0)) break;
+                this.sendCommand("clan storage");
+                this.stateTimer.reset();
+                break;
+            }
+            case 21: {
+                Inventory inventory = AutoWarden.mc.player.getInventory();
+                if (inventory instanceof PlayerInventory) {
+                    PlayerInventory playerInv = (PlayerInventory)inventory;
+                    if (!this.stateTimer.passed(120.0)) break;
+                    this.depositToClanStorage(playerInv);
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (this.hasLootToDeposit()) {
+                    this.pendingClanStorageWithdraw = true;
+                    this.warehouseHomeCommandSent = false;
+                    this.state = State.GO_WAREHOUSE;
+                    this.stateTimer.reset();
+                    break;
+                }
+                this.returnToScanning();
+                break;
+            }
+            case 16: {
+                String homeName = this.getHouseHome();
+                if (homeName.isBlank()) {
+                    this.supplyRetryAfter = System.currentTimeMillis() + 15000L;
+                    this.finishSupplies(false);
+                    return;
+                }
+                if (this.isSupplyTimedOut()) {
+                    this.supplyStartedAt = System.currentTimeMillis();
+                }
+                if (!this.supplyHomeCommandSent) {
+                    if (AutoWarden.mc.world != null) {
+                        AutoWarden.mc.player.stopRiding();
+                    }
+                    this.sendCommand(homeName);
+                    this.supplyHomeCommandSent = true;
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (!this.stateTimer.passed(6000.0)) break;
+                this.state = State.SUPPLY_PATHING;
+                this.stateTimer.reset();
+                break;
+            }
+            case 17: {
+                if (this.getHouseHome().isBlank()) {
+                    this.supplyRetryAfter = System.currentTimeMillis() + 15000L;
+                    this.finishSupplies(false);
+                    return;
+                }
+                if (this.isSupplyTimedOut()) {
+                    this.supplyStartedAt = System.currentTimeMillis();
+                    this.supplyChest = null;
+                }
+                if (this.supplyChest == null) {
+                    if (this.stateTimer.passed(500.0)) {
+                        this.supplyChest = this.findSupplyChest();
+                        this.stateTimer.reset();
+                    }
+                    return;
+                }
+                if (this.isNearChest(this.supplyChest)) {
+                    if (iBaritone != null) {
+                        iBaritone.getPathingBehavior().cancelEverything();
+                    }
+                    this.aimedSupplyChest = false;
+                    this.state = State.SUPPLY_OPEN;
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (iBaritone == null || iBaritone.getPathingBehavior().isPathing() && !this.stateTimer.passed(2000.0)) break;
+                iBaritone.getCustomGoalProcess().setGoalAndPath(new GoalNear(this.supplyChest, 1));
+                this.stateTimer.reset();
+                break;
+            }
+            case 18: {
+                if (iBaritone != null) {
+                    iBaritone.getPathingBehavior().cancelEverything();
+                }
+                if (this.isTimedOut(State.SUPPLY_OPEN)) {
+                    this.retryChestOpen(State.SUPPLY_OPEN);
+                    return;
+                }
+                BlockPos supplyChest = this.getSupplyChest();
+                if (this.getHouseHome().isBlank() || supplyChest == null || this.isSupplyTimedOut()) {
+                    this.clearCurrentChest();
+                    this.supplyRetryAfter = System.currentTimeMillis() + 15000L;
+                    this.finishSupplies(false);
+                    return;
+                }
+                if (!this.isNearChest(supplyChest)) {
+                    this.clearCurrentChest();
+                    this.resetOpenAttempts();
+                    this.aimedSupplyChest = false;
+                    this.state = State.SUPPLY_PATHING;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (this.isChestOpen(supplyChest)) {
+                    this.resetOpenAttempts();
+                    this.clearCurrentChest();
+                    this.aimedSupplyChest = false;
+                    this.state = State.SUPPLY_TAKE;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (this.isInventoryOpen()) {
+                    this.clearCurrentChest();
+                    KeyBindingUtils.setKeyPressed(false);
+                    this.resetOpenAttempts();
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (this.aimedSupplyChest && !this.isChestStillThere(supplyChest)) break;
+                if (!this.attemptChestOpen(supplyChest, false)) {
+                    return;
+                }
+                this.aimedSupplyChest = true;
+                this.openedCurrentChest = true;
+                this.stateTimer.reset();
+                break;
+            }
+            case 19: {
+                Inventory inventory = AutoWarden.mc.player.getInventory();
+                if (inventory instanceof PlayerInventory) {
+                    PlayerInventory playerInv = (PlayerInventory)inventory;
+                    if (!this.stateTimer.passed(80.0)) break;
+                    this.takeSupplies(playerInv);
+                    this.stateTimer.reset();
+                    break;
+                }
+                this.finishSupplies(false);
+                break;
+            }
+            case 24: {
+                String homeName = this.getHouseHome();
+                if (homeName.isBlank()) {
+                    this.state = State.IDLE;
+                    return;
+                }
+                if (!this.hasLootToDeposit()) {
+                    if (this.pendingDeposit && !this.stateTimer.passed(2000.0)) {
+                        return;
+                    }
+                    this.pendingDeposit = false;
+                    this.resetChestState();
+                    this.scanIndex = 0;
+                    this.state = State.SCAN_NEXT;
+                    this.stateTimer.reset();
+                    return;
+                }
+                this.ignoredChests.clear();
+                this.targetChest = null;
+                if (!this.warehouseHomeCommandSent) {
+                    if (AutoWarden.mc.world != null) {
+                        AutoWarden.mc.player.stopRiding();
+                    }
+                    this.sendCommand(homeName);
+                    this.warehouseHomeCommandSent = true;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (!this.stateTimer.passed(6000.0)) break;
+                this.state = this.pendingClanStorageWithdraw ? State.CLAN_STORAGE_WITHDRAW_OPEN : State.WAREHOUSE_OPEN;
+                this.stateTimer.reset();
+                break;
+            }
+            case 26: {
+                this.state = State.GO_WAREHOUSE;
+                this.stateTimer.reset();
+                break;
+            }
+            case 22: {
+                if (this.isInventoryOpen()) {
+                    this.pendingClanStorageWithdraw = false;
+                    this.depositSlotIndex = 0;
+                    this.state = State.CLAN_STORAGE_WITHDRAW;
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (!this.stateTimer.passed(800.0)) break;
+                this.sendCommand("clan storage");
+                this.stateTimer.reset();
+                break;
+            }
+            case 23: {
+                Inventory inventory = AutoWarden.mc.player.getInventory();
+                if (inventory instanceof PlayerInventory) {
+                    PlayerInventory playerInv = (PlayerInventory)inventory;
+                    if (!this.stateTimer.passed(120.0)) break;
+                    this.withdrawFromClanStorage(playerInv);
+                    this.stateTimer.reset();
+                    break;
+                }
+                this.state = State.WAREHOUSE_OPEN;
+                this.stateTimer.reset();
+                break;
+            }
+            case 27: 
+            case 28: {
+                this.state = State.WAREHOUSE_OPEN;
+                break;
+            }
+            case 29: {
+                if (iBaritone != null && (this.targetChest == null || this.isNearChest(this.targetChest))) {
+                    iBaritone.getPathingBehavior().cancelEverything();
+                }
+                if (this.targetChest != null && this.isChestOpen(this.targetChest)) {
+                    if (!this.isChestCurrent(this.targetChest)) {
+                        this.returnToScanning();
+                        return;
+                    }
+                    this.resetOpenAttempts();
+                    this.depositSlotIndex = 0;
+                    this.state = State.DEPOSITING;
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (this.isInventoryOpen()) {
+                    this.clearCurrentChest();
+                    KeyBindingUtils.setKeyPressed(false);
+                    this.resetOpenAttempts();
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (!this.hasLootToDeposit()) {
+                    this.returnToScanning();
+                    break;
+                }
+                if (!this.stateTimer.passed(this.getOpenRetryDelay())) break;
+                if (this.targetChest == null || !this.isChestCurrent(this.targetChest)) {
+                    this.targetChest = this.findWarehouseChest();
+                }
+                if (this.targetChest == null) {
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (!this.isNearChest(this.targetChest)) {
+                    this.resetOpenAttempts();
+                    if (iBaritone != null) {
+                        iBaritone.getCustomGoalProcess().setGoalAndPath(new GoalNear(this.targetChest, 1));
+                    }
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (this.isTimedOut(State.WAREHOUSE_OPEN)) {
+                    this.retryChestOpen(State.WAREHOUSE_OPEN);
+                    return;
+                }
+                if (!this.attemptChestOpen(this.targetChest, false)) break;
+                this.stateTimer.reset();
+                break;
+            }
+            case 30: {
+                Screen screen = AutoWarden.mc.currentScreen;
+                if (screen instanceof HandledScreen) {
+                    HandledScreen handledScreen = (HandledScreen)screen;
+                    if (this.targetChest == null || !this.isChestCurrent(this.targetChest)) {
+                        this.returnToScanning();
+                        return;
+                    }
+                    if (!this.stateTimer.passed(150.0)) break;
+                    this.depositToChest(handledScreen);
+                    this.stateTimer.reset();
+                    break;
+                }
+                if (this.hasLootToDeposit()) {
+                    if (this.targetChest != null) {
+                        this.ignoredChests.put(this.targetChest.toImmutable(), System.currentTimeMillis() + 300000L);
+                    }
+                    this.targetChest = null;
+                    this.state = State.WAREHOUSE_FIND_CHEST;
+                    this.stateTimer.reset();
+                    break;
+                }
+                this.returnToScanning();
+                break;
+            }
+            case 25: {
+                if (!this.farmHomeCommandSent) {
+                    if (AutoWarden.mc.world != null) {
+                        AutoWarden.mc.player.stopRiding();
+                    }
+                    this.sendCommand(this.getFarmHome());
+                    this.farmHomeCommandSent = true;
+                    this.stateTimer.reset();
+                    return;
+                }
+                if (!this.stateTimer.passed(6000.0)) break;
+                this.farmHomeCommandSent = false;
+                this.warehouseHomeCommandSent = false;
+                this.pendingDeposit = false;
+                this.ignoredChests.clear();
+                this.resetChestState();
+                this.scanIndex = 0;
+                this.state = State.SCAN_NEXT;
+                this.stateTimer.reset();
+            }
+        }
+    }
+
+    private void returnToScanning() {
+        this.clearCurrentChest();
+        this.resetOpenAttempts();
+        if (this.targetChest != null) {
+            this.ignoredChests.put(this.targetChest.toImmutable(), System.currentTimeMillis() + 300000L);
+        }
+        this.targetChest = null;
+        this.depositSlotIndex = 0;
+        if (AutoWarden.mc.player != null && AutoWarden.mc.world != null) {
+            KeyBindingUtils.setKeyPressed(false);
+        }
+        this.state = State.WAREHOUSE_FIND_CHEST;
+        this.stateTimer.reset();
+    }
+
+    private void handleTickError() {
+        try {
+            this.stopEatingAndDrinking();
+            this.cancelPathing();
+            this.resetMovementKeys();
+            this.disableAutoJump();
+            IBaritone iBaritone = this.getBaritone();
+            if (iBaritone != null) {
+                iBaritone.getPathingBehavior().cancelEverything();
+            }
+            if (AutoWarden.mc.player != null && AutoWarden.mc.world != null) {
+                AutoWarden.mc.player.stopRiding();
+            }
+            this.resetOpenAttempts();
+            this.targetChest = null;
+            this.supplyChest = null;
+            this.openedCurrentChest = false;
+            this.aimedCurrentChest = false;
+            this.aimedSupplyChest = false;
+            this.checkingUntimedChest = false;
+            this.openingTimedChestImmediately = false;
+            this.chestOpenRecoveries = 0;
+            this.depositSlotIndex = 0;
+            this.emptyLootChecks = 0;
+            this.pendingClanStorageWithdraw = false;
+            this.warehouseHomeCommandSent = false;
+            this.farmHomeCommandSent = false;
+            this.supplyHomeCommandSent = false;
+            this.forceSupplyPending = false;
+            this.state = this.initialSupplyPending ? State.IDLE : State.SCAN_NEXT;
+            this.stateTimer.reset();
+        } catch (Throwable throwable) {
+            this.state = State.IDLE;
+        }
+    }
+
+    private boolean isTimedOut(State state) {
+        long currentTime = System.currentTimeMillis();
+        if (this.openTimeoutState != state) {
+            this.openTimeoutState = state;
+            this.openTimeoutStartedAt = currentTime;
+            return false;
+        }
+        if (state == State.WAIT_OPEN && this.openingTimedChestImmediately && this.targetOpenTime > 0L && currentTime <= this.targetOpenTime + 20000L) {
+            return false;
+        }
+        return this.openTimeoutStartedAt > 0L && currentTime - this.openTimeoutStartedAt > 20000L;
+    }
+
+    private void resetOpenAttempts() {
+        this.openTimeoutState = null;
+        this.openTimeoutStartedAt = -1L;
+        this.resetOpenAttemptData();
+    }
+
+    private void retryChestOpen(State state) {
+        this.stopEatingAndDrinking();
+        this.disableAutoJump();
+        this.resetOpenAttempts();
+        if (AutoWarden.mc.player != null && AutoWarden.mc.world != null) {
+            AutoWarden.mc.player.stopRiding();
+        }
+        if (state == State.SUPPLY_OPEN) {
+            this.supplyChest = null;
+            this.aimedSupplyChest = false;
+            this.supplyStartedAt = System.currentTimeMillis();
+            this.state = State.SUPPLY_PATHING;
+        } else if (state == State.WAREHOUSE_OPEN) {
+            if (this.targetChest != null) {
+                this.ignoredChests.put(this.targetChest.toImmutable(), System.currentTimeMillis() + 60000L);
+            }
+            this.targetChest = null;
+            this.state = State.WAREHOUSE_FIND_CHEST;
+        } else {
+            if (this.targetChest != null && this.chestOpenRecoveries < 4) {
+                ++this.chestOpenRecoveries;
+                this.openedCurrentChest = false;
+                this.aimedCurrentChest = false;
+                this.checkingUntimedChest = false;
+                this.openingTimedChestImmediately = false;
+                this.state = this.isNearChest(this.targetChest) ? State.WAIT_OPEN : State.RUSH_PATH;
+                this.stateTimer.reset();
+                return;
+            }
+            if (this.targetChest != null) {
+                this.ignoredChests.put(this.targetChest.toImmutable(), System.currentTimeMillis() + 60000L);
+            }
+            this.targetChest = null;
+            this.openedCurrentChest = false;
+            this.aimedCurrentChest = false;
+            this.checkingUntimedChest = false;
+            this.openingTimedChestImmediately = false;
+            this.chestOpenRecoveries = 0;
+            this.state = State.SCAN_FIND_HOLOGRAM;
+        }
+        this.stateTimer.reset();
+    }
+
+    private boolean shouldSkipTick(IBaritone iBaritone) {
+        return false;
+    }
+
+    private void handleBaritonePathingTimeout(IBaritone iBaritone) {
+        boolean isPathing;
+        if (iBaritone == null || !this.isBaritonePathingNeeded()) {
+            this.baritoneNoPathSince = -1L;
+            return;
+        }
+        IPathingBehavior pathingBehavior = iBaritone.getPathingBehavior();
+        boolean hasPath = pathingBehavior.getInProgress().isPresent();
+        boolean hasGoal = pathingBehavior.getGoal() != null;
+        boolean noPath = hasGoal && !pathingBehavior.hasPath() && !pathingBehavior.isPathing();
+        boolean bl = isPathing = hasPath || noPath;
+        if (!isPathing) {
+            this.baritoneNoPathSince = -1L;
+            return;
+        }
+        long currentTime = System.currentTimeMillis();
+        if (this.baritoneNoPathSince == -1L) {
+            this.baritoneNoPathSince = currentTime;
+            return;
+        }
+        if (currentTime - this.baritoneNoPathSince >= 4000L) {
+            this.resetBaritonePathing();
+        }
+    }
+
+    private boolean isBaritonePathingNeeded() {
+        return switch (this.state.ordinal()) {
+            case 4, 13, 17, 28 -> true;
+            case 29 -> {
+                if (this.targetChest != null && !this.isNearChest(this.targetChest)) {
+                    yield true;
+                }
+                yield false;
+            }
+            default -> false;
+        };
+    }
+
+    private void resetBaritonePathing() {
+        this.cancelPathing();
+        this.resetOpenAttempts();
+        this.baritoneNoPathSince = -1L;
+        this.aimedCurrentChest = false;
+        this.aimedSupplyChest = false;
+        this.openedCurrentChest = false;
+        switch (this.state.ordinal()) {
+            case 17: {
+                this.supplyChest = null;
+                this.state = State.SUPPLY_PATHING;
+                break;
+            }
+            case 28: 
+            case 29: {
+                this.targetChest = null;
+                this.state = State.WAREHOUSE_FIND_CHEST;
+                break;
+            }
+            default: {
+                this.targetChest = null;
+                this.targetFoundOpenTime = -1L;
+                this.scannedChestOpenTime = -1L;
+                this.state = State.SCAN_FIND_HOLOGRAM;
+            }
+        }
+        this.stateTimer.reset();
+    }
+
+    private void configureBaritone() {
+        try {
+            if (this.previousBaritoneFreeLook == null) {
+                this.previousBaritoneFreeLook = (Boolean)BaritoneAPI.getSettings().freeLook.value;
+                this.previousBaritoneRightClickContainerOnArrival = (Boolean)BaritoneAPI.getSettings().rightClickContainerOnArrival.value;
+            }
+            BaritoneAPI.getSettings().freeLook.value = false;
+            BaritoneAPI.getSettings().rightClickContainerOnArrival.value = false;
+        } catch (Throwable throwable) {
+        }
+    }
+
+    private void restoreBaritoneSettings() {
+        try {
+            if (this.previousBaritoneFreeLook != null) {
+                BaritoneAPI.getSettings().freeLook.value = this.previousBaritoneFreeLook;
+                BaritoneAPI.getSettings().rightClickContainerOnArrival.value = this.previousBaritoneRightClickContainerOnArrival;
+            }
+        } catch (Throwable throwable) {
+        }
+        this.previousBaritoneFreeLook = null;
+        this.previousBaritoneRightClickContainerOnArrival = null;
+    }
+
+    private BlockPos findNearestHologram() {
+        this.scannedChestOpenTime = -1L;
+        if (AutoWarden.mc.player == null || AutoWarden.mc.world == null) {
+            return null;
+        }
+        long currentTime = System.currentTimeMillis();
+        Vec3d playerPos = AutoWarden.mc.player.getEyePos();
+        List<HologramData> holograms = new ArrayList<HologramData>();
+        Box searchBox = AutoWarden.mc.player.getBoundingBox().expand(150.0);
+        for (Entity entity : AutoWarden.mc.world.getEntities(Entity.class, searchBox, this::isValidHologram)) {
+            Long ignoreUntil;
+            String text = this.getHologramText(entity);
+            long time = this.parseTime(text);
+            if (time < 0L) continue;
+            BlockPos entityPos = entity.getBlockPos();
+            BlockPos chestPos = entityPos.toImmutable();
+            if (AutoWarden.mc.world.isChunkLoaded(entityPos.getX() >> 4, entityPos.getZ() >> 4)) {
+                BlockPos chestBelow = null;
+                for (int i = 1; i <= 3; ++i) {
+                    BlockPos checkPos = entityPos.down(i);
+                    BlockState state = AutoWarden.mc.world.getBlockState(checkPos);
+                    if (state.getBlock() != Blocks.CHEST && state.getBlock() != Blocks.TRAPPED_CHEST) continue;
+                    chestBelow = checkPos.toImmutable();
+                    break;
+                }
+                if (chestBelow == null) continue;
+                chestPos = chestBelow;
+            }
+            if ((ignoreUntil = this.ignoredChests.get(chestPos)) != null && ignoreUntil > currentTime) continue;
+            long openTime = currentTime + time * 1000L + 1000L;
+            double distance = entity.distanceTo(playerPos);
+            HologramData existing = null;
+            for (HologramData data : holograms) {
+                if (!data.pos.equals(chestPos)) continue;
+                existing = data;
+                break;
+            }
+            if (existing == null) {
+                holograms.add(new HologramData(chestPos.toImmutable(), openTime, distance));
+                continue;
+            }
+            existing.openTime = Math.max(existing.openTime, openTime);
+            existing.distance = Math.min(existing.distance, distance);
+        }
+        HologramData best = null;
+        for (HologramData data : holograms) {
+            boolean isTimed = this.isTimedChest(data.openTime);
+            boolean isBestTimed = best != null && this.isTimedChest(best.openTime);
+            if (best == null) {
+                best = data;
+                continue;
+            }
+            if (isTimed && !isBestTimed) {
+                best = data;
+                continue;
+            }
+            if (isTimed && isBestTimed) {
+                if (data.openTime >= best.openTime && (data.openTime != best.openTime || !(data.distance < best.distance))) continue;
+                best = data;
+                continue;
+            }
+            if (isBestTimed || !(data.distance < best.distance)) continue;
+            best = data;
+        }
+        if (best == null) {
+            return null;
+        }
+        this.scannedChestOpenTime = best.openTime;
+        return best.pos;
+    }
+
+    private BlockPos findTimedChest() {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.world == null) {
+            return null;
+        }
+        long currentTime = System.currentTimeMillis();
+        BlockPos playerPos = AutoWarden.mc.player.getBlockPos();
+        BlockPos bestChest = null;
+        double bestDistance = Double.MAX_VALUE;
+        int horizontalRadius = 8;
+        int verticalRadius = 48;
+        double maxDistance = 22500.0;
+        int chunkX = playerPos.getX() >> 4;
+        int chunkZ = playerPos.getZ() >> 4;
+        for (int dx = -horizontalRadius; dx <= horizontalRadius; ++dx) {
+            for (int dz = -horizontalRadius; dz <= horizontalRadius; ++dz) {
+                int cx = chunkX + dx;
+                int cz = chunkZ + dz;
+                if (!AutoWarden.mc.world.getChunkManager().isChunkLoaded(cx, cz)) continue;
+                Chunk chunk = AutoWarden.mc.world.getChunkManager().getChunk(cx, cz);
+                if (chunk == null) continue;
+                for (BlockPos pos : chunk.getBlockEntities().keySet()) {
+                    Long ignoreUntil;
+                    BlockPos chestPos = pos.toImmutable();
+                    if (Math.abs(chestPos.getY() - playerPos.getY()) > verticalRadius) continue;
+                    if (!this.isValidChest(chestPos)) continue;
+                    if ((ignoreUntil = this.ignoredChests.get(chestPos)) != null && ignoreUntil > currentTime) continue;
+                    double distance = playerPos.distanceTo(chestPos);
+                    if (distance > maxDistance) continue;
+                    if (!(distance < bestDistance)) continue;
+                    bestDistance = distance;
+                    bestChest = chestPos;
+                }
+            }
+        }
+        BlockPos nearestChest = this.findNearestChest(playerPos, currentTime);
+        return this.pickBestChest(bestChest, nearestChest);
+    }
+
+    private BlockPos findNearestChest(BlockPos playerPos, long currentTime) {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.world == null || playerPos == null) {
+            return null;
+        }
+        BlockPos bestChest = null;
+        double bestDistance = Double.MAX_VALUE;
+        int radius = 24;
+        int verticalRadius = 16;
+        for (BlockPos pos : BlockPos.iterateOutwards(playerPos, radius, verticalRadius, radius)) {
+            Long ignoreUntil;
+            BlockPos chestPos = pos.toImmutable();
+            if (!this.isValidChest(chestPos)) continue;
+            if ((ignoreUntil = this.ignoredChests.get(chestPos)) != null && ignoreUntil > currentTime) continue;
+            double distance = playerPos.distanceTo(chestPos);
+            if (!(distance < bestDistance)) continue;
+            bestDistance = distance;
+            bestChest = chestPos;
+        }
+        return bestChest;
+    }
+
+    private BlockPos pickBestChest(BlockPos chest1, BlockPos chest2) {
+        if (AutoWarden.mc.player == null) {
+            return chest1 != null ? chest1 : chest2;
+        }
+        if (chest1 == null) {
+            return chest2;
+        }
+        if (chest2 == null) {
+            return chest1;
+        }
+        BlockPos playerPos = AutoWarden.mc.player.getBlockPos();
+        return playerPos.distanceTo(chest1) <= playerPos.distanceTo(chest2) ? chest1 : chest2;
+    }
+
+    private void rememberChest(BlockPos pos) {
+        if (pos == null) {
+            return;
+        }
+        this.lastKnownLootChest = pos.toImmutable();
+        this.lastKnownLootChestAt = System.currentTimeMillis();
+    }
+
+    private BlockPos getLastKnownChest() {
+        if (this.lastKnownLootChest == null || this.lastKnownLootChestAt <= 0L) {
+            return null;
+        }
+        if (System.currentTimeMillis() - this.lastKnownLootChestAt > 300000L) {
+            return null;
+        }
+        return this.lastKnownLootChest;
+    }
+
+    private boolean attemptChestOpen(BlockPos pos, boolean isLootChest) {
+        if (pos == null) {
+            return false;
+        }
+        this.stopEatingAndDrinking();
+        this.disableAutoJump();
+        this.resetChestOpenState();
+        if (!this.switchToEmptyHand()) {
+            return false;
+        }
+        if (!this.isChestValidToOpen(pos)) {
+            return false;
+        }
+        if (!this.isChestInRange(pos, isLootChest)) {
+            return false;
+        }
+        long currentTime = System.currentTimeMillis();
+        this.prepareChestOpen(pos, currentTime);
+        this.setPendingChest(pos);
+        this.lastOpenAttemptChest = pos.toImmutable();
+        this.lastOpenAttemptAt = currentTime;
+        return true;
+    }
+
+    private boolean switchToEmptyHand() {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.interactionManager == null) {
+            return false;
+        }
+        int currentSlot = AutoWarden.mc.player.getInventory().selectedSlot;
+        ItemStack heldItem = AutoWarden.mc.player.getInventory().getStack(currentSlot);
+        if (heldItem.isEmpty()) {
+            return true;
+        }
+        if (isLootChest) {
+            return this.switchToEmptyHandSlot(currentSlot);
+        }
+        int emptySlot = this.findEmptyHotbarSlot();
+        if (emptySlot != -1) {
+            this.switchToSlot(emptySlot);
+            return false;
+        }
+        int freeInventorySlot = this.findFreeInventorySlot();
+        if (freeInventorySlot == -1) {
+            return true;
+        }
+        int hotbarSlot = 36 + currentSlot;
+        AutoWarden.mc.interactionManager.clickSlot(AutoWarden.mc.player.getInventory().syncId, hotbarSlot, 0, ClickType.PICKUP, AutoWarden.mc.player);
+        AutoWarden.mc.interactionManager.clickSlot(AutoWarden.mc.player.getInventory().syncId, freeInventorySlot, 0, ClickType.PICKUP, AutoWarden.mc.player);
+        return false;
+    }
+
+    private boolean switchToEmptyHandSlot(int currentSlot) {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.interactionManager == null) {
+            return false;
+        }
+        int emptySlot = this.findEmptyHotbarSlot();
+        if (emptySlot == -1) {
+            int freeSlot = this.findFreeInventorySlot();
+            if (freeSlot != -1) {
+                AutoWarden.mc.interactionManager.clickSlot(AutoWarden.mc.player.getInventory().syncId, 36 + currentSlot, 0, ClickType.PICKUP, AutoWarden.mc.player);
+                AutoWarden.mc.interactionManager.clickSlot(AutoWarden.mc.player.getInventory().syncId, freeSlot, 0, ClickType.PICKUP, AutoWarden.mc.player);
+            }
+            return false;
+        }
+        AutoWarden.mc.interactionManager.clickSlot(AutoWarden.mc.player.getInventory().syncId, 36 + currentSlot, 0, ClickType.PICKUP, AutoWarden.mc.player);
+        AutoWarden.mc.interactionManager.clickSlot(AutoWarden.mc.player.getInventory().syncId, emptySlot, 0, ClickType.PICKUP, AutoWarden.mc.player);
+        return false;
+    }
+
+    private boolean isChestInRange(BlockPos pos, boolean isLootChest) {
+        if (!this.isNearChest(pos)) {
+            return false;
+        }
+        if (!this.isChestStillThere(pos)) {
+            return false;
+        }
+        long currentTime = System.currentTimeMillis();
+        if (this.lastOpenAttemptChest != null && this.lastOpenAttemptChest.equals(pos)) {
+            return currentTime - this.lastOpenAttemptAt >= this.getOpenRetryDelay();
+        }
+        return true;
+    }
+
+    private void resetChestOpenState() {
+        this.lastOpenAttemptChest = null;
+        this.lastOpenAttemptAt = -1L;
+        this.pendingOpenedChest = null;
+        this.openAttemptSyncId = -1;
+        this.openAttemptStartedAt = -1L;
+    }
+
+    private void prepareChestOpen(BlockPos pos, long currentTime) {
+        this.pendingOpenedChest = pos.toImmutable();
+        this.openAttemptSyncId = AutoWarden.mc.player != null ? AutoWarden.mc.player.getInventory().syncId : -1;
+        this.openAttemptStartedAt = currentTime;
+    }
+
+    private void setPendingChest(BlockPos pos) {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.interactionManager == null || pos == null) {
+            return;
+        }
+        this.pointAtChest(pos);
+        HitResult hitResult = this.getHitResult(pos);
+        AutoWarden.mc.crosshairTarget = hitResult;
+        AutoWarden.mc.interactionManager.interactBlock(AutoWarden.mc.player, Hand.MAIN_HAND, hitResult);
+        AutoWarden.mc.player.swingHand(Hand.MAIN_HAND);
+    }
+
+    private boolean pointAtChest(BlockPos pos) {
+        if (AutoWarden.mc.player == null || pos == null) {
+            return false;
+        }
+        Vec3d targetVec = Vec3d.ofCenter(pos);
+        double dx = targetVec.x - AutoWarden.mc.player.getX();
+        double dy = targetVec.y - (AutoWarden.mc.player.getY() + AutoWarden.mc.player.getEyeHeight(AutoWarden.mc.player.getPose()));
+        double dz = targetVec.z - AutoWarden.mc.player.getZ();
+        AutoWarden.mc.player.setYaw((float)Math.toDegrees(Math.atan2(dz, dx)) - 90.0f);
+        AutoWarden.mc.player.setPitch((float)(-Math.toDegrees(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz)))));
+        return true;
+    }
+
+    private HitResult getHitResult(BlockPos pos) {
+        return new BlockHitResult(Vec3d.ofCenter(pos), Direction.UP, pos, false);
+    }
+
+    private boolean isInventoryOpen() {
+        return AutoWarden.mc.currentScreen instanceof HandledScreen && AutoWarden.mc.player != null && AutoWarden.mc.player.getInventory() instanceof PlayerInventory;
+    }
+
+    private boolean isChestOpen(BlockPos pos) {
+        if (!this.isInventoryOpen() || AutoWarden.mc.player == null || pos == null || this.pendingOpenedChest == null) {
+            return false;
+        }
+        if (!this.pendingOpenedChest.equals(pos)) {
+            return false;
+        }
+        if (this.openAttemptStartedAt <= 0L || System.currentTimeMillis() - this.openAttemptStartedAt > 5000L) {
+            return false;
+        }
+        return this.isNearChest(pos);
+    }
+
+    private void clearCurrentChest() {
+        if (AutoWarden.mc.currentScreen != null && !this.autoEatingFood && !this.autoDrinkingInvisibility) {
+            KeyBindingUtils.setKeyPressed(false);
+        }
+    }
+
+    private void cancelPathing() {
+        if (AutoWarden.mc.currentScreen != null) {
+            KeyBindingUtils.setKeyPressed(false);
+        }
+    }
+
+    private void stopEatingAndDrinking() {
+        if (AutoWarden.mc.currentScreen != null) {
+            KeyBindingUtils.setKeyPressed(false);
+        }
+    }
+
+    private void disableAutoJump() {
+        if (AutoWarden.mc.player == null) {
+            return;
+        }
+        if (AutoWarden.mc.options != null) {
+            AutoWarden.mc.options.setKeyPressed(false);
+        }
+        if (AutoWarden.mc.player.isSneaking()) {
+            AutoWarden.mc.player.setSneaking(false);
+            AutoWarden.mc.player.getNetworkHandler().sendPacket(new ClientCommandPacket(AutoWarden.mc.player, ClientCommandPacket.Mode.PRESS_SHIFT_KEY));
+        }
+    }
+
+    private void resetMovementKeys() {
+        if (AutoWarden.mc.currentScreen != null && !this.autoEatingFood && !this.autoDrinkingInvisibility) {
+            KeyBindingUtils.setKeyPressed(false);
+        }
+    }
+
+    private boolean isNearChest(BlockPos pos) {
+        return AutoWarden.mc.player != null && pos != null && AutoWarden.mc.player.getEyePos().distanceTo(pos.toCenterPos()) <= 9.0;
+    }
+
+    private long readChestTime(BlockPos pos) {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.world == null || pos == null) {
+            return -1L;
+        }
+        Box searchBox = new Box(pos.getX() - 2.0, pos.getY(), pos.getZ() - 2.0, pos.getX() + 3.0, pos.getY() + 7.0, pos.getZ() + 3.0);
+        Vec3d centerPos = pos.toCenterPos();
+        double bestDistance = Double.MAX_VALUE;
+        long bestTime = -1L;
+        for (Entity entity : AutoWarden.mc.world.getEntities(Entity.class, searchBox, this::isValidHologram)) {
+            double dx = entity.getX() - centerPos.x;
+            double dz = entity.getZ() - centerPos.z;
+            double horizontalDist = dx * dx + dz * dz;
+            if (entity.getY() + 0.25 < pos.getY() || horizontalDist > 4.0) continue;
+            long time = this.parseTime(this.getHologramText(entity));
+            if (time < 0L) continue;
+            if (bestTime == -1L || horizontalDist + 0.25 < bestDistance) {
+                bestDistance = horizontalDist;
+                bestTime = time;
+                continue;
+            }
+            if (!(Math.abs(horizontalDist - bestDistance) <= 0.25) || time <= bestTime) continue;
+            bestTime = time;
+        }
+        return bestTime;
+    }
+
+    private boolean isValidHologram(Entity entity) {
+        return entity instanceof ArmorStand && ((ArmorStand)entity).isMarker() || entity instanceof ItemFrame;
+    }
+
+    private String getHologramText(Entity entity) {
+        String text = "";
+        if (entity instanceof ArmorStand && ((ArmorStand)entity).getName() != null) {
+            text = ((ArmorStand)entity).getName().getString();
+        } else if (entity instanceof ItemFrame && ((ItemFrame)entity).getName() != null) {
+            text = ((ItemFrame)entity).getName().getString();
+        }
+        return this.cleanString(text);
+    }
+
+    private String cleanString(String text) {
+        return text.replaceAll("§.", "").toLowerCase(Locale.ROOT).trim();
+    }
+
+    private long parseTime(String text) {
+        if (text == null || text.isBlank()) {
+            return -1L;
+        }
+        text = this.cleanString(text).replace('\u00a0', ' ').replace('\u202f', ' ').replace('\ufe55', ':').replace('\uff1a', ':').replace('\ua789', ':').replace('\u2236', ':');
+        Matcher timeMatcher = TIME_PATTERN.matcher(text);
+        if (timeMatcher.find()) {
+            long hours = Long.parseLong(timeMatcher.group(1));
+            long minutes = Long.parseLong(timeMatcher.group(2));
+            if (timeMatcher.group(3) == null) {
+                return hours * 60L + minutes;
+            }
+            return hours * 3600L + minutes * 60L + Long.parseLong(timeMatcher.group(3));
+        }
+        Matcher minSecMatcher = MIN_SEC_PATTERN.matcher(text);
+        if (minSecMatcher.find()) {
+            long totalSec = Long.parseLong(minSecMatcher.group(1)) * 60L;
+            if (minSecMatcher.group(2) != null) {
+                totalSec += Long.parseLong(minSecMatcher.group(2));
+            }
+            return totalSec;
+        }
+        if (text.contains(":")) {
+            return -1L;
+        }
+        Matcher secMatcher = SECONDS_PATTERN.matcher(text);
+        if (secMatcher.find()) {
+            return Long.parseLong(secMatcher.group(1));
+        }
+        return -1L;
+    }
+
+    private void sendCommand(String command) {
+        if (command == null || command.isBlank()) {
+            return;
+        }
+        if (AutoWarden.mc.player != null && AutoWarden.mc.player.getNetworkHandler() != null) {
+            AutoWarden.mc.player.getNetworkHandler().sendChatCommand(command.trim());
+        }
+    }
+
+    private void goHomeForSupplies() {
+        this.clearCurrentChest();
+        this.stopEatingAndDrinking();
+        IBaritone iBaritone = this.getBaritone();
+        if (iBaritone != null) {
+            iBaritone.getPathingBehavior().cancelEverything();
+        }
+        this.disableAutoJump();
+        if (AutoWarden.mc.player != null && AutoWarden.mc.world != null) {
+            AutoWarden.mc.player.stopRiding();
+        }
+        this.sendCommand("hub");
+    }
+
+    private void resetAllState() {
+        this.clearCurrentChest();
+        this.stopEatingAndDrinking();
+        this.resetOpenAttempts();
+        this.targetAnarchy = -1;
+        this.targetChest = null;
+        this.targetOpenTime = -1L;
+        this.targetFoundOpenTime = -1L;
+        this.scannedChestOpenTime = -1L;
+        this.lootedCurrentChest = false;
+        this.openedCurrentChest = false;
+        this.aimedCurrentChest = false;
+        this.checkingUntimedChest = false;
+        this.openingTimedChestImmediately = false;
+        this.chestOpenRecoveries = 0;
+        this.lootContainerOpenedAt = -1L;
+        this.emptyLootChecks = 0;
+        this.returnCommandSent = false;
+        this.warehouseHomeCommandSent = false;
+        this.pendingClanStorageWithdraw = false;
+        this.farmHomeCommandSent = false;
+        this.supplyHomeCommandSent = false;
+        this.supplyChest = null;
+        this.supplyReturnState = State.RUSH_JOIN;
+        this.supplyStartedAt = -1L;
+        this.aimedSupplyChest = false;
+        this.supplyTookInvisibility = false;
+        this.supplyTookFood = false;
+    }
+
+    private void cleanupAll() {
+        this.clearCurrentChest();
+        this.stopEatingAndDrinking();
+        this.resetOpenAttempts();
+        this.resetAllState();
+        this.ignoredChests.clear();
+        this.depositSlotIndex = 0;
+        this.scanIndex = 0;
+        this.pendingDeposit = false;
+        this.warehouseHomeCommandSent = false;
+        this.pendingClanStorageWithdraw = false;
+        this.farmHomeCommandSent = false;
+        this.supplyHomeCommandSent = false;
+        this.chestOpenRecoveries = 0;
+        this.lootContainerOpenedAt = -1L;
+        this.emptyLootChecks = 0;
+        this.supplyRetryAfter = 0L;
+        this.initialSupplyPending = this.autoSupplies.get();
+        this.forceSupplyPending = false;
+        this.state = State.IDLE;
+        this.stateTimer.reset();
+    }
+
+    private boolean shouldHandleSupplies(int supplyStatus) {
+        if (!this.autoSupplies.get() || supplyStatus <= 0) {
+            return false;
+        }
+        return switch (this.state.ordinal()) {
+            case 7, 8, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 -> false;
+            default -> true;
+        };
+    }
+
+    private boolean goToSupply(State returnState, int supplyStatus, boolean force) {
+        BlockPos supplyChest;
+        if (!this.autoSupplies.get() || !force && !this.needsSupplies() || AutoWarden.mc.currentScreen != null) {
+            return false;
+        }
+        if (this.getHouseHome().isBlank()) {
+            return false;
+        }
+        long currentTime = System.currentTimeMillis();
+        if (!force && currentTime < this.supplyRetryAfter) {
+            return false;
+        }
+        this.supplyChest = supplyChest = this.findSupplyChest();
+        this.supplyReturnState = returnState;
+        this.supplyStartedAt = currentTime;
+        this.aimedSupplyChest = false;
+        this.supplyTookInvisibility = this.hasInvisibilityPotions();
+        this.supplyTookFood = false;
+        this.supplyHomeCommandSent = false;
+        this.state = this.supplyChest == null ? State.SUPPLY_WAIT_JOIN : (this.isNearChest(this.supplyChest) ? State.SUPPLY_OPEN : State.SUPPLY_PATHING);
+        this.stateTimer.reset();
+        return true;
+    }
+
+    private void goToSuppliesDirect() {
+        this.forceSupplyPending = this.autoSupplies.get();
+        this.initialSupplyPending = this.autoSupplies.get();
+        String homeName = this.getHouseHome();
+        if (!this.autoSupplies.get() || homeName.isBlank()) {
+            this.sendCommand(this.getFarmHome());
+            return;
+        }
+        if (AutoWarden.mc.player != null && AutoWarden.mc.world != null) {
+            AutoWarden.mc.player.stopRiding();
+        }
+        this.supplyChest = null;
+        this.supplyReturnState = State.RETURN_FARM_HOME;
+        this.supplyStartedAt = System.currentTimeMillis();
+        this.aimedSupplyChest = false;
+        this.supplyTookInvisibility = this.hasInvisibilityPotions();
+        this.supplyTookFood = false;
+        this.sendCommand(homeName);
+        this.supplyHomeCommandSent = true;
+        this.state = State.SUPPLY_WAIT_JOIN;
+        this.stateTimer.reset();
+    }
+
+    private boolean isSupplyRelated() {
+        return switch (this.state.ordinal()) {
+            case 16, 17, 18, 19, 25 -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isInHub() {
+        if (AutoWarden.mc.player == null) {
+            return false;
+        }
+        BlockPos pos = AutoWarden.mc.player.getBlockPos();
+        return pos.getX() == 0 && pos.getZ() == 0 && pos.getY() == 90;
+    }
+
+    private boolean goHomeOnTimeout() {
+        if (!this.isInHub()) {
+            return false;
+        }
+        long currentTime = System.currentTimeMillis();
+        if (this.pausedByHomeTeleport && currentTime < this.homeTeleportPauseUntil) {
+            return true;
+        }
+        String homeName = this.getHouseHome();
+        if (homeName.isBlank()) {
+            homeName = Clan + this.House.get();
+        }
+        this.sendCommand(homeName);
+        this.stopEatingAndDrinking();
+        IBaritone iBaritone = this.getBaritone();
+        if (iBaritone != null) {
+            iBaritone.getPathingBehavior().cancelEverything();
+        }
+        this.disableAutoJump();
+        if (AutoWarden.mc.world != null) {
+            AutoWarden.mc.player.stopRiding();
+        }
+        this.pausedByHomeTeleport = true;
+        this.homeTeleportPauseUntil = currentTime + 5000L;
+        this.stateTimer.reset();
+        return true;
+    }
+
+    private boolean needsSupplies() {
+        return this.getInvisibilityCount() < 1 || this.getFoodCount() < 8;
+    }
+
+    private boolean isSupplyTimedOut() {
+        return this.supplyStartedAt > 0L && System.currentTimeMillis() - this.supplyStartedAt > 45000L;
+    }
+
+    private void finishSupplies(boolean success) {
+        this.clearCurrentChest();
+        this.resetOpenAttempts();
+        if (AutoWarden.mc.player != null && AutoWarden.mc.world != null) {
+            AutoWarden.mc.player.stopRiding();
+        }
+        this.supplyChest = null;
+        this.supplyStartedAt = -1L;
+        this.aimedSupplyChest = false;
+        this.supplyTookInvisibility = false;
+        this.supplyTookFood = false;
+        this.supplyHomeCommandSent = false;
+        if (!success && this.initialSupplyPending) {
+            if (this.forceSupplyPending) {
+                this.state = State.IDLE;
+                this.stateTimer.reset();
+                return;
+            }
+            this.state = State.IDLE;
+            this.stateTimer.reset();
+            return;
+        }
+        if (success) {
+            this.initialSupplyPending = false;
+            this.forceSupplyPending = false;
+            this.returnToLooting();
+            return;
+        }
+        State returnState = this.supplyReturnState == null ? State.RUSH_JOIN : this.supplyReturnState;
+        this.state = returnState;
+        if (this.state == State.HUB_WAITING) {
+            this.returnCommandSent = false;
+            this.goHomeForSupplies();
+        }
+        this.stateTimer.reset();
+    }
+
+    private void takeSupplies(PlayerInventory inventory) {
+        int totalSlots = inventory.size();
+        if (!this.supplyTookInvisibility) {
+            int slot = this.findItemSlot(inventory, totalSlots, this::isInvisibilityPotion);
+            this.supplyTookInvisibility = true;
+            if (slot != -1) {
+                if (!this.takeItemFromChest(inventory, slot, totalSlots)) {
+                    return;
+                }
+                return;
+            }
+        }
+        if (!this.supplyTookFood) {
+            int slot = this.findItemSlot(inventory, totalSlots, this::isFood);
+            this.supplyTookFood = true;
+            if (slot != -1) {
+                if (!this.takeItemFromChest(inventory, slot)) {
+                    return;
+                }
+                return;
+            }
+        }
+        KeyBindingUtils.setKeyPressed(false);
+        this.finishSupplies(true);
+    }
+
+    private boolean hasEmptyInventorySlot(PlayerInventory inventory) {
+        int totalSlots = inventory.size();
+        for (int i = 0; i < totalSlots; ++i) {
+            ItemStack stack = inventory.getStack(i);
+            if (!stack.isEmpty() || !stack.getItem().equals(Items.SHULKER_BOX)) continue;
+            AutoWarden.mc.interactionManager.clickSlot(inventory.syncId, inventory.getSlot(i).id, 0, ClickType.PICKUP, AutoWarden.mc.player);
+            return true;
+        }
+        return false;
+    }
+
+    private int findItemSlot(PlayerInventory inventory, int totalSlots, Predicate<ItemStack> predicate) {
+        for (int i = 0; i < totalSlots; ++i) {
+            ItemStack stack = inventory.getStack(i);
+            if (stack.isEmpty() || !predicate.test(stack)) continue;
+            return i;
+        }
+        return -1;
+    }
+
+    private boolean takeItemFromChest(PlayerInventory inventory, int slot, int totalSlots) {
+        ItemStack stack = inventory.getStack(slot);
+        int emptySlot = this.findEmptySlot(inventory, totalSlots, stack);
+        if (emptySlot == -1) {
+            this.supplyRetryAfter = System.currentTimeMillis() + 15000L;
+            KeyBindingUtils.setKeyPressed(false);
+            this.finishSupplies(false);
+            return false;
+        }
+        AutoWarden.mc.interactionManager.clickSlot(inventory.syncId, inventory.getSlot(slot).id, 0, ClickType.PICKUP, AutoWarden.mc.player);
+        AutoWarden.mc.interactionManager.clickSlot(inventory.syncId, inventory.getSlot(emptySlot).id, 1, ClickType.PICKUP, AutoWarden.mc.player);
+        AutoWarden.mc.interactionManager.clickSlot(inventory.syncId, inventory.getSlot(slot).id, 0, ClickType.PICKUP, AutoWarden.mc.player);
+        return true;
+    }
+
+    private int findEmptySlot(PlayerInventory inventory, int totalSlots, ItemStack stack) {
+        for (int i = 0; i < totalSlots; ++i) {
+            ItemStack currentStack = inventory.getStack(i);
+            if (!currentStack.isEmpty() || !ItemStack.areItemsEqual(currentStack, stack) && currentStack.getCount() >= currentStack.getMaxCount()) continue;
+            return i;
+        }
+        for (int i = 0; i < totalSlots; ++i) {
+            if (!inventory.getSlot(i).isEmpty()) continue;
+            return i;
+        }
+        return -1;
+    }
+
+    private boolean takeItemFromChest(PlayerInventory inventory, int slot) {
+        ItemStack stack = inventory.getStack(slot);
+        if (!this.canTakeItem(stack)) {
+            this.supplyRetryAfter = System.currentTimeMillis() + 15000L;
+            KeyBindingUtils.setKeyPressed(false);
+            this.finishSupplies(false);
+            return false;
+        }
+        AutoWarden.mc.interactionManager.clickSlot(inventory.syncId, inventory.getSlot(slot).id, 0, ClickType.QUICK_MOVE, AutoWarden.mc.player);
+        return true;
+    }
+
+    private BlockPos findSupplyChest() {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.world == null) {
+            return null;
+        }
+        BlockPos playerPos = AutoWarden.mc.player.getBlockPos();
+        BlockPos bestChest = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (BlockPos pos : BlockPos.iterateOutwards(playerPos, 32, 1, 32)) {
+            if (!this.isValidChest(pos) || !this.hasSupplySign(pos)) continue;
+            double distance = playerPos.distanceTo(pos);
+            if (!(distance < bestDistance)) continue;
+            bestDistance = distance;
+            bestChest = pos.toImmutable();
+        }
+        return bestChest != null ? bestChest : this.getCurrentChest();
+    }
+
+    private BlockPos getCurrentChest() {
+        HitResult hitResult;
+        if (AutoWarden.mc.world == null || !((hitResult = AutoWarden.mc.crosshairTarget) instanceof BlockHitResult)) {
+            return null;
+        }
+        BlockHitResult blockHit = (BlockHitResult)hitResult;
+        BlockPos pos = blockHit.getBlockPos();
+        if (!this.isValidChest(pos) || AutoWarden.mc.player.getEyePos().distanceTo(pos.toCenterPos()) > 36.0) {
+            return null;
+        }
+        return pos.toImmutable();
+    }
+
+    private boolean hasSupplySign(BlockPos pos) {
+        if (AutoWarden.mc.world == null) {
+            return false;
+        }
+        for (BlockPos checkPos : BlockPos.iterateOutwards(pos, 1, 2, 1)) {
+            BlockEntity blockEntity = AutoWarden.mc.world.getBlockEntity(checkPos);
+            if (!(blockEntity instanceof SignBlockEntity) || !this.isSupplySign((SignBlockEntity)blockEntity)) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isSupplySign(SignBlockEntity sign) {
+        String text = this.cleanString(this.getSignText(sign.getFrontText()) + " " + this.getSignText(sign.getBackText()));
+        for (String keyword : this.getSupplyKeywords()) {
+            if (keyword.isBlank() || !text.contains(this.cleanString(keyword))) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private String getSignText(Text text) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < 4; ++i) {
+            builder.append(' ').append(text.getLine(i, false).getString());
+        }
+        return builder.toString().replaceAll("§.", "");
+    }
+
+    private List<String> getSupplyKeywords() {
+        List<String> keywords = new ArrayList<String>();
+        String signText = this.supplySign.get();
+        if (signText != null) {
+            for (String part : signText.split("[,;\\s]+")) {
+                String keyword = this.cleanString(part).trim();
+                if (keyword.isBlank()) continue;
+                keywords.add(keyword);
+            }
+        }
+        if (keywords.isEmpty()) {
+            keywords.addAll(List.of(DEFAULT_SUPPLY_SIGN_KEYWORDS));
+        }
+        return keywords;
+    }
+
+    private boolean isSupplyChestNear() {
+        return this.supplyChest != null && this.isNearChest(this.supplyChest);
+    }
+
+    private int getInvisibilityCount() {
+        return this.countItems(this::isInvisibilityPotion);
+    }
+
+    private boolean hasInvisibilityPotions() {
+        if (AutoWarden.mc.player == null) {
+            return false;
+        }
+        for (int i = 0; i < 9; ++i) {
+            if (!this.isInvisibilityPotion(AutoWarden.mc.player.getInventory().getStack(i))) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private int getFoodCount() {
+        return this.countItems(this::isFood);
+    }
+
+    private int countItems(Predicate<ItemStack> predicate) {
+        if (AutoWarden.mc.player == null) {
+            return 0;
+        }
+        int count = 0;
+        for (int i = 0; i < AutoWarden.mc.player.getInventory().size(); ++i) {
+            ItemStack stack = AutoWarden.mc.player.getInventory().getStack(i);
+            if (!predicate.test(stack)) continue;
+            count += stack.getCount();
+        }
+        return count;
+    }
+
+    private boolean isInvisibilityPotion(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        if (!stack.getItem().equals(Items.POTION)) {
+            return false;
+        }
+        PotionUtil.getPotionEffects(stack);
+        List<StatusEffectInstance> effects = PotionUtil.getPotionEffects(stack);
+        for (StatusEffectInstance effect : effects) {
+            if (!effect.getEffectType().equals(StatusEffects.INVISIBILITY)) continue;
+            return true;
+        }
+        String name = this.cleanString(stack.getName().getString());
+        return name.contains("инвиз") || name.contains("невид") || name.contains("invis");
+    }
+
+    private boolean isFood(ItemStack stack) {
+        return stack != null && !stack.isEmpty() && stack.getItem().getFoodComponent() != null;
+    }
+
+    private boolean isLootItem(ItemStack stack) {
+        return this.isInvisibilityPotion(stack) || this.isFood(stack);
+    }
+
+    private boolean canTakeItem(ItemStack stack) {
+        if (AutoWarden.mc.player == null || stack == null || stack.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < 36; ++i) {
+            ItemStack invStack = AutoWarden.mc.player.getInventory().getStack(i);
+            if (invStack.isEmpty()) {
+                return true;
+            }
+            if (!ItemStack.areItemsEqual(invStack, stack) || invStack.getCount() >= invStack.getMaxCount()) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private void lootChest(PlayerInventory inventory) {
+        boolean looted = false;
+        for (int i = 0; i < inventory.size(); ++i) {
+            if (!inventory.getSlot(i).isEmpty() || !this.isLootItem(inventory.getStack(i))) continue;
+            QuickMoveUtils.quickMove(i, 0, ClickType.QUICK_MOVE, true);
+            looted = true;
+        }
+        if (looted) {
+            this.lootedCurrentChest = true;
+            this.emptyLootChecks = 0;
+            this.pendingDeposit = true;
+        }
+        this.checkEmptyChest(inventory);
+    }
+
+    private void checkEmptyChest(PlayerInventory inventory) {
+        if (this.isTimedChestLootGrace()) {
+            this.emptyLootChecks = 0;
+            return;
+        }
+        if (this.lootContainerOpenedAt > 0L && System.currentTimeMillis() - this.lootContainerOpenedAt < 500L) {
+            return;
+        }
+        boolean hasItems = false;
+        for (int i = 0; i < inventory.size(); ++i) {
+            if (!inventory.getSlot(i).isEmpty()) continue;
+            hasItems = true;
+            if (!this.isLootItem(inventory.getStack(i))) continue;
+            this.emptyLootChecks = 0;
+            return;
+        }
+        if (hasItems) {
+            KeyBindingUtils.setKeyPressed(false);
+            return;
+        }
+        ++this.emptyLootChecks;
+        if (this.emptyLootChecks < 2) {
+            return;
+        }
+        KeyBindingUtils.setKeyPressed(false);
+    }
+
+    private boolean isTimedChestLootGrace() {
+        return this.openingTimedChestImmediately && this.targetOpenTime > 0L && System.currentTimeMillis() < this.targetOpenTime + 3000L;
+    }
+
+    private boolean isLootItem(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        if (!this.autoLoot.get()) {
+            return false;
+        }
+        return this.isValuableLoot(stack);
+    }
+
+    private boolean isValuableLoot(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        String name = this.normalizeString(stack.getName().getString());
+        String id = this.normalizeString(Registry.ITEM.getId(stack.getItem()).toString());
+        for (String strictId : STRICT_LOOT_ITEM_IDS) {
+            if (!id.equals(this.normalizeString(strictId))) continue;
+            return true;
+        }
+        for (String lootItem : LOOT_ITEMS) {
+            String normalizedLoot = this.normalizeString(lootItem);
+            if (normalizedLoot.isEmpty() || this.isStrictMatch(normalizedLoot) || !name.contains(normalizedLoot)) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isStrictMatch(String name) {
+        for (String strictId : STRICT_LOOT_ITEM_IDS) {
+            if (!name.equals(this.normalizeString(strictId))) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private String normalizeString(String text) {
+        return text == null ? "" : text.toLowerCase(Locale.ROOT).replace("minecraft:", "").replace('_', ' ').trim();
+    }
+
+    private void depositToClanStorage(PlayerInventory inventory) {
+        int startSlot = this.getStartSlot(inventory);
+        if (startSlot < 0) {
+            KeyBindingUtils.setKeyPressed(false);
+            return;
+        }
+        for (int i = startSlot + this.depositSlotIndex; i < inventory.size(); ++i) {
+            ItemStack stack = inventory.getStack(i);
+            if (stack.isEmpty() || !this.isDepositItem(stack)) continue;
+            ItemStack original = stack.copy();
+            AutoWarden.mc.interactionManager.clickSlot(inventory.syncId, inventory.getSlot(i).id, 0, ClickType.QUICK_MOVE, AutoWarden.mc.player);
+            ItemStack newStack = inventory.getStack(i);
+            if (!newStack.isEmpty() && ItemStack.areItemsEqual(newStack, original) && newStack.getCount() >= original.getCount()) {
+                this.startDepositNextSlot();
+                return;
+            }
+            this.depositSlotIndex = i - startSlot + 1;
+            return;
+        }
+        this.depositSlotIndex = 0;
+        KeyBindingUtils.setKeyPressed(false);
+    }
+
+    private void startDepositNextSlot() {
+        this.depositSlotIndex = 0;
+        this.pendingClanStorageWithdraw = true;
+        this.warehouseHomeCommandSent = false;
+        KeyBindingUtils.setKeyPressed(false);
+        this.state = State.GO_WAREHOUSE;
+        this.stateTimer.reset();
+    }
+
+    private void withdrawFromClanStorage(PlayerInventory inventory) {
+        int totalSlots = inventory.size();
+        for (int i = this.depositSlotIndex; i < totalSlots; ++i) {
+            ItemStack stack = inventory.getStack(i);
+            if (stack.isEmpty() || !this.isDepositItem(stack)) continue;
+            if (!this.canTakeItem(stack)) {
+                this.pendingClanStorageWithdraw = true;
+                this.depositSlotIndex = 0;
+                KeyBindingUtils.setKeyPressed(false);
+                return;
+            }
+            AutoWarden.mc.interactionManager.clickSlot(inventory.syncId, inventory.getSlot(i).id, 0, ClickType.QUICK_MOVE, AutoWarden.mc.player);
+            this.depositSlotIndex = i + 1;
+            return;
+        }
+        this.depositSlotIndex = 0;
+        this.pendingClanStorageWithdraw = false;
+        KeyBindingUtils.setKeyPressed(false);
+        this.state = State.WAREHOUSE_OPEN;
+        this.stateTimer.reset();
+    }
+
+    private int getStartSlot(PlayerInventory inventory) {
+        int totalSlots = inventory.size() - 36;
+        return totalSlots >= 0 ? totalSlots : -1;
+    }
+
+    private void returnToLooting() {
+        this.pendingDeposit = false;
+        this.pendingClanStorageWithdraw = false;
+        this.warehouseHomeCommandSent = false;
+        this.resetChestState();
+        this.scanIndex = 0;
+        this.state = State.SCAN_NEXT;
+        this.stateTimer.reset();
+    }
+
+    private void depositToChest(HandledScreen screen) {
+        int totalSlots = ((PlayerInventory)screen.getScreenHandler().getInventory()).size();
+        int startSlot = totalSlots - 36;
+        for (int i = this.depositSlotIndex; i < 36; ++i) {
+            int slotIndex = startSlot + i;
+            ItemStack stack = ((PlayerInventory)screen.getScreenHandler().getInventory()).getStack(slotIndex);
+            if (stack.isEmpty() || !this.isDepositItem(stack)) continue;
+            AutoWarden.mc.interactionManager.clickSlot(((PlayerInventory)screen.getScreenHandler().getInventory()).syncId, slotIndex, 0, ClickType.QUICK_MOVE, AutoWarden.mc.player);
+            this.depositSlotIndex = i + 1;
+            return;
+        }
+        this.depositSlotIndex = 0;
+        AutoWarden.mc.player.stopRiding();
+        if (this.hasLootToDeposit()) {
+            if (this.targetChest != null) {
+                this.ignoredChests.put(this.targetChest.toImmutable(), System.currentTimeMillis() + 300000L);
+            }
+            this.targetChest = null;
+            this.state = State.WAREHOUSE_FIND_CHEST;
+        } else if (this.pendingClanStorageWithdraw) {
+            this.state = State.CLAN_STORAGE_WITHDRAW_OPEN;
+        } else {
+            this.pendingDeposit = false;
+            this.returnToLooting();
+        }
+        this.stateTimer.reset();
+    }
+
+    private boolean isDepositItem(ItemStack stack) {
+        return !this.isLootItem(stack) && this.isValuableLoot(stack);
+    }
+
+    private boolean hasLootToDeposit() {
+        if (AutoWarden.mc.player == null) {
+            return false;
+        }
+        for (int i = 0; i < AutoWarden.mc.player.getInventory().size(); ++i) {
+            ItemStack stack = AutoWarden.mc.player.getInventory().getStack(i);
+            if (stack.isEmpty() || !this.isDepositItem(stack)) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private boolean hasAnyItems() {
+        if (AutoWarden.mc.player == null) {
+            return false;
+        }
+        for (int i = 0; i < AutoWarden.mc.player.getInventory().size(); ++i) {
+            if (AutoWarden.mc.player.getInventory().getStack(i).isEmpty()) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private void clearExpiredIgnoredChests() {
+        long currentTime = System.currentTimeMillis();
+        this.ignoredChests.entrySet().removeIf(entry -> entry.getValue() <= currentTime);
+    }
+
+    private boolean isTimedChestAvailable() {
+        if (this.targetAnarchy == -1 || this.targetOpenTime == -1L || this.targetChest == null) {
+            return false;
+        }
+        return this.isValidTimedChest(this.targetOpenTime);
+    }
+
+    private boolean isValidTimedChest(long openTime) {
+        if (openTime == -1L || this.shouldDepositLoot()) {
+            return false;
+        }
+        long timeUntilOpen = openTime - System.currentTimeMillis();
+        long minWait = Math.max(10000L, this.getRejoinLead() + 2000L);
+        return timeUntilOpen <= this.getMaxWaitTime() && timeUntilOpen > minWait;
+    }
+
+    private long getOpenRetryDelay() {
+        return Math.max(0, this.openRetryDelay.get());
+    }
+
+    private long getRejoinLead() {
+        return Math.max(500L, (long)this.rejoinLead.get());
+    }
+
+    private long getMaxWaitTime() {
+        try {
+            return Math.max(1L, Long.parseLong(this.zaxdod.get())) * 1000L;
+        } catch (Exception exception) {
+            return 60000L;
+        }
+    }
+
+    private long calculateOpenTime(long timeLeft) {
+        return System.currentTimeMillis() + Math.max(0L, timeLeft) * 1000L + 1000L;
+    }
+
+    private boolean shouldSetArenaHome(long timeUntilOpen) {
+        return timeUntilOpen > 9000L && timeUntilOpen <= this.getMaxWaitTime();
+    }
+
+    private void resetChestState() {
+        this.clearCurrentChest();
+        this.stopEatingAndDrinking();
+        this.resetOpenAttempts();
+        this.targetAnarchy = -1;
+        this.targetChest = null;
+        this.targetOpenTime = -1L;
+        this.targetFoundOpenTime = -1L;
+        this.scannedChestOpenTime = -1L;
+        this.lootedCurrentChest = false;
+        this.openedCurrentChest = false;
+        this.aimedCurrentChest = false;
+        this.checkingUntimedChest = false;
+        this.openingTimedChestImmediately = false;
+        this.chestOpenRecoveries = 0;
+        this.lootContainerOpenedAt = -1L;
+        this.emptyLootChecks = 0;
+        this.returnCommandSent = false;
+        this.warehouseHomeCommandSent = false;
+        this.pendingClanStorageWithdraw = false;
+        this.farmHomeCommandSent = false;
+        this.supplyHomeCommandSent = false;
+        this.supplyChest = null;
+        this.supplyReturnState = State.RUSH_JOIN;
+        this.supplyStartedAt = -1L;
+        this.aimedSupplyChest = false;
+        this.supplyTookInvisibility = false;
+        this.supplyTookFood = false;
+    }
+
+    private void blacklistChest(long openTime) {
+        if (this.targetChest != null) {
+            long blacklistUntil = Math.max(System.currentTimeMillis() + 1000L, openTime - this.getMaxWaitTime());
+            this.ignoredChests.put(this.targetChest.toImmutable(), blacklistUntil);
+        }
+        this.targetAnarchy = -1;
+        this.targetChest = null;
+        this.targetOpenTime = -1L;
+        this.targetFoundOpenTime = -1L;
+        this.scannedChestOpenTime = -1L;
+        this.lootedCurrentChest = false;
+        this.openedCurrentChest = false;
+        this.aimedCurrentChest = false;
+        this.checkingUntimedChest = false;
+        this.openingTimedChestImmediately = false;
+        this.returnCommandSent = false;
+    }
+
+    private boolean isValidChest(BlockPos pos) {
+        if (AutoWarden.mc.world == null || pos == null) {
+            return false;
+        }
+        BlockState state = AutoWarden.mc.world.getBlockState(pos);
+        return state.getBlock() == Blocks.CHEST || state.getBlock() == Blocks.TRAPPED_CHEST || state.getBlock() == Blocks.BARREL || state.getBlock() == Blocks.SHULKER_BOX;
+    }
+
+    private boolean isChestStillThere(BlockPos pos) {
+        return this.isValidChest(pos) && this.isNearChest(pos);
+    }
+
+    private boolean isChestCurrent(BlockPos pos) {
+        return this.targetChest != null && this.targetChest.equals(pos);
+    }
+
+    private boolean isPlayerDead() {
+        return AutoWarden.mc.player == null || AutoWarden.mc.player.isDead() || AutoWarden.mc.player.getHealth() <= 0.0f;
+    }
+
+    private boolean isTeleportingToHub() {
+        if (AutoWarden.mc.inGameHud == null) {
+            return false;
+        }
+        for (BossBar bossBar : AutoWarden.mc.inGameHud.getBossBarHud().getBossBars().values()) {
+            String text = bossBar.getName().getString().trim();
+            if (!"Телепортация".equals(text)) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private boolean shouldDepositLoot() {
+        return this.hasLootToDeposit() && AutoWarden.mc.player != null && AutoWarden.mc.world != null && AutoWarden.mc.currentScreen != null && this.isPvPArena();
+    }
+
+    private boolean isPvPArena() {
+        for (BossBar bossBar : AutoWarden.mc.inGameHud.getBossBarHud().getBossBars().values()) {
+            String text = this.cleanString(bossBar.getName().getString());
+            if (!text.contains("pvp") && !text.contains("пвп")) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private String getHouseHome() {
+        return this.getSettingString(this.House);
+    }
+
+    private String getFarmHome() {
+        return this.getSettingString(this.Loot);
+    }
+
+    private String getWarehouseHome() {
+        return this.getSettingString(this.warehouse, "sethome ");
+    }
+
+    private String getWarehouseHomeCommand() {
+        return this.getSettingString(this.warehouse, "home ");
+    }
+
+    private String getSettingString(SettingString setting) {
+        String value = setting.get();
+        if (value.isBlank()) {
+            return "";
+        }
+        if (value.regionMatches(true, 0, Clan, 0, Clan.length())) {
+            return value;
+        }
+        return Clan + value;
+    }
+
+    private String getSettingString(SettingString setting, String prefix) {
+        String value = setting.get();
+        if (value.isBlank()) {
+            return "";
+        }
+        if (value.regionMatches(true, 0, prefix, 0, prefix.length())) {
+            return value;
+        }
+        return prefix + value;
+    }
+
+    private String formatTime(long time) {
+        if (time <= 0L) {
+            return "READY";
+        }
+        long seconds = (time + 999L) / 1000L;
+        long minutes = seconds / 60L;
+        long remainingSeconds = seconds % 60L;
+        return String.format(Locale.ROOT, "%02d:%02d", minutes, remainingSeconds);
+    }
+
+    private BlockPos findWarehouseChest() {
+        BlockPos currentChest = this.getCurrentChest();
+        if (currentChest != null) {
+            return currentChest;
+        }
+        if (AutoWarden.mc.player == null || AutoWarden.mc.world == null) {
+            return null;
+        }
+        BlockPos playerPos = AutoWarden.mc.player.getBlockPos();
+        BlockPos bestChest = null;
+        double bestDistance = Double.MAX_VALUE;
+        long currentTime = System.currentTimeMillis();
+        for (BlockPos pos : BlockPos.iterateOutwards(playerPos, 32, 1, 32)) {
+            BlockPos chestPos = pos.toImmutable();
+            Long ignoreUntil = this.ignoredChests.get(chestPos);
+            if (ignoreUntil != null && ignoreUntil > currentTime) continue;
+            if (!this.isValidChest(chestPos)) continue;
+            double distance = playerPos.distanceTo(chestPos);
+            if (!(distance < bestDistance)) continue;
+            bestDistance = distance;
+            bestChest = chestPos;
+        }
+        return bestChest;
+    }
+
+    private void handleAutoEatAndDrink() {
+        int selectedSlot = AutoWarden.mc.player.getInventory().selectedSlot;
+        if (this.shouldUseInvisibility() && this.drinkInvisibilityPotion()) {
+            return;
+        }
+        if (AutoWarden.mc.player.getHungerManager().isNotFull() && this.eatFood()) {
+            return;
+        }
+    }
+
+    private boolean shouldUseInvisibility() {
+        StatusEffectInstance invisibility = AutoWarden.mc.player.getStatusEffect(StatusEffects.INVISIBILITY);
+        return invisibility == null || !invisibility.isAmbient() && invisibility.getDuration() <= 200;
+    }
+
+    private boolean drinkInvisibilityPotion() {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.interactionManager == null || AutoWarden.mc.currentScreen != null) {
+            this.stopDrinkingInvisibility();
+            return false;
+        }
+        if (!this.shouldUseInvisibility()) {
+            this.stopDrinkingInvisibility();
+            return false;
+        }
+        if (!this.autoDrinkingInvisibility && !this.findInvisibilityPotion()) {
+            return false;
+        }
+        if (this.invisibilityHotbarSlot < 0 || this.invisibilityHotbarSlot > 8 || !this.isInvisibilityPotion(AutoWarden.mc.player.getInventory().getStack(this.invisibilityHotbarSlot))) {
+            this.stopDrinkingInvisibility();
+            return false;
+        }
+        this.switchToSlot(this.invisibilityHotbarSlot);
+        this.disableAutoJump();
+        if (this.invisibilityUseDelayTicks > 0) {
+            --this.invisibilityUseDelayTicks;
+            return true;
+        }
+        if (AutoWarden.mc.currentScreen != null) {
+            KeyBindingUtils.setKeyPressed(true);
+        }
+        if (!AutoWarden.mc.player.isUsingItem()) {
+            AutoWarden.mc.interactionManager.interactItem(AutoWarden.mc.player, Hand.MAIN_HAND);
+        }
+        if (this.invisibilityUseTimer.passed(7000.0)) {
+            this.stopDrinkingInvisibility();
+            return false;
+        }
+        return true;
+    }
+
+    private boolean findInvisibilityPotion() {
+        int slot = this.findHotbarSlot(this::isInvisibilityPotion);
+        this.previousInvisibilitySlot = AutoWarden.mc.player.getInventory().selectedSlot;
+        if (slot != -1) {
+            this.invisibilityHotbarSlot = slot;
+            this.autoDrinkingInvisibility = true;
+            this.invisibilityUseDelayTicks = 1;
+            this.invisibilityUseTimer.reset();
+            return true;
+        }
+        ItemStack potion = InventoryUtils.findItem(this::isInvisibilityPotion);
+        if (potion == null) {
+            this.stopDrinkingInvisibility();
+            return false;
+        }
+        this.invisibilityHotbarSlot = this.findEmptyHotbarSlot();
+        if (this.invisibilityHotbarSlot == -1) {
+            this.invisibilityHotbarSlot = this.previousInvisibilitySlot;
+        }
+        this.switchToSlot(this.invisibilityHotbarSlot);
+        InventoryUtils.moveItem(potion, Hand.MAIN_HAND, false, true);
+        this.autoDrinkingInvisibility = true;
+        this.invisibilityUseDelayTicks = 2;
+        this.invisibilityUseTimer.reset();
+        return true;
+    }
+
+    private boolean eatFood() {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.interactionManager == null || AutoWarden.mc.currentScreen != null) {
+            this.stopEatingFood();
+            return false;
+        }
+        if (!AutoWarden.mc.player.getHungerManager().isNotFull()) {
+            this.stopEatingFood();
+            return false;
+        }
+        if (!this.autoEatingFood && !this.findFood()) {
+            return false;
+        }
+        if (this.foodHotbarSlot < 0 || this.foodHotbarSlot > 8 || !this.isFood(AutoWarden.mc.player.getInventory().getStack(this.foodHotbarSlot))) {
+            this.stopEatingFood();
+            return false;
+        }
+        this.switchToSlot(this.foodHotbarSlot);
+        this.disableAutoJump();
+        if (this.foodUseDelayTicks > 0) {
+            --this.foodUseDelayTicks;
+            return true;
+        }
+        if (AutoWarden.mc.currentScreen != null) {
+            KeyBindingUtils.setKeyPressed(true);
+        }
+        if (!AutoWarden.mc.player.isUsingItem()) {
+            AutoWarden.mc.interactionManager.interactItem(AutoWarden.mc.player, Hand.MAIN_HAND);
+        }
+        if (this.foodUseTimer.passed(7000.0)) {
+            this.stopEatingFood();
+            return false;
+        }
+        return true;
+    }
+
+    private boolean findFood() {
+        int slot = this.findHotbarSlot(this::isFood);
+        this.previousFoodSlot = AutoWarden.mc.player.getInventory().selectedSlot;
+        if (slot != -1) {
+            this.foodHotbarSlot = slot;
+            this.autoEatingFood = true;
+            this.foodUseDelayTicks = 1;
+            this.foodUseTimer.reset();
+            return true;
+        }
+        ItemStack food = InventoryUtils.findItem(this::isFood);
+        if (food == null || !this.isFood(food)) {
+            this.stopEatingFood();
+            return false;
+        }
+        this.foodHotbarSlot = this.findEmptyHotbarSlot();
+        if (this.foodHotbarSlot == -1) {
+            this.foodHotbarSlot = this.previousFoodSlot;
+        }
+        this.switchToSlot(this.foodHotbarSlot);
+        InventoryUtils.moveItem(food, Hand.MAIN_HAND, false, true);
+        this.autoEatingFood = true;
+        this.foodUseDelayTicks = 2;
+        this.foodUseTimer.reset();
+        return true;
+    }
+
+    private int findHotbarSlot(Predicate<ItemStack> predicate) {
+        if (AutoWarden.mc.player == null) {
+            return -1;
+        }
+        for (int i = 0; i < 9; ++i) {
+            if (!predicate.test(AutoWarden.mc.player.getInventory().getStack(i))) continue;
+            return i;
+        }
+        return -1;
+    }
+
+    private int findEmptyHotbarSlot() {
+        return this.findHotbarSlot(ItemStack::isEmpty);
+    }
+
+    private int findFreeInventorySlot() {
+        if (AutoWarden.mc.player == null) {
+            return -1;
+        }
+        for (int i = 9; i < 36; ++i) {
+            if (!AutoWarden.mc.player.getInventory().getStack(i).isEmpty()) continue;
+            return i;
+        }
+        return -1;
+    }
+
+    private void switchToSlot(int slot) {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.player.getNetworkHandler() == null || slot < 0 || slot > 8) {
+            return;
+        }
+        if (AutoWarden.mc.player.getInventory().selectedSlot != slot) {
+            AutoWarden.mc.player.getInventory().selectedSlot = slot;
+            AutoWarden.mc.player.getNetworkHandler().sendPacket(new SetSelectedSlotPacket(slot));
+        }
+    }
+
+    private void stopEatingFood() {
+        if (!this.autoEatingFood) {
+            this.resetFoodState();
+            return;
+        }
+        if (AutoWarden.mc.currentScreen != null) {
+            KeyBindingUtils.setKeyPressed(false);
+        }
+        if (this.previousFoodSlot != -1) {
+            this.switchToSlot(this.previousFoodSlot);
+        }
+        this.resetFoodState();
+    }
+
+    private void stopDrinkingInvisibility() {
+        if (!this.autoDrinkingInvisibility) {
+            this.resetInvisibilityState();
+            return;
+        }
+        if (AutoWarden.mc.currentScreen != null) {
+            KeyBindingUtils.setKeyPressed(false);
+        }
+        if (this.previousInvisibilitySlot != -1) {
+            this.switchToSlot(this.previousInvisibilitySlot);
+        }
+        this.resetInvisibilityState();
+    }
+
+    private void resetFoodState() {
+        this.autoEatingFood = false;
+        this.previousFoodSlot = -1;
+        this.foodHotbarSlot = -1;
+        this.foodUseDelayTicks = 0;
+        this.foodUseTimer.reset();
+    }
+
+    private void resetInvisibilityState() {
+        this.autoDrinkingInvisibility = false;
+        this.previousInvisibilitySlot = -1;
+        this.invisibilityHotbarSlot = -1;
+        this.invisibilityUseDelayTicks = 0;
+        this.invisibilityUseTimer.reset();
+    }
+
+    private IBaritone getBaritone() {
+        try {
+            return BaritoneAPI.getProvider().getPrimaryBaritone();
+        } catch (Throwable throwable) {
+            return null;
+        }
+    }
+
+    @SubscribeEvent
+    public void onRender(RenderEvent event) {
+        if (AutoWarden.mc.player == null || AutoWarden.mc.currentScreen == null) {
+            return;
+        }
+        String status = switch (this.state.ordinal()) {
+            case 16 -> "Иду на склад за инвизом";
+            case 17 -> {
+                if (this.supplyChest == null) {
+                    yield "Ищу сундук инвиза";
+                }
+                yield "Иду к сундуку инвиза";
+            }
+            case 18, 19 -> "Беру инвиз и еду";
+            case 20, 21 -> "Складываю лут в clan storage";
+            case 24 -> "Иду на склад";
+            case 22, 23 -> "Забираю лут из clan storage";
+            default -> this.targetAnarchy != -1 && this.targetOpenTime != -1L ? "Открытие через " + this.formatTime(this.targetOpenTime - System.currentTimeMillis()) : "Поиск сундука";
+        };
+        int width = AutoWarden.mc.currentScreen.getTextRenderer().getWidth(status) + 12;
+        int x = AutoWarden.mc.currentScreen.getWindow().getScaledWidth() / 2 - width / 2;
+        int y = 50;
+        DrawContext context = AutoWarden.mc.currentScreen.getDrawContext();
+        Rectangle.drawRounded(context, x, y, width, 18.0, 8.0f, new Color(0, 0, 0, 255).getRGB());
+        AutoWarden.mc.currentScreen.getTextRenderer().draw(status, x + 6, y + 5, new Color(255, 255, 255, 255).getRGB(), false);
+    }
+
+    private class HologramData {
+        final BlockPos pos;
+        long openTime;
+        double distance;
+
+        HologramData(BlockPos pos, long openTime, double distance) {
+            this.pos = pos;
+            this.openTime = openTime;
+            this.distance = distance;
+        }
+    }
+
+    private enum State {
+        IDLE,
+        SCAN_NEXT,
+        SCAN_WAIT_JOIN,
+        SCAN_FIND_HOLOGRAM,
+        SCAN_PATHING,
+        SCAN_READ_HOLOGRAM,
+        HUB_WAITING,
+        ARENA_SET_HOME,
+        ARENA_OPEN,
+        ARENA_WAIT_RETURN,
+        ARENA_RETURN,
+        ARENA_RETURN_WAIT,
+        RUSH_JOIN,
+        RUSH_PATH,
+        WAIT_OPEN,
+        LOOTING,
+        SUPPLY_WAIT_JOIN,
+        SUPPLY_PATHING,
+        SUPPLY_OPEN,
+        SUPPLY_TAKE,
+        CLAN_STORAGE_OPEN,
+        CLAN_STORAGE_DEPOSIT,
+        CLAN_STORAGE_WITHDRAW_OPEN,
+        CLAN_STORAGE_WITHDRAW,
+        GO_WAREHOUSE,
+        RETURN_FARM_HOME,
+        WAREHOUSE_WAIT_JOIN,
+        WAREHOUSE_FIND_CHEST,
+        WAREHOUSE_PATHING,
+        WAREHOUSE_OPEN,
+        DEPOSITING
+    }
+}

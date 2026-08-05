@@ -92,6 +92,10 @@ public final class ZarabotokReallyWorld extends Module {
    private Vec3d rtpStartPos;
    private int shearsStep;
    private final Timer shearsTimer = new Timer();
+   private int craftSubStep;
+   private int craftSlotA;
+   private int craftSlotB;
+   private boolean craftNeedSecond;   // надо ли брать железо из второго слота (countA == 1)
    private float lastHealth;
    private final Timer damageTpTimer = new Timer();
    private final Timer hostileTpTimer = new Timer();
@@ -277,16 +281,35 @@ public final class ZarabotokReallyWorld extends Module {
             break;
 
          case 3:
-            this.craftShears();
-            this.shearsStep = 4;
-            this.shearsTimer.reset();
+            if (this.craftSubStep == 0) {
+               if (!this.startShearsCraft()) {
+                  MessageUtil.displayInfo("Не нашёл железо для крафта — модуль остановлен");
+                  this.setToggled(false);
+                  break;
+               }
+               this.shearsTimer.reset();
+            }
+            if (this.shearsTimer.finished(250L)) {
+               this.shearsTimer.reset();
+               if (this.advanceShearsCraft()) {
+                  this.shearsStep = 4;
+                  this.shearsTimer.reset();
+               }
+            }
             break;
 
          case 4:
             if (this.shearsTimer.finished(500L)) {
-               this.takeShearsFromCraft();
-               this.shearsStep = 5;
-               this.shearsTimer.reset();
+               if (!this.isShearsInCraftOutput()) {
+                  MessageUtil.displayInfo("Крафт ножниц не удался — чищу сетку и пробую заново");
+                  this.cleanCraftGrid();
+                  this.shearsStep = 3;
+                  this.shearsTimer.reset();
+               } else {
+                  this.takeShearsFromCraft();
+                  this.shearsStep = 5;
+                  this.shearsTimer.reset();
+               }
             }
             break;
 
@@ -300,7 +323,11 @@ public final class ZarabotokReallyWorld extends Module {
             break;
 
          case 99:
-            this.shearsStep = 0;
+      this.shearsStep = 0;
+      this.craftSubStep = 0;
+      this.craftSlotA = -1;
+      this.craftSlotB = -1;
+      this.craftNeedSecond = false;
             this.stage = this.isAncientDebris() ? Stage.NETHER_WALK : Stage.RTP;
             break;
       }
@@ -383,31 +410,85 @@ public final class ZarabotokReallyWorld extends Module {
       return -1;
    }
 
-   private void craftShears() {
-      int slotA = this.findIronSlot();
-      if (slotA == -1) {
-         return;
-      }
-      int countA = mc.player.currentScreenHandler.getSlot(slotA).getStack().getCount();
-      if (countA >= 2) {
-         PlayerInventoryUtil.clickSlot(0, slotA, 0, SlotActionType.PICKUP, false);
-         PlayerInventoryUtil.clickSlot(0, 2, 1, SlotActionType.PICKUP, false);
-         PlayerInventoryUtil.clickSlot(0, 3, 1, SlotActionType.PICKUP, false);
-         PlayerInventoryUtil.clickSlot(0, slotA, 0, SlotActionType.PICKUP, false);
-      } else {
-         PlayerInventoryUtil.clickSlot(0, slotA, 0, SlotActionType.PICKUP, false);
-         PlayerInventoryUtil.clickSlot(0, 2, 1, SlotActionType.PICKUP, false);
-         int slotB = this.findIronSlot();
-         if (slotB == -1) {
-            return;
+   private int findIronSlotExcept(int except) {
+      for (int i = 0; i < 36; i++) {
+         int id = i < 9 ? 36 + i : i;
+         if (id == except) {
+            continue;
          }
-         PlayerInventoryUtil.clickSlot(0, slotB, 0, SlotActionType.PICKUP, false);
-         PlayerInventoryUtil.clickSlot(0, 3, 1, SlotActionType.PICKUP, false);
+         if (mc.player.getInventory().main.get(i).getItem() == Items.IRON_INGOT) {
+            return id;
+         }
       }
+      return -1;
+   }
+
+   private boolean startShearsCraft() {
+      this.craftSlotA = this.findIronSlot();
+      if (this.craftSlotA == -1) {
+         return false;
+      }
+      int countA = mc.player.currentScreenHandler.getSlot(this.craftSlotA).getStack().getCount();
+      this.craftNeedSecond = countA < 2;
+      this.craftSlotB = -1;
+      if (this.craftNeedSecond) {
+         this.craftSlotB = this.findIronSlotExcept(this.craftSlotA);
+         if (this.craftSlotB == -1) {
+            return false;
+         }
+      }
+      this.craftSubStep = 1;
+      return true;
+   }
+
+   private boolean advanceShearsCraft() {
+      switch (this.craftSubStep) {
+         case 1:
+            PlayerInventoryUtil.clickSlot(0, this.craftSlotA, 0, SlotActionType.PICKUP, false);
+            break;
+         case 2:
+            PlayerInventoryUtil.clickSlot(0, 2, 1, SlotActionType.PICKUP, false);
+            break;
+         case 3:
+            if (this.craftNeedSecond) {
+               PlayerInventoryUtil.clickSlot(0, this.craftSlotB, 0, SlotActionType.PICKUP, false);
+            } else {
+               PlayerInventoryUtil.clickSlot(0, 3, 1, SlotActionType.PICKUP, false);
+            }
+            break;
+         case 4:
+            if (this.craftNeedSecond) {
+               PlayerInventoryUtil.clickSlot(0, 3, 1, SlotActionType.PICKUP, false);
+            } else {
+               PlayerInventoryUtil.clickSlot(0, this.craftSlotA, 0, SlotActionType.PICKUP, false);
+            }
+            break;
+         case 5:
+            if (this.craftNeedSecond) {
+               PlayerInventoryUtil.clickSlot(0, this.craftSlotB, 0, SlotActionType.PICKUP, false);
+               this.craftSubStep = 6;
+            } else {
+               this.craftSubStep = 0;
+               return true;
+            }
+            break;
+         case 6:
+            this.craftSubStep = 0;
+            return true;
+         default:
+            this.craftSubStep = 0;
+            return true;
+      }
+      this.craftSubStep++;
+      return false;
    }
 
    private void takeShearsFromCraft() {
       PlayerInventoryUtil.clickSlot(0, 0, 0, SlotActionType.QUICK_MOVE, false);
+   }
+
+   private boolean isShearsInCraftOutput() {
+      return mc.player.currentScreenHandler.getSlot(0).getStack().getItem() == Items.SHEARS;
    }
 
    private void moveShearsToHotbar() {
