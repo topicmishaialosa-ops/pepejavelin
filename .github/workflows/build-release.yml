@@ -41,16 +41,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          JAR="${{ steps.jar.outputs.jar }}"
           # удалить старый релиз/тег (если был), затем создать свежий
           gh release delete latest --yes --cleanup-tag || true
-          gh release create "latest" \
-            "${{ steps.jar.outputs.jar }}" \
-            --title "huihuiclient latest (1.21.4)" \
-            --notes "Автосборка Fabric-клиента из ветки main.
-
-- Версия мода: 0.1-recode
-- Minecraft: 1.21.4
-- Commit: ${{ github.sha }}
-
-Скачанный файл положи в .minecraft/mods/
-"
+          gh release create "latest" "$JAR" \
+              --title "huihuiclient latest (1.21.4)" \
+              --notes "Автосборка Fabric-клиента (1.21.4) из main. Это мод — положи в .minecraft/mods/. Подробности: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
