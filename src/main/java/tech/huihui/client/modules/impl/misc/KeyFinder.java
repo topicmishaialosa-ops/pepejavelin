@@ -20,6 +20,8 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.chunk.WorldChunk;
 import tech.huihui.base.events.impl.other.EventTick;
 import tech.huihui.base.events.impl.render.EventRender3D;
+import tech.huihui.base.events.impl.server.EventChatReceive;
+import tech.huihui.base.events.impl.render.EventHudRender;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
@@ -28,6 +30,7 @@ import tech.huihui.utility.game.other.BaritoneUtil;
 import tech.huihui.utility.game.other.MessageUtil;
 import tech.huihui.utility.math.Timer;
 import tech.huihui.utility.render.level.Render3DUtil;
+import net.minecraft.text.Text;
 
 @ModuleAnnotation(
       name = "KeyFinder",
@@ -37,88 +40,187 @@ import tech.huihui.utility.render.level.Render3DUtil;
 public final class KeyFinder extends Module {
    public static final KeyFinder INSTANCE = new KeyFinder();
 
-   private static final int SEARCH_RADIUS = 24;
-   private static final int SPAWNER_RADIUS = 4;
-   private static final long SCAN_DELAY = 1000L;
-   private static final long BARITONE_DELAY = 1500L;
+    private static final int SEARCH_RADIUS = 24;
+    private static final int SPAWNER_RADIUS = 4;
+    private static final int GLOBAL_SEARCH_RADIUS = 200;
+    private static final long SCAN_DELAY = 1000L;
+    private static final long BARITONE_DELAY = 1500L;
+    private static final long REGION_COOLDOWN = 60000L; // 1 минута
 
-   private final BooleanSetting walkWithBaritone = new BooleanSetting(
-         "Идти к цели через Baritone",
-         "Автоматически отправлять Baritone к ближайшей найденной цели",
-         false
-   );
+    private final BooleanSetting walkWithBaritone = new BooleanSetting(
+          "Идти к цели через Baritone",
+          "Автоматически отправлять Baritone к ближайшей найденной цели",
+          false
+    );
 
-   private final List<KeyTarget> targets = new CopyOnWriteArrayList<>();
-   private final Set<BlockPos> visitedContainers = new HashSet<>();
-   private final Timer scanTimer = new Timer();
-   private final Timer baritoneTimer = new Timer();
+    private final BooleanSetting activeSearch = new BooleanSetting(
+          "Активный поиск по миру",
+          "Перемещаться к целям и сканировать регион в радиусе 200 блоков",
+          false
+    );
 
-   private BlockPos currentBaritoneTarget;
-   private boolean baritoneMissing;
+    private final List<KeyTarget> targets = new CopyOnWriteArrayList<>();
+    private final Set<BlockPos> visitedContainers = new HashSet<>();
+    private final Timer scanTimer = new Timer();
+    private final Timer baritoneTimer = new Timer();
+    private final Timer regionCooldownTimer = new Timer();
+    private final Timer rtpTimer = new Timer();
+    private boolean regionCooldown = false;
+    private int rtpAttempts = 0;
+    private int totalTargetsFound = 0;
+    private int lastScanCount = 0;
+
+    private BlockPos currentBaritoneTarget;
+    private boolean baritoneMissing;
 
    private KeyFinder() {
    }
 
-   @Override
-   public void onEnable() {
-      super.onEnable();
-      this.targets.clear();
-      this.visitedContainers.clear();
-      this.currentBaritoneTarget = null;
-      this.baritoneMissing = false;
-      this.scanTimer.reset();
-      this.baritoneTimer.reset();
+    @Override
+    public void onEnable() {
+       super.onEnable();
+       this.targets.clear();
+       this.visitedContainers.clear();
+       this.currentBaritoneTarget = null;
+       this.baritoneMissing = false;
+       this.scanTimer.reset();
+       this.baritoneTimer.reset();
+       this.regionCooldown = false;
+       this.rtpAttempts = 0;
+       this.totalTargetsFound = 0;
+       this.lastScanCount = 0;
+       this.regionCooldownTimer.reset();
+       this.rtpTimer.reset();
 
-      if (this.walkWithBaritone.isEnabled() && !BaritoneUtil.isPresent()) {
-         this.baritoneMissing = true;
-         MessageUtil.displayInfo("KeyFinder: Baritone не найден, автоматический маршрут недоступен");
-      }
-   }
+       if (this.walkWithBaritone.isEnabled() && !BaritoneUtil.isPresent()) {
+          this.baritoneMissing = true;
+          MessageUtil.displayInfo("KeyFinder: Baritone не найден, автоматический маршрут недоступен");
+       }
+    }
 
     @Override
     public void onDisable() {
        this.stopBaritone();
        if (!this.targets.isEmpty()) {
-          MessageUtil.displayInfo(String.format("🎯 KeyFinder выключен: осталось %d целей", this.targets.size()));
+          MessageUtil.displayInfo(String.format("END KeyFinder выключен: осталось %d целей", this.targets.size()));
+       }
+       if (this.activeSearch.isEnabled()) {
+          MessageUtil.displayInfo("🛑 Активный поиск отключён");
        }
        this.targets.clear();
        this.currentBaritoneTarget = null;
        super.onDisable();
     }
 
-   @EventTarget
-   private void onTick(EventTick event) {
-      if (mc.world == null || mc.player == null) {
-         return;
-      }
+    @EventTarget
+    private void onTick(EventTick event) {
+       if (mc.world == null || mc.player == null) {
+          return;
+       }
 
-      if (this.scanTimer.finished(SCAN_DELAY)) {
-         this.scanWorld();
-         this.scanTimer.reset();
-      }
+       if (this.activeSearch.isEnabled()) {
+          if (this.scanTimer.finished(SCAN_DELAY)) {
+             this.scanWorld();
+             this.scanTimer.reset();
+          }
 
-      if (this.walkWithBaritone.isEnabled() && !this.baritoneMissing) {
-         this.followNearestTarget();
-      }
-   }
+          if (this.regionCooldown && this.regionCooldownTimer.finished(REGION_COOLDOWN)) {
+             this.regionCooldown = false;
+             this.rtpAttempts = 0;
+             MessageUtil.displayInfo("Кулдаун /rtp прошёл — могу искать дальше");
+          }
 
-   @EventTarget
-   private void onRender3D(EventRender3D event) {
-      if (mc.world == null || this.targets.isEmpty()) {
-         return;
-      }
+          if (this.regionCooldown && this.activeSearch.isEnabled()) {
+             this.rtpTimer.reset();
+             this.activeSearch.setEnabled(false);
+             MessageUtil.displayInfo("OFF Обнаружен защищённый регион — отключаю поиск и делаю /rtp");
+             mc.player.networkHandler.sendChatMessage("/rtp");
+             this.regionCooldown = true;
+             return;
+          }
+       }
 
-      for (KeyTarget target : this.targets) {
-         int color = switch (target.status) {
-            case HAS_KEY -> 0xFF35D07F;
-            case UNLOOTED -> 0xFFFFC857;
-            case LOOTED -> 0xFF888888;
-         };
-         Render3DUtil.drawBox(new Box(target.position), color, 1.5F, true, false, false);
-      }
-   }
+       if (this.walkWithBaritone.isEnabled() && !this.baritoneMissing) {
+          this.followNearestTarget();
+       }
+    }
 
-   private void scanWorld() {
+    @EventTarget
+    private void onChatReceive(EventChatReceive event) {
+       Text message = event.getMessage();
+       String lower = message.getString().toLowerCase();
+
+       if (this.activeSearch.isEnabled() && this.regionCooldown) {
+          if (lower.contains("не можете сломать")
+                || lower.contains("нельзя сломать")
+                || lower.contains("cannot break")
+                || lower.contains("защищен")
+                || lower.contains("защищён")
+                || lower.contains("приват")
+                || lower.contains("обломки не могут быть сломаны")
+                || lower.contains("this structure is protected")) {
+             if (this.rtpAttempts < 3) {
+                this.rtpAttempts++;
+                MessageUtil.displayInfo("WARN Защищённый регион — делаю /rtp");
+                mc.player.networkHandler.sendChatMessage("/rtp");
+                this.regionCooldown = true;
+                this.regionCooldownTimer.reset();
+             } else {
+                MessageUtil.displayInfo("ERR Регион защищён, отключаю активный поиск");
+                this.activeSearch.setEnabled(false);
+                this.regionCooldown = false;
+             }
+          }
+       }
+
+       if (this.rtpTimer.finished(10000L)) {
+          if (lower.contains("телепортировался") || lower.contains("you have been teleported")) {
+             this.rtpAttempts = 0;
+             this.regionCooldown = false;
+             this.rtpTimer.reset();
+             MessageUtil.displayInfo("OK Телепорт выполнен, возобновляю поиск");
+          }
+       }
+    }
+
+    @EventTarget
+    private void onRender3D(EventRender3D event) {
+       if (mc.world == null || this.targets.isEmpty()) {
+          return;
+       }
+
+       for (KeyTarget target : this.targets) {
+          int color = switch (target.status) {
+             case HAS_KEY -> 0xFF35D07F;
+             case UNLOOTED -> 0xFFFFC857;
+             case LOOTED -> 0xFF888888;
+          };
+          Render3DUtil.drawBox(new Box(target.position), color, 1.5F, true, false, false);
+       }
+
+        if (this.regionCooldown && this.activeSearch.isEnabled()) {
+           MessageUtil.displayInfo("[!] Защищённый регион - отключаю поиск и делаю /rtp");
+        }
+     }
+
+     @EventTarget
+     private void onHudRender(EventHudRender event) {
+        if (this.activeSearch.isEnabled() && !this.regionCooldown && mc.player != null) {
+           for (KeyTarget target : this.targets) {
+              String status = switch (target.status) {
+                 case HAS_KEY -> "[KEY] С ключом";
+                 case UNLOOTED -> "[?] Без ключа";
+                 case LOOTED -> "[OK] Залутано";
+              };
+              String coords = String.format("(%d, %d, %d)", target.position.getX(), target.position.getY(), target.position.getZ());
+              double distance = mc.player.getPos().distanceTo(Vec3d.ofCenter(target.position));
+              
+              MessageUtil.displayInfo(String.format("[TARGET] %s: %s - %s (%.1f блоков)", status, coords, target.position.toShortString(), distance));
+           }
+        }
+     }
+
+    private void scanWorld() {
       BlockPos playerPos = mc.player.getBlockPos();
       int minChunkX = (playerPos.getX() - SEARCH_RADIUS) >> 4;
       int maxChunkX = (playerPos.getX() + SEARCH_RADIUS) >> 4;
@@ -154,7 +256,7 @@ public final class KeyFinder extends Module {
                    KeyTarget target = new KeyTarget(immutable, state);
                    found.add(target);
                    if (state == LootState.HAS_KEY) {
-                      MessageUtil.displayInfo(String.format("🔑 Ключ найден в сундуке в (%d, %d, %d)!", 
+                      MessageUtil.displayInfo(String.format("[KEY] Найден ключ в сундуке в (%d, %d, %d)!", 
                             immutable.getX(), immutable.getY(), immutable.getZ()));
                    }
                 }
@@ -176,7 +278,7 @@ public final class KeyFinder extends Module {
              KeyTarget target = new KeyTarget(position, state);
              found.add(target);
              if (state == LootState.HAS_KEY) {
-                MessageUtil.displayInfo(String.format("🔑 Ключ найден в вагонетке в (%d, %d, %d)!", 
+                MessageUtil.displayInfo(String.format("[KEY] Найден ключ в вагонетке в (%d, %d, %d)!", 
                       position.getX(), position.getY(), position.getZ()));
              }
           }
@@ -190,7 +292,7 @@ public final class KeyFinder extends Module {
                 KeyTarget target = new KeyTarget(chest, state);
                 found.add(target);
                 if (state == LootState.HAS_KEY) {
-                   MessageUtil.displayInfo(String.format("🔑 Ключ найден в сундуке рядом со спавнером в (%d, %d, %d)!", 
+                   MessageUtil.displayInfo(String.format("[KEY] Найден ключ в сундуке рядом со спавнером в (%d, %d, %d)!", 
                          chest.getX(), chest.getY(), chest.getZ()));
                 }
              }
@@ -201,7 +303,7 @@ public final class KeyFinder extends Module {
        this.targets.addAll(found);
        
        if (!found.isEmpty()) {
-          MessageUtil.displayInfo(String.format("🔍 KeyFinder: Найдено %d цели(й) в радиусе %d блоков", found.size(), SEARCH_RADIUS));
+          MessageUtil.displayInfo(String.format("[SCAN] KeyFinder: Найдено %d цели(й) в радиусе %d блоков", found.size(), SEARCH_RADIUS));
        }
     }
 
@@ -280,7 +382,7 @@ public final class KeyFinder extends Module {
 
        this.currentBaritoneTarget = nearest.position;
        this.baritoneTimer.reset();
-       String targetType = nearest.status == LootState.HAS_KEY ? "🔑 с ключом" : "📦 без ключа";
+       String targetType = nearest.status == LootState.HAS_KEY ? "KEY с ключом" : "CHT без ключа";
        String coords = String.format("X:%d Y:%d Z:%d", nearest.position.getX(), nearest.position.getY(), nearest.position.getZ());
        MessageUtil.displayInfo(String.format("🧭 KeyFinder: Иду к цели через Baritone: %s в %s", targetType, coords));
        mc.player.networkHandler.sendChatMessage("#goto "
