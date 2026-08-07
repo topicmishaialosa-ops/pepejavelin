@@ -46,6 +46,7 @@ import tech.huihui.client.modules.impl.misc.CreeperFarm;
 import tech.huihui.client.modules.impl.misc.ElytraHelper;
 import tech.huihui.client.modules.impl.misc.FreeCam;
 import tech.huihui.client.modules.impl.misc.ItemScroller;
+import tech.huihui.client.modules.impl.misc.KeyFinder;
 import tech.huihui.client.modules.impl.misc.MineHelper;
 import tech.huihui.client.modules.impl.misc.NameProtect;
 import tech.huihui.client.modules.impl.misc.NoInteract;
@@ -213,7 +214,8 @@ public final class ModuleManager implements IMinecraft {
       registerModule(ZarabotokReallyWorld.INSTANCE);
        registerModule(AutoJoiner.INSTANCE);
        registerModule(BaseFinder.INSTANCE);
-       registerModule(MineHelper.INSTANCE);
+        registerModule(MineHelper.INSTANCE);
+        registerModule(KeyFinder.INSTANCE);
         registerModule(AutoWarden.INSTANCE);
      }
 
