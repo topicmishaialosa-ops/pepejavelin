@@ -20,6 +20,7 @@ import tech.huihui.base.comand.impl.MacroCommand;
 import tech.huihui.base.comand.impl.PilotCommand;
 import tech.huihui.base.comand.impl.RCTCommand;
 import tech.huihui.base.comand.impl.StopCommand;
+import tech.huihui.base.comand.impl.TPCommand;
 
 public class CommandManager {
    private String prefix = ".";
@@ -43,6 +44,7 @@ public class CommandManager {
        this.registerCommand(new StopCommand());
        this.registerCommand(new HelpCommand());
        this.registerCommand(new PilotCommand());
+       this.registerCommand(new TPCommand());
     }
 
    @Native
