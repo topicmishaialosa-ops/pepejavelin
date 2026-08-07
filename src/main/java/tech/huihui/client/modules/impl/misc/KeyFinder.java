@@ -75,13 +75,16 @@ public final class KeyFinder extends Module {
       }
    }
 
-   @Override
-   public void onDisable() {
-      this.stopBaritone();
-      this.targets.clear();
-      this.currentBaritoneTarget = null;
-      super.onDisable();
-   }
+    @Override
+    public void onDisable() {
+       this.stopBaritone();
+       if (!this.targets.isEmpty()) {
+          MessageUtil.displayInfo(String.format("🎯 KeyFinder выключен: осталось %d целей", this.targets.size()));
+       }
+       this.targets.clear();
+       this.currentBaritoneTarget = null;
+       super.onDisable();
+    }
 
    @EventTarget
    private void onTick(EventTick event) {
@@ -145,43 +148,62 @@ public final class KeyFinder extends Module {
                   continue;
                }
 
-               BlockPos immutable = position.toImmutable();
-               if (seen.add(immutable)) {
-                  found.add(new KeyTarget(immutable, this.hasKey(blockEntity)
-                        ? LootState.HAS_KEY : LootState.UNLOOTED));
-               }
-            }
-         }
-      }
+                BlockPos immutable = position.toImmutable();
+                if (seen.add(immutable)) {
+                   LootState state = this.hasKey(blockEntity) ? LootState.HAS_KEY : LootState.UNLOOTED;
+                   KeyTarget target = new KeyTarget(immutable, state);
+                   found.add(target);
+                   if (state == LootState.HAS_KEY) {
+                      MessageUtil.displayInfo(String.format("🔑 Ключ найден в сундуке в (%d, %d, %d)!", 
+                            immutable.getX(), immutable.getY(), immutable.getZ()));
+                   }
+                }
+             }
+          }
+       }
 
-      for (Entity entity : mc.world.getEntities()) {
-         if (!(entity instanceof ChestMinecartEntity minecart)) {
-            continue;
-         }
-         if (minecart.squaredDistanceTo(mc.player) > (double) SEARCH_RADIUS * SEARCH_RADIUS) {
-            continue;
-         }
+       for (Entity entity : mc.world.getEntities()) {
+          if (!(entity instanceof ChestMinecartEntity minecart)) {
+             continue;
+          }
+          if (minecart.squaredDistanceTo(mc.player) > (double) SEARCH_RADIUS * SEARCH_RADIUS) {
+             continue;
+          }
 
-         BlockPos position = minecart.getBlockPos().toImmutable();
-         if (seen.add(position)) {
-            found.add(new KeyTarget(position, this.hasKey(minecart)
-                  ? LootState.HAS_KEY : LootState.UNLOOTED));
-         }
-      }
+          BlockPos position = minecart.getBlockPos().toImmutable();
+          if (seen.add(position)) {
+             LootState state = this.hasKey(minecart) ? LootState.HAS_KEY : LootState.UNLOOTED;
+             KeyTarget target = new KeyTarget(position, state);
+             found.add(target);
+             if (state == LootState.HAS_KEY) {
+                MessageUtil.displayInfo(String.format("🔑 Ключ найден в вагонетке в (%d, %d, %d)!", 
+                      position.getX(), position.getY(), position.getZ()));
+             }
+          }
+       }
 
-      for (BlockPos spawner : this.findSpawners(playerPos)) {
-         for (BlockPos chest : this.findNearbyContainers(spawner)) {
-            if (seen.add(chest)) {
-               BlockEntity blockEntity = mc.world.getBlockEntity(chest);
-               found.add(new KeyTarget(chest, this.hasKey(blockEntity)
-                     ? LootState.HAS_KEY : LootState.UNLOOTED));
-            }
-         }
-      }
+       for (BlockPos spawner : this.findSpawners(playerPos)) {
+          for (BlockPos chest : this.findNearbyContainers(spawner)) {
+             if (seen.add(chest)) {
+                BlockEntity blockEntity = mc.world.getBlockEntity(chest);
+                LootState state = this.hasKey(blockEntity) ? LootState.HAS_KEY : LootState.UNLOOTED;
+                KeyTarget target = new KeyTarget(chest, state);
+                found.add(target);
+                if (state == LootState.HAS_KEY) {
+                   MessageUtil.displayInfo(String.format("🔑 Ключ найден в сундуке рядом со спавнером в (%d, %d, %d)!", 
+                         chest.getX(), chest.getY(), chest.getZ()));
+                }
+             }
+          }
+       }
 
-      this.targets.clear();
-      this.targets.addAll(found);
-   }
+       this.targets.clear();
+       this.targets.addAll(found);
+       
+       if (!found.isEmpty()) {
+          MessageUtil.displayInfo(String.format("🔍 KeyFinder: Найдено %d цели(й) в радиусе %d блоков", found.size(), SEARCH_RADIUS));
+       }
+    }
 
    private List<BlockPos> findSpawners(BlockPos center) {
       List<BlockPos> result = new ArrayList<>();
@@ -256,13 +278,16 @@ public final class KeyFinder extends Module {
          return;
       }
 
-      this.currentBaritoneTarget = nearest.position;
-      this.baritoneTimer.reset();
-      mc.player.networkHandler.sendChatMessage("#goto "
-            + nearest.position.getX() + " "
-            + nearest.position.getY() + " "
-            + nearest.position.getZ());
-   }
+       this.currentBaritoneTarget = nearest.position;
+       this.baritoneTimer.reset();
+       String targetType = nearest.status == LootState.HAS_KEY ? "🔑 с ключом" : "📦 без ключа";
+       String coords = String.format("X:%d Y:%d Z:%d", nearest.position.getX(), nearest.position.getY(), nearest.position.getZ());
+       MessageUtil.displayInfo(String.format("🧭 KeyFinder: Иду к цели через Baritone: %s в %s", targetType, coords));
+       mc.player.networkHandler.sendChatMessage("#goto "
+             + nearest.position.getX() + " "
+             + nearest.position.getY() + " "
+             + nearest.position.getZ());
+    }
 
    private void stopBaritone() {
       if (mc.player != null && mc.player.networkHandler != null && this.currentBaritoneTarget != null) {
