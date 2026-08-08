@@ -17,7 +17,6 @@ import net.minecraft.item.Items;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.chunk.WorldChunk;
 import tech.huihui.base.events.impl.other.EventTick;
 import tech.huihui.base.events.impl.render.EventRender3D;
 import tech.huihui.base.events.impl.server.EventChatReceive;
@@ -222,47 +221,9 @@ public final class KeyFinder extends Module {
 
     private void scanWorld() {
       BlockPos playerPos = mc.player.getBlockPos();
-      int minChunkX = (playerPos.getX() - SEARCH_RADIUS) >> 4;
-      int maxChunkX = (playerPos.getX() + SEARCH_RADIUS) >> 4;
-      int minChunkZ = (playerPos.getZ() - SEARCH_RADIUS) >> 4;
-      int maxChunkZ = (playerPos.getZ() + SEARCH_RADIUS) >> 4;
 
       List<KeyTarget> found = new ArrayList<>();
       Set<BlockPos> seen = new HashSet<>();
-
-      for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
-         for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
-            if (!mc.world.getChunkManager().isChunkLoaded(chunkX, chunkZ)) {
-               continue;
-            }
-
-            WorldChunk chunk = mc.world.getChunk(chunkX, chunkZ);
-            if (chunk == null) {
-               continue;
-            }
-
-            for (BlockPos position : chunk.getBlockEntities().keySet()) {
-               BlockEntity blockEntity = chunk.getBlockEntity(position);
-               if (!(blockEntity instanceof LootableContainerBlockEntity)) {
-                  continue;
-               }
-               if (position.getSquaredDistance(playerPos) > (double) SEARCH_RADIUS * SEARCH_RADIUS) {
-                  continue;
-               }
-
-                BlockPos immutable = position.toImmutable();
-                if (seen.add(immutable)) {
-                   LootState state = this.hasKey(blockEntity) ? LootState.HAS_KEY : LootState.UNLOOTED;
-                   KeyTarget target = new KeyTarget(immutable, state);
-                   found.add(target);
-                   if (state == LootState.HAS_KEY) {
-                      MessageUtil.displayInfo(String.format("[KEY] Найден ключ в сундуке в (%d, %d, %d)!", 
-                            immutable.getX(), immutable.getY(), immutable.getZ()));
-                   }
-                }
-             }
-          }
-       }
 
        for (Entity entity : mc.world.getEntities()) {
           if (!(entity instanceof ChestMinecartEntity minecart)) {
