@@ -27,7 +27,7 @@ public class BindComponent extends Component {
 
    @Override
    public void render(CustomDrawContext draw, Theme theme, float mouseX, float mouseY, float alpha) {
-      draw.drawText(Fonts.REGULAR.getFont(5.5F), this.setting.getName(), this.x + 5.0F, this.y + 4.5F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
+      draw.drawText(Fonts.REGULAR.getFont(5.5F), this.setting.getName(), this.x + 7.0F, this.y + 4.5F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
       String bind = this.setting.getKeyCode() == -1 ? "Нету" : this.setting.getNameKey();
       if (this.activated) {
          bind = "...";

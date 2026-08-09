@@ -1,6 +1,7 @@
 package tech.huihui.client.modules.impl.render;
 
 import com.darkmagician6.eventapi.EventTarget;
+import com.mojang.blaze3d.systems.RenderSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -10,11 +11,18 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.network.PlayerListEntry;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.render.BufferRenderer;
+import net.minecraft.client.render.Tessellator;
+import net.minecraft.client.render.VertexFormat.DrawMode;
+import net.minecraft.client.render.VertexFormats;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.client.util.DefaultSkinHelper;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.util.math.Vector2f;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -61,7 +69,7 @@ import tech.huihui.utility.render.display.shader.DrawUtil;
 )
 public final class TargetHud extends Module {
    public static final TargetHud INSTANCE = new TargetHud();
-   public final ModeSetting type = new ModeSetting("Тип", "Крупный", "Маленький", "Проценты", "Большая полоса", "Вертикальный", "Метал", "Мини", "Градиент", "Боссбар", "Минимал");
+   public final ModeSetting type = new ModeSetting("Тип", "Крупный", "Маленький", "Проценты", "Большая полоса", "Вертикальный", "Метал", "Мини", "Градиент", "Боссбар", "Минимал", "Кружок");
    public final NumberSetting x = new NumberSetting("X", 4.0F, 0.0F, 1920.0F, 1.0F);
    public final NumberSetting y = new NumberSetting("Y", 4.0F, 0.0F, 1080.0F, 1.0F);
    private final BooleanSetting hover = new BooleanSetting("Наведение", true);
@@ -183,11 +191,13 @@ public final class TargetHud extends Module {
          this.renderMini(ctx, alpha);
       } else if (this.type.is("Градиент")) {
          this.renderGradient(ctx, alpha);
-      } else if (this.type.is("Боссбар")) {
-         this.renderBossbar(ctx, alpha);
-      } else {
-         this.renderMinimal(ctx, alpha);
-      }
+       } else if (this.type.is("Боссбар")) {
+          this.renderBossbar(ctx, alpha);
+       } else if (this.type.is("Кружок")) {
+          this.renderCircle(ctx, alpha);
+       } else {
+          this.renderMinimal(ctx, alpha);
+       }
    }
 
    @EventTarget
@@ -305,11 +315,13 @@ public final class TargetHud extends Module {
          return new float[]{64.0F, 16.0F};
       } else if (this.type.is("Градиент")) {
          return new float[]{112.0F, 38.0F};
-      } else if (this.type.is("Боссбар")) {
-         return new float[]{180.0F, 34.0F};
-      } else {
-         return new float[]{110.0F, 22.0F};
-      }
+       } else if (this.type.is("Боссбар")) {
+          return new float[]{180.0F, 34.0F};
+       } else if (this.type.is("Кружок")) {
+          return new float[]{132.0F, 48.0F};
+       } else {
+          return new float[]{110.0F, 22.0F};
+       }
    }
 
    private void setTarget(LivingEntity target) {      if (target == null) {
@@ -910,6 +922,72 @@ public final class TargetHud extends Module {
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y + 17.0F, mainW, barH, BorderRadius.all(0.75F), main[0], main[1], main[2], main[3]);
       ColorRGBA emptyBar = this.customColorsEnabled() ? this.bgColor.getColor().withAlpha(120.0F * alpha) : (new ColorRGBA(255, 255, 255)).withAlpha(40.0F * alpha);
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x + mainW, y + 17.0F, width - mainW, barH, BorderRadius.all(0.75F), emptyBar, emptyBar, emptyBar, emptyBar);
+   }
+
+   private void renderCircle(CustomDrawContext ctx, float alpha) {
+      this.updateAnimations();
+      float x = this.x.getCurrent();
+      float y = this.y.getCurrent();
+      float width = 132.0F;
+      float height = 48.0F;
+      this.drawBackground(ctx, x, y, width, height, alpha);
+      this.drawHead(ctx, x + 5.0F, y + 5.0F, 32.0F, alpha);
+      MsdfRenderer.renderText(Fonts.ROUND_BOLD, this.name(), 8.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 43.0F, y + 6.0F, 0.0F, true, 0.7F, 1.0F, 82.0F);
+      ctx.drawText(Fonts.REGULAR.getFont(6.5F), this.secondaryText(), x + 43.0F, y + 18.0F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
+      float centerX = x + 96.0F;
+      float centerY = y + 26.0F;
+      float outerRadius = 15.0F;
+      float thickness = 4.5F * this.barThickness.getCurrent();
+      this.drawRing(ctx, centerX, centerY, outerRadius, thickness, -0.25F, 0.75F, this.trackColor(alpha));
+      float outdated = MathHelper.clamp(this.outdatedHealthAnimation.getValue(), 0.0F, 1.0F);
+      if (outdated > 0.0F) {
+         ColorRGBA[] outdatedColors = this.outdatedColors(alpha);
+         this.drawRing(ctx, centerX, centerY, outerRadius, thickness, -0.25F, -0.25F + outdated, outdatedColors[0]);
+      }
+      float hp = MathHelper.clamp(this.healthAnimation.getValue(), 0.0F, 1.0F);
+      ColorRGBA[] mainColors = this.hpColors(this.theme(), alpha);
+      this.drawRing(ctx, centerX, centerY, outerRadius, thickness, -0.25F, -0.25F + hp, mainColors[0]);
+      float abs = MathHelper.clamp(this.gappleAnimation.getValue(), 0.0F, 1.0F);
+      if (abs > 0.0F) {
+         this.drawRing(ctx, centerX, centerY, outerRadius, thickness, -0.25F, -0.25F + abs, (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha));
+      }
+      String big = this.bigText();
+      MsdfRenderer.renderText(Fonts.ROUND_BOLD, big, 8.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), centerX - Fonts.ROUND_BOLD.getWidth(big, 8.5F) / 2.0F, centerY - 3.5F, 0.0F, true, 0.7F, 1.0F, 24.0F);
+      if (this.showArmor.isEnabled()) {
+         this.drawArmor(ctx, x + 4.0F, y + 37.0F, 10.0F, alpha);
+      }
+   }
+
+   private void drawRing(CustomDrawContext ctx, float centerX, float centerY, float outerRadius, float thickness, float from, float to, ColorRGBA color) {
+      if (to <= from) {
+         return;
+      }
+      float innerRadius = outerRadius - thickness;
+      float start = from * 2.0F * (float)Math.PI;
+      float end = to * 2.0F * (float)Math.PI;
+      int arcSegments = Math.max(2, (int)(32.0F * (to - from)));
+      MatrixStack matrices = ctx.getMatrices();
+      matrices.push();
+      RenderSystem.enableBlend();
+      RenderSystem.defaultBlendFunc();
+      RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+      BufferBuilder builder = Tessellator.getInstance().begin(DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+      org.joml.Matrix4f matrix = matrices.peek().getPositionMatrix();
+      for (int i = 0; i < arcSegments; i++) {
+         float a1 = start + (end - start) * (float)i / (float)arcSegments;
+         float a2 = start + (end - start) * (float)(i + 1) / (float)arcSegments;
+         float c1 = MathHelper.cos(a1);
+         float s1 = MathHelper.sin(a1);
+         float c2 = MathHelper.cos(a2);
+         float s2 = MathHelper.sin(a2);
+         builder.vertex(matrix, centerX + innerRadius * c1, centerY + innerRadius * s1, 0.0F).color(color.getRGB());
+         builder.vertex(matrix, centerX + outerRadius * c1, centerY + outerRadius * s1, 0.0F).color(color.getRGB());
+         builder.vertex(matrix, centerX + outerRadius * c2, centerY + outerRadius * s2, 0.0F).color(color.getRGB());
+         builder.vertex(matrix, centerX + innerRadius * c2, centerY + innerRadius * s2, 0.0F).color(color.getRGB());
+      }
+      BufferRenderer.drawWithGlobalProgram(builder.end());
+      RenderSystem.disableBlend();
+      matrices.pop();
    }
 
    private static final class HeadFace {

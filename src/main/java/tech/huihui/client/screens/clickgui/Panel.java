@@ -10,6 +10,7 @@ import tech.huihui.base.font.Fonts;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
+import tech.huihui.client.modules.impl.render.EditClickGUI;
 import tech.huihui.utility.math.MathUtil;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
@@ -84,12 +85,23 @@ public class Panel {
          this.animatedScroll = 0.0F;
       }
 
-      DrawUtil.drawRoundedRect(draw.getMatrices(), this.x, this.y, width, height, BorderRadius.all(radius), (new ColorRGBA(15, 15, 15)).withAlpha((int) ((float) this.screen.panelOpacity() * alpha)));
-      DrawUtil.drawRoundedBorder(draw.getMatrices(), this.x, this.y, width, height, 1.0F, BorderRadius.all(radius), (new ColorRGBA(21, 21, 21)).withAlpha(84.0F * alpha));
+      float opacity = (float) this.screen.panelOpacity() * alpha;
+      ColorRGBA bg = EditClickGUI.INSTANCE.getBgColor().getColor().withAlpha((int) opacity);
+      if (EditClickGUI.INSTANCE.getBlur().isEnabled()) {
+         DrawUtil.drawBlur(draw.getMatrices(), this.x, this.y, width, height, 11.0F, BorderRadius.all(radius), bg);
+      }
+      if (EditClickGUI.INSTANCE.getGradientEnabled().isEnabled()) {
+         ColorRGBA bottom = EditClickGUI.INSTANCE.getGradientColor().getColor().withAlpha((int) opacity);
+         DrawUtil.drawRoundedRect(draw.getMatrices(), this.x, this.y, width, height, BorderRadius.all(radius), bg, bottom, bottom, bg);
+      } else {
+         DrawUtil.drawRoundedRect(draw.getMatrices(), this.x, this.y, width, height, BorderRadius.all(radius), bg);
+      }
+      ColorRGBA border = EditClickGUI.INSTANCE.getBorderColor().getColor().withAlpha(84.0F * alpha);
+      DrawUtil.drawRoundedBorder(draw.getMatrices(), this.x, this.y, width, height, 1.0F, BorderRadius.all(radius), border);
 
-      float textWidth = Fonts.MEDIUM.getWidth(this.category.getName(), 7.5F);
-      draw.drawText(Fonts.ICONS.getFont(7.0F), this.category.getIcon(), this.x + 10.0F, this.y + header / 2.0F - 4.0F, theme.getColor().withAlpha(255.0F * alpha));
-      draw.drawText(Fonts.MEDIUM.getFont(7.5F), this.category.getName(), this.x + width / 2.0F - textWidth / 2.0F, this.y + header / 2.0F - 4.5F, (new ColorRGBA(222, 222, 222)).withAlpha(255.0F * alpha));
+      float contentX = this.x + 13.5F;
+      draw.drawText(Fonts.ICONS.getFont(7.0F), this.category.getIcon(), contentX, this.y + header / 2.0F - 4.0F, theme.getColor().withAlpha(255.0F * alpha));
+      draw.drawText(Fonts.MEDIUM.getFont(7.5F), this.category.getName(), contentX + 15.0F, this.y + header / 2.0F - 4.5F, (new ColorRGBA(222, 222, 222)).withAlpha(255.0F * alpha));
 
       this.screen.scissor(draw, this.x + 1.0F, this.y + header, width - 2.0F, height - header - 2.0F);
       float moduleY = this.y + header + this.animatedScroll;

@@ -32,8 +32,8 @@ public class SliderComponent extends Component {
    @Override
    public void render(CustomDrawContext draw, Theme theme, float mouseX, float mouseY, float alpha) {
       String value = this.formatValue();
-      draw.drawText(Fonts.REGULAR.getFont(5.5F), this.setting.getName(), this.x + 5.0F, this.y + 3.5F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
-      draw.drawText(Fonts.REGULAR.getFont(5.5F), value, this.x + this.width - 6.0F - Fonts.REGULAR.getWidth(value, 5.5F), this.y + 3.5F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
+      draw.drawText(Fonts.REGULAR.getFont(5.5F), this.setting.getName(), this.x + 7.0F, this.y + 3.5F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
+      draw.drawText(Fonts.REGULAR.getFont(5.5F), value, this.x + this.width - 8.0F - Fonts.REGULAR.getWidth(value, 5.5F), this.y + 3.5F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
 
       float trackWidth = this.width - 10.0F;
       float target = trackWidth * (this.setting.getCurrent() - this.setting.getMin()) / (this.setting.getMax() - this.setting.getMin());

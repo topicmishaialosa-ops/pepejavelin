@@ -113,9 +113,9 @@ public class ModuleComponent extends Component {
 
       if (showContainer) {
          float containerAlpha = Math.min(1.0F, expanded * 1.3F);
-         float cX = this.x + 1.7F;
+         float cX = this.x + 5.5F;
          float cY = this.y + ClickGuiScreen.MODULE_HEIGHT - 0.5F;
-         float cW = this.width - 3.4F;
+         float cW = this.width - 11.0F;
          float cH = settingsH - 1.0F;
          BorderRadius containerRadius = BorderRadius.bottom(radius, radius);
          DrawUtil.drawRoundedRect(draw.getMatrices(), cX, cY, cW, cH, containerRadius, (new ColorRGBA(9, 9, 11)).withAlpha((int)(containerAlpha * 200.0F * alpha)));
@@ -124,7 +124,10 @@ public class ModuleComponent extends Component {
       }
 
       ColorRGBA textColor = this.module.isEnabled() ? (new ColorRGBA(222, 222, 222)).withAlpha(255.0F * alpha) : (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha);
-      draw.drawText(Fonts.REGULAR.getFont(6.5F), this.module.getName(), this.x + this.width / 12.0F, this.y + 6.5F, textColor);
+      if (hovered) {
+         DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + 0.7F, this.y + 1.0F, this.width - 2.0F, ClickGuiScreen.MODULE_HEIGHT - 2.0F, headerRadius, (new ColorRGBA(255, 255, 255)).withAlpha((int)(5.0F * alpha)));
+      }
+      draw.drawText(Fonts.REGULAR.getFont(6.5F), this.module.getName(), this.x + 7.0F, this.y + 6.5F, textColor);
 
       if (this.bind) {
          String bindText = this.module.getKeyCode() == -1 ? "Bind..." : Keyboard.getKeyName(this.module.getKeyCode());
@@ -143,14 +146,14 @@ public class ModuleComponent extends Component {
    }
 
    private void renderSettings(CustomDrawContext draw, Theme theme, float mouseX, float mouseY, float alpha) {
-      float cX = this.x + 1.7F;
+      float cX = this.x + 5.5F;
       float cY = this.y + ClickGuiScreen.MODULE_HEIGHT - 0.5F;
-      float cW = this.width - 3.4F;
+      float cW = this.width - 11.0F;
       float cH = this.getSettingsHeight() * this.expandAnim.getValue() - 1.0F;
       this.screen.scissor(draw, cX, cY, cW, cH);
       float settingY = this.y + ClickGuiScreen.MODULE_HEIGHT;
-      float settingX = this.x + 2.7F;
-      float settingW = this.width - 5.4F;
+      float settingX = this.x + 6.5F;
+      float settingW = this.width - 13.0F;
       for (Component component : this.components) {
          Setting setting = this.getSetting(component);
          setting.getAnimationAlpha().update(setting.isVisible());

@@ -14,6 +14,7 @@ import tech.huihui.base.events.impl.render.EventRender2D;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.impl.render.Crosshair;
 import tech.huihui.client.modules.impl.render.Interface;
+import tech.huihui.client.modules.impl.render.ScoreboardHud;
 import tech.huihui.utility.interfaces.IMinecraft;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
 
@@ -110,6 +111,10 @@ public abstract class InGameHudMixin {
    private void injectRenderScoreboardSidebar(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
       Interface interfaceModule = Interface.INSTANCE;
       if (interfaceModule.isEnabled() && interfaceModule.isEnableScoreBar()) {
+         ci.cancel();
+      }
+
+      if (ScoreboardHud.INSTANCE.isEnabled()) {
          ci.cancel();
       }
 

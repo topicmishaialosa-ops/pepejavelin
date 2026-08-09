@@ -27,7 +27,7 @@ import tech.huihui.utility.render.display.base.color.ColorRGBA;
 import tech.huihui.utility.render.display.shader.DrawUtil;
 
 public final class TargetHudEditScreen extends Screen implements IMinecraft {
-   private static final String[] PRESETS = {"Крупный", "Маленький", "Проценты", "Большая полоса", "Вертикальный", "Метал", "Мини", "Градиент", "Боссбар", "Минимал"};
+   private static final String[] PRESETS = {"Крупный", "Маленький", "Проценты", "Большая полоса", "Вертикальный", "Метал", "Мини", "Градиент", "Боссбар", "Минимал", "Кружок"};
    private static final String[] MODES = {"Проценты и HP", "Проценты", "HP"};
    private static final String[] COLOR_NAMES = {"Цвет полоски", "Второй цвет полоски", "Цвет фона", "Цвет рамки", "Цвет текста"};
    private static final String[] SLIDER_NAMES = {"Толщина полоски", "Размер иконки головы", "Поворот головы", "Наклон головы", "Скругление", "Толщина рамки", "Прозрачность фона", "Скорость анимации"};

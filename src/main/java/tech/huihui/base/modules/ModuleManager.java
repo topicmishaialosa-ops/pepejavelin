@@ -81,6 +81,7 @@ import tech.huihui.client.modules.impl.render.BlockESP;
 import tech.huihui.client.modules.impl.render.ChunkAnimator;
 import tech.huihui.client.modules.impl.render.Crosshair;
 import tech.huihui.client.modules.impl.render.CustomFog;
+import tech.huihui.client.modules.impl.render.CustomModel;
 import tech.huihui.client.modules.impl.render.ClickGUI;
 import tech.huihui.client.modules.impl.render.EditClickGUI;
 import tech.huihui.client.modules.impl.render.EntityESP;
@@ -100,6 +101,7 @@ import tech.huihui.client.modules.impl.render.ViewModel;
 import tech.huihui.client.modules.impl.render.Watermark;
 import tech.huihui.client.modules.impl.render.WorldTime;
 import tech.huihui.client.modules.impl.render.XRay;
+import tech.huihui.client.modules.impl.render.ScoreboardHud;
 import tech.huihui.client.screens.menu.MenuScreen;
 import tech.huihui.utility.component.RotationComponent;
 import tech.huihui.utility.game.player.rotation.Rotation;
@@ -167,8 +169,9 @@ public final class ModuleManager implements IMinecraft {
       registerModule(Crosshair.INSTANCE);
       registerModule(ViewModel.INSTANCE);
       registerModule(CustomFog.INSTANCE);
-      registerModule(FullBright.INSTANCE);
-      registerModule(GlowHands.INSTANCE);
+       registerModule(FullBright.INSTANCE);
+       registerModule(CustomModel.INSTANCE);
+       registerModule(GlowHands.INSTANCE);
       registerModule(Optimization.INSTANCE);
       registerModule(ShulkerPreview.INSTANCE);
       registerModule(WorldTime.INSTANCE);
@@ -182,6 +185,7 @@ public final class ModuleManager implements IMinecraft {
        registerModule(Watermark.INSTANCE);
        registerModule(ChunkAnimator.INSTANCE);
        registerModule(XRay.INSTANCE);
+       registerModule(ScoreboardHud.INSTANCE);
     }
 
    private void registerPlayer() {

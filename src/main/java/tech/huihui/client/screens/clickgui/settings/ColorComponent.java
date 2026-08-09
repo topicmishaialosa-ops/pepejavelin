@@ -61,8 +61,8 @@ public class ColorComponent extends Component {
 
    @Override
    public void render(CustomDrawContext draw, Theme theme, float mouseX, float mouseY, float alpha) {
-      draw.drawText(Fonts.REGULAR.getFont(6.0F), this.setting.getName(), this.x + 5.0F, this.y + 4.0F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
-      DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + this.width - 21.0F, this.y + 4.0F, 16.0F, 10.0F, BorderRadius.all(3.5F), this.setting.getColor().withAlpha(255.0F * alpha));
+      draw.drawText(Fonts.REGULAR.getFont(6.0F), this.setting.getName(), this.x + 7.0F, this.y + 4.0F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
+      DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + this.width - 24.0F, this.y + 4.0F, 16.0F, 10.0F, BorderRadius.all(3.5F), this.setting.getColor().withAlpha(255.0F * alpha));
       if (this.panelOpened) {
          this.renderPicker(draw, theme, mouseX, mouseY, alpha);
          this.setHeight(18.0F - 4.0F + PICKER_HEIGHT + 5.0F);
@@ -108,7 +108,7 @@ public class ColorComponent extends Component {
 
    @Override
    public boolean mouseClick(float mouseX, float mouseY, int button) {
-      if (button == 1 && MathUtil.isHovered(mouseX, mouseY, this.x + this.width - 21.0F, this.y + 4.0F, 16.0F, 10.0F)) {
+      if (button == 1 && MathUtil.isHovered(mouseX, mouseY, this.x + this.width - 24.0F, this.y + 4.0F, 16.0F, 10.0F)) {
          this.panelOpened = !this.panelOpened;
          if (this.panelOpened) {
             this.initHsb();

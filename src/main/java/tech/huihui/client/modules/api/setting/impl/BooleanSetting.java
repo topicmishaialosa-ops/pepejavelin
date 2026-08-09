@@ -11,6 +11,7 @@ public class BooleanSetting extends Setting {
    private boolean enabled;
    private final String description;
    private final Animation animation;
+   private Runnable onToggle;
 
    public BooleanSetting(String name, boolean state) {
       super(name);
@@ -52,6 +53,7 @@ public class BooleanSetting extends Setting {
 
    public void toggle() {
       this.enabled = !this.enabled;
+      this.fireOnToggle();
    }
 
    public void safe(JsonObject propertiesObject) {
@@ -70,6 +72,17 @@ public class BooleanSetting extends Setting {
    @Generated
    public void setEnabled(boolean enabled) {
       this.enabled = enabled;
+      this.fireOnToggle();
+   }
+
+   public void setOnToggle(Runnable onToggle) {
+      this.onToggle = onToggle;
+   }
+
+   private void fireOnToggle() {
+      if (this.onToggle != null) {
+         this.onToggle.run();
+      }
    }
 
    @Generated

@@ -10,6 +10,7 @@ import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.command.CommandSource;
 import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.base.comand.api.CommandAbstract;
+import tech.huihui.base.comand.impl.BlockESPCommand;
 import tech.huihui.base.comand.impl.ClipCommand;
 import tech.huihui.base.comand.impl.ConfigCommand;
 import tech.huihui.base.comand.impl.FarmCommand;
@@ -34,6 +35,7 @@ public class CommandManager {
 
     @Native
     private void register() {
+       this.registerCommand(new BlockESPCommand());
        this.registerCommand(new FriendCommand());
        this.registerCommand(new MacroCommand());
        this.registerCommand(new ClipCommand());

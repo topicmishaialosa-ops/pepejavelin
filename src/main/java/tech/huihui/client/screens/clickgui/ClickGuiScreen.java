@@ -95,6 +95,14 @@ public class ClickGuiScreen extends Screen implements IClient {
       return (int) EditClickGUI.INSTANCE.getOpacity().getCurrent();
    }
 
+   ColorRGBA panelBg() {
+      return EditClickGUI.INSTANCE.getBgColor().getColor();
+   }
+
+   ColorRGBA panelBorder() {
+      return EditClickGUI.INSTANCE.getBorderColor().getColor();
+   }
+
    float panelRadius() {
       return EditClickGUI.INSTANCE.getRadius().getCurrent();
    }
@@ -119,8 +127,16 @@ public class ClickGuiScreen extends Screen implements IClient {
       }
    }
 
+   private float topBarWidth() {
+      return EDIT_BTN_SIZE + 4.0F + THEME_WIDTH + 8.0F + SEARCH_WIDTH;
+   }
+
+   private float topBarStart() {
+      return (float) screenWidth / 2.0F - this.topBarWidth() / 2.0F;
+   }
+
    private float searchX() {
-      return (float) screenWidth / 2.0F - SEARCH_WIDTH / 2.0F;
+      return this.topBarStart() + EDIT_BTN_SIZE + 4.0F + THEME_WIDTH + 8.0F;
    }
 
    private float searchY() {
@@ -128,11 +144,11 @@ public class ClickGuiScreen extends Screen implements IClient {
    }
 
    private float themeX() {
-      return this.searchX() - THEME_WIDTH - 8.0F;
+      return this.topBarStart() + EDIT_BTN_SIZE + 4.0F;
    }
 
    private float editBtnX() {
-      return this.themeX() - EDIT_BTN_SIZE - 4.0F;
+      return this.topBarStart();
    }
 
    private float editBtnY() {
@@ -281,7 +297,7 @@ public class ClickGuiScreen extends Screen implements IClient {
       float boxHeight = 18.0F;
       float x = ((float) screenWidth - boxWidth) / 2.0F;
       float y = (float) screenHeight - boxHeight - 8.0F;
-      DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, boxWidth, boxHeight, BorderRadius.all(6.0F), (new ColorRGBA(15, 15, 15)).withAlpha(200.0F * alpha));
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, boxWidth, boxHeight, BorderRadius.all(6.0F), this.panelBg().withAlpha((int) (200.0F * alpha)));
       DrawUtil.drawRoundedBorder(draw.getMatrices(), x, y, boxWidth, boxHeight, 1.0F, BorderRadius.all(6.0F), theme.getColor().withAlpha(90.0F * alpha));
       draw.drawText(font, description, x + 8.0F, y + 6.0F, (new ColorRGBA(222, 222, 222)).withAlpha(255.0F * alpha));
    }
@@ -290,7 +306,7 @@ public class ClickGuiScreen extends Screen implements IClient {
       float x = this.searchX();
       float y = this.searchY();
       boolean active = this.searchFocused || !this.searchText.isEmpty();
-      DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, SEARCH_WIDTH, SEARCH_HEIGHT, BorderRadius.all(6.0F), (new ColorRGBA(15, 15, 15)).withAlpha(200.0F * alpha));
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, SEARCH_WIDTH, SEARCH_HEIGHT, BorderRadius.all(6.0F), this.panelBg().withAlpha((int) (200.0F * alpha)));
       if (active) {
          DrawUtil.drawRoundedBorder(draw.getMatrices(), x, y, SEARCH_WIDTH, SEARCH_HEIGHT, 1.0F, BorderRadius.all(6.0F), theme.getColor().withAlpha(90.0F * alpha));
       }
@@ -315,13 +331,13 @@ public class ClickGuiScreen extends Screen implements IClient {
       Theme current = themeManager.getCurrentTheme();
 
       boolean hovered = this.isThemeBoxHovered(mx, my);
-      DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, THEME_WIDTH, THEME_HEIGHT, BorderRadius.all(6.0F), (new ColorRGBA(15, 15, 15)).withAlpha(200.0F * alpha));
+      DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, THEME_WIDTH, THEME_HEIGHT, BorderRadius.all(6.0F), this.panelBg().withAlpha((int) (200.0F * alpha)));
       DrawUtil.drawRoundedBorder(draw.getMatrices(), x, y, THEME_WIDTH, THEME_HEIGHT, 1.0F, BorderRadius.all(6.0F), theme.getColor().withAlpha(hovered ? 130.0F : 90.0F).withAlpha(255.0F * alpha));
 
       float ebx = this.editBtnX();
       float eby = this.editBtnY();
       boolean editHovered = this.isEditBtnHovered(mx, my);
-      DrawUtil.drawRoundedRect(draw.getMatrices(), ebx, eby, EDIT_BTN_SIZE, EDIT_BTN_SIZE, BorderRadius.all(6.0F), editHovered ? theme.getColor().withAlpha(120.0F * alpha) : (new ColorRGBA(15, 15, 15)).withAlpha(200.0F * alpha));
+      DrawUtil.drawRoundedRect(draw.getMatrices(), ebx, eby, EDIT_BTN_SIZE, EDIT_BTN_SIZE, BorderRadius.all(6.0F), editHovered ? theme.getColor().withAlpha(120.0F * alpha) : this.panelBg().withAlpha((int) (200.0F * alpha)));
       DrawUtil.drawRoundedBorder(draw.getMatrices(), ebx, eby, EDIT_BTN_SIZE, EDIT_BTN_SIZE, 1.0F, BorderRadius.all(6.0F), theme.getColor().withAlpha(editHovered ? 200.0F : 90.0F).withAlpha(255.0F * alpha));
       ColorRGBA pencil = (new ColorRGBA(222, 222, 222)).withAlpha(255.0F * alpha);
       DrawUtil.drawLine(draw.getMatrices(), new Vec2f(ebx + 11.5F, eby + 4.5F), new Vec2f(ebx + 5.0F, eby + 11.0F), pencil);
@@ -340,7 +356,7 @@ public class ClickGuiScreen extends Screen implements IClient {
       if (this.themeOpen) {
          float listY = this.themeListY();
          float listH = this.themeListHeight() * this.themeAnim.getValue();
-         DrawUtil.drawRoundedRect(draw.getMatrices(), x, listY, THEME_WIDTH, Math.max(listH, 2.0F), BorderRadius.all(6.0F), (new ColorRGBA(15, 15, 15)).withAlpha(225.0F * alpha));
+         DrawUtil.drawRoundedRect(draw.getMatrices(), x, listY, THEME_WIDTH, Math.max(listH, 2.0F), BorderRadius.all(6.0F), this.panelBg().withAlpha((int) (225.0F * alpha)));
          DrawUtil.drawRoundedBorder(draw.getMatrices(), x, listY, THEME_WIDTH, Math.max(listH, 2.0F), 1.0F, BorderRadius.all(6.0F), theme.getColor().withAlpha(70.0F * alpha));
          this.scissor(draw, x, listY, THEME_WIDTH, listH);
          int row = 0;
