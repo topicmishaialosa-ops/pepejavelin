@@ -51,13 +51,16 @@ public class InformationComponent extends DraggableHudElement {
       int py = (int)Math.floor(mc.player.getY());
       int pz = (int)Math.floor(mc.player.getZ());
       double speed = Math.hypot(mc.player.getX() - mc.player.prevX, mc.player.getZ() - mc.player.prevZ);
-      String coordsText = String.format(Locale.US, "%d %d %d", px, py, pz);
-      String speedText = String.format("%.2f", speed * 20.0D).replace(",", ".");
-      DrawUtil.drawBlur(ctx.getMatrices(), 4.0F, this.yAnimation.getValue() - 17.0F, Fonts.REGULAR.getWidth(coordsText, 7.75F) + Fonts.REGULAR.getWidth(speedText, 7.75F) + 49.5F, 14.0F, 11.0F, BorderRadius.all(2.0F), new ColorRGBA(80, 80, 80, 255));
+      String coordsText = px + " " + py + " " + pz;
+      long scaledSpeed = Math.round(speed * 20.0D * 100.0D);
+      String speedText = scaledSpeed / 100L + "." + (scaledSpeed % 100L < 10L ? "0" : "") + scaledSpeed % 100L;
+      float coordsWidth = Fonts.REGULAR.getWidth(coordsText, 7.75F);
+      float speedWidth = Fonts.REGULAR.getWidth(speedText, 7.75F);
+      DrawUtil.drawBlur(ctx.getMatrices(), 4.0F, this.yAnimation.getValue() - 17.0F, coordsWidth + speedWidth + 49.5F, 14.0F, 11.0F, BorderRadius.all(2.0F), new ColorRGBA(80, 80, 80, 255));
       ctx.drawText(Fonts.ICONS2.getFont(7.5F), "\uf57d", 7.75F, this.yAnimation.getValue() - 12.5F, theme.getColor());
       ctx.drawText(Fonts.REGULAR.getFont(7.5F), coordsText, 18.0F, this.yAnimation.getValue() - 12.5F, ColorRGBA.WHITE);
-      DrawUtil.drawRoundedRect(ctx.getMatrices(), 18.5F + Fonts.REGULAR.getWidth(coordsText, 7.75F) + 3.0F, this.yAnimation.getValue() - 11.0F, 2.0F, 2.0F, BorderRadius.all(0.5F), theme.getColor());
-      ctx.drawText(Fonts.ICONS2.getFont(7.5F), "\uf70c", 24.0F + Fonts.REGULAR.getWidth(coordsText, 7.75F) + 3.5F, this.yAnimation.getValue() - 12.5F, theme.getColor());
-      ctx.drawText(Fonts.REGULAR.getFont(7.5F), speedText + " Б/С", 24.0F + Fonts.REGULAR.getWidth(coordsText, 7.75F) + 12.0F, this.yAnimation.getValue() - 12.5F, ColorRGBA.WHITE);
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), 18.5F + coordsWidth + 3.0F, this.yAnimation.getValue() - 11.0F, 2.0F, 2.0F, BorderRadius.all(0.5F), theme.getColor());
+      ctx.drawText(Fonts.ICONS2.getFont(7.5F), "\uf70c", 24.0F + coordsWidth + 3.5F, this.yAnimation.getValue() - 12.5F, theme.getColor());
+      ctx.drawText(Fonts.REGULAR.getFont(7.5F), speedText + " Б/С", 24.0F + coordsWidth + 12.0F, this.yAnimation.getValue() - 12.5F, ColorRGBA.WHITE);
    }
 }

@@ -1,6 +1,7 @@
 package tech.huihui.client.hud.elements.component;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,7 @@ public class PotionsComponent extends DraggableHudElement {
    private final Animation xLine;
    private final Animation alpha;
    private final List<PotionsComponent.PotionItem> potionItems;
+   private boolean potionsDirty = true;
 
    public PotionsComponent(String name, float initialX, float initialY, float windowWidth, float windowHeight, float offsetX, float offsetY, DraggableHudElement.Align align) {
       super(name, initialX, initialY, windowWidth, windowHeight, offsetX, offsetY, align);
@@ -54,9 +56,12 @@ public class PotionsComponent extends DraggableHudElement {
          float posY = this.getY();
          float defaultWidth = 47.0F;
          float height = 14.5F;
-         this.potionItems.sort(Comparator.comparing((pi) -> {
-            return pi.name;
-         }));
+         if (this.potionsDirty) {
+            this.potionItems.sort(Comparator.comparing((pi) -> {
+               return pi.name;
+            }));
+            this.potionsDirty = false;
+         }
          boolean isFound = false;
          float durationWidth = 0.0F;
          Iterator var8 = this.potionItems.iterator();
@@ -69,7 +74,7 @@ public class PotionsComponent extends DraggableHudElement {
                int seconds = item.durationTicks / 20;
                int minutes = seconds / 60;
                int sec = seconds % 60;
-               duration = String.format("%d:%02d", minutes, sec);
+               duration = minutes + ":" + (sec < 10 ? "0" : "") + sec;
                durationWidth = Fonts.REGULAR.getWidth(duration, 6.75F) + 4.0F;
                height += 11.0F * item.animation.getValue();
                if (item.animation.getValue() != 0.0F) {
@@ -153,7 +158,7 @@ public class PotionsComponent extends DraggableHudElement {
       int totalSeconds = durationTicks / 20;
       int minutes = totalSeconds / 60;
       int seconds = totalSeconds % 60;
-      return String.format("%02d:%02d", minutes, seconds);
+      return minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
    }
 
    private Identifier getEffectIcon(StatusEffect effect) {
@@ -164,14 +169,15 @@ public class PotionsComponent extends DraggableHudElement {
    @Native
    public void updatePotions() {
       if (mc.player != null) {
-         Map<String, StatusEffectInstance> currentEffects = (Map)mc.player.getStatusEffects().stream().collect(Collectors.toMap((e) -> {
-            String var10000 = Text.translatable(e.getTranslationKey()).getString();
-            return var10000 + ":" + e.getAmplifier();
-         }, (e) -> {
-            return e;
-         }, (e1, e2) -> {
-            return e1;
-         }));
+         Map<String, StatusEffectInstance> currentEffects = new HashMap();
+         Iterator var2 = mc.player.getStatusEffects().iterator();
+
+         while(var2.hasNext()) {
+            StatusEffectInstance e = (StatusEffectInstance)var2.next();
+            String key = Text.translatable(e.getTranslationKey()).getString() + ":" + e.getAmplifier();
+            currentEffects.putIfAbsent(key, e);
+         }
+
          this.potionItems.forEach((item) -> {
             String key = item.name + ":" + item.amplifier;
             StatusEffectInstance effect = (StatusEffectInstance)currentEffects.get(key);
@@ -188,12 +194,25 @@ public class PotionsComponent extends DraggableHudElement {
             }
 
          });
-         currentEffects.forEach((key, effect) -> {
+         boolean changed = false;
+         Iterator var7 = currentEffects.entrySet().iterator();
+
+         while(var7.hasNext()) {
+            Map.Entry<String, StatusEffectInstance> entry = (Map.Entry)var7.next();
+            StatusEffectInstance effect = (StatusEffectInstance)entry.getValue();
             this.potionItems.add(new PotionsComponent.PotionItem(Text.translatable(effect.getTranslationKey()).getString(), effect.getAmplifier(), effect.getDuration(), effect));
-         });
-         this.potionItems.removeIf((item) -> {
+            changed = true;
+         }
+
+         if (this.potionItems.removeIf((item) -> {
             return !item.active && item.animation.getValue() == 0.0F;
-         });
+         })) {
+            changed = true;
+         }
+
+         if (changed) {
+            this.potionsDirty = true;
+         }
       }
    }
 

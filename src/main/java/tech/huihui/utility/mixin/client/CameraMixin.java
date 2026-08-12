@@ -18,6 +18,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import tech.huihui.base.events.impl.player.EventRotation;
 import tech.huihui.base.events.impl.render.EventCamera;
 import tech.huihui.base.events.impl.render.EventCameraPosition;
+import tech.huihui.client.modules.impl.misc.FreeCam;
 import tech.huihui.utility.game.player.rotation.Rotation;
 import tech.huihui.utility.mixin.accessors.CameraAccessor;
 
@@ -69,8 +70,21 @@ public abstract class CameraMixin {
 
    }
 
-   @Inject(
-      method = {"setPos(Lnet/minecraft/util/math/Vec3d;)V"},
+    @Inject(
+       method = {"update"},
+       at = {@At("TAIL")}
+    )
+    private void freecamCameraHook(BlockView area, Entity focusedEntity, boolean thirdPerson, boolean inverseView, float tickDelta, CallbackInfo ci) {
+       if (FreeCam.INSTANCE.isCameraMode()) {
+          FreeCam.INSTANCE.tickCamera();
+          this.field_18712 = FreeCam.INSTANCE.getCamPos();
+          this.field_18713.set(this.field_18712.x, this.field_18712.y, this.field_18712.z);
+          this.method_19325(FreeCam.INSTANCE.getCamYaw(), FreeCam.INSTANCE.getCamPitch());
+       }
+    }
+
+    @Inject(
+       method = {"setPos(Lnet/minecraft/util/math/Vec3d;)V"},
       at = {@At("HEAD")},
       cancellable = true
    )

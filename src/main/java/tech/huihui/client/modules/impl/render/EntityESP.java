@@ -1,11 +1,10 @@
 package tech.huihui.client.modules.impl.render;
 
 import com.darkmagician6.eventapi.EventTarget;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.stream.Collectors;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.component.type.ItemEnchantmentsComponent;
@@ -20,6 +19,8 @@ import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.TypeFilter;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Vector4d;
@@ -46,78 +47,131 @@ import tech.huihui.utility.render.display.shader.DrawUtil;
 )
 public final class EntityESP extends Module {
    public static final EntityESP INSTANCE = new EntityESP();
-   private final HashMap<Entity, Vector4f> positions = new HashMap();
+   private static final Text GRAY_OPEN = Text.literal(" [").setStyle(Style.EMPTY.withColor(Formatting.GRAY));
+   private static final Text GRAY_CLOSE = Text.literal("]").setStyle(Style.EMPTY.withColor(Formatting.GRAY));
+   private static final ColorRGBA BG_DARK = new ColorRGBA(0, 0, 0, 123);
+   private static final ColorRGBA BG_FRIEND = new ColorRGBA(0, 166, 0, 123);
+   private static final int ENCH_DANGER_RGB = (new ColorRGBA(212, 45, 43, 255)).getRGB();
+   private static final EquipmentSlot[] EQUIP_SLOTS = new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
+   private final HashMap<Entity, Text> nameCache = new HashMap();
+   private final HashMap<Entity, Text> itemNameCache = new HashMap();
+   private final HashMap<Entity, TagCache> tagCache = new HashMap();
+   private final IdentityHashMap<ItemStack, EnchText[]> enchCache = new IdentityHashMap();
+   private final ItemStack[] itemArray = new ItemStack[6];
+   private int cacheCleanupTick;
+
+   private static final class TagCache {
+      int hpInt;
+      Text name;
+      Text text;
+      float width;
+   }
+
+   private static final class EnchText {
+      String text;
+      float width;
+      int color;
+   }
 
    @EventTarget
    private void onRender(EventRender2D e) {
       if (mc.world != null && mc.player != null) {
+         if (++this.cacheCleanupTick % 50 == 0) {
+            this.nameCache.entrySet().removeIf((entry) -> entry.getKey().isRemoved());
+            this.itemNameCache.entrySet().removeIf((entry) -> entry.getKey().isRemoved());
+            this.tagCache.entrySet().removeIf((entry) -> entry.getKey().isRemoved());
+         }
+         if (this.enchCache.size() > 128) {
+            this.enchCache.clear();
+         }
          float tickDelta = e.getTickDelta();
          this.renderPlayerTags(tickDelta, e);
          this.renderItemTags(tickDelta, e);
       }
    }
 
+   private Text cachedName(Entity entity) {
+      if (entity == mc.player && NameProtect.INSTANCE.isEnabled()) {
+         return Text.literal(NameProtect.getCustomName());
+      }
+      Text cached = this.nameCache.get(entity);
+      if (cached == null || mc.player.age - entity.age > 5) {
+         cached = ReplaceUtil.replaceSymbols(entity.getDisplayName());
+         this.nameCache.put(entity, cached);
+      }
+      return cached;
+   }
+
    private void renderPlayerTags(float tickDelta, EventRender2D e) {
       Iterator var3 = mc.world.getPlayers().iterator();
 
-      while(true) {
-         Vector4d position;
-         float posY;
-         ItemStack[] itemArray;
-         int itemCount;
-         do {
-            PlayerEntity entity;
-            Vec3d pos;
-            do {
-               do {
-                  do {
-                     do {
-                        if (!var3.hasNext()) {
-                           return;
-                        }
-
-                        entity = (PlayerEntity)var3.next();
-                     } while(entity == mc.player && !mc.getEntityRenderDispatcher().camera.isThirdPerson());
-                  } while(!ProjectionUtil.canSee(entity.getBoundingBox().getCenter()));
-
-                  double x = MathHelper.lerp((double)tickDelta, entity.lastRenderX, entity.getX());
-                  double y = MathHelper.lerp((double)tickDelta, entity.lastRenderY, entity.getY()) + (double)entity.getHeight() + 0.2D;
-                  double z = MathHelper.lerp((double)tickDelta, entity.lastRenderZ, entity.getZ());
-                  pos = ProjectionUtil.worldSpaceToScreenSpace(new Vec3d(x, y, z));
-               } while(pos.z <= 0.0D);
-            } while(pos.z >= 1.0D);
-
-            position = ProjectionUtil.getVector4D(entity);
-            posY = (float)(position.y - 11.0D);
-            float hp = ScoreboardHealth.INSTANCE.isEnabled() && entity != mc.player ? PlayerIntersectionUtil.getHealth(entity) : entity.getHealth();
-            Text name = entity == mc.player && NameProtect.INSTANCE.isEnabled() ? Text.literal(NameProtect.getCustomName()) : ReplaceUtil.replaceSymbols(entity.getDisplayName());
-            Text nameWithHp = ((Text)name).copy().append(Text.literal(" [").setStyle(Style.EMPTY.withColor(Formatting.GRAY))).append(Text.literal(String.valueOf((int)hp)).setStyle(Style.EMPTY.withColor(Formatting.RED))).append(Text.literal("]").setStyle(Style.EMPTY.withColor(Formatting.GRAY)));
-            float textWidth = Fonts.REGULAR.getWidth(nameWithHp.getString(), 6.5F);
-            DrawUtil.drawRoundedRect(e.getContext().getMatrices(), (float)(position.x + (position.z - position.x) / 2.0D - (double)(textWidth / 2.0F) - 3.0D), posY - 2.5F, textWidth + 5.0F, 10.0F, BorderRadius.ZERO, HuihuiClient.getInstance().getFriendManager().isFriend(entity.getNameForScoreboard()) ? new ColorRGBA(0, 166, 0, 123) : new ColorRGBA(0, 0, 0, 123));
-            e.getContext().drawText(Fonts.REGULAR.getFont(6.5F), nameWithHp, (float)(position.x + (position.z - position.x) / 2.0D - (double)(textWidth / 2.0F)), posY, 255.0F);
-            itemArray = new ItemStack[6];
-            itemCount = 0;
-            EquipmentSlot[] var19 = new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
-            int var20 = var19.length;
-
-            for(int var21 = 0; var21 < var20; ++var21) {
-               EquipmentSlot slot = var19[var21];
-               ItemStack stack = entity.getEquippedStack(slot);
-               if (!stack.isEmpty()) {
-                  itemArray[itemCount++] = stack;
-               }
+      while(var3.hasNext()) {
+         PlayerEntity entity = (PlayerEntity)var3.next();
+         if (entity == mc.player && !mc.getEntityRenderDispatcher().camera.isThirdPerson()) {
+            continue;
+         }
+         if (entity.squaredDistanceTo(mc.player) > 9216.0D) {
+            continue;
+         }
+         if (!ProjectionUtil.canSee(entity.getBoundingBox().getCenter())) {
+            continue;
+         }
+         double x = MathHelper.lerp((double)tickDelta, entity.lastRenderX, entity.getX());
+         double y = MathHelper.lerp((double)tickDelta, entity.lastRenderY, entity.getY()) + (double)entity.getHeight() + 0.2D;
+         double z = MathHelper.lerp((double)tickDelta, entity.lastRenderZ, entity.getZ());
+         Vec3d pos = ProjectionUtil.worldSpaceToScreenSpace(new Vec3d(x, y, z));
+         if (pos.z <= 0.0D || pos.z >= 1.0D) {
+            continue;
+         }
+         Vector4d position = ProjectionUtil.getVector4D(entity);
+         float posY = (float)(position.y - 11.0D);
+         float hp = ScoreboardHealth.INSTANCE.isEnabled() && entity != mc.player ? PlayerIntersectionUtil.getHealth(entity) : entity.getHealth();
+         int hpInt = (int)hp;
+         Text name = this.cachedName(entity);
+         TagCache cachedTag = this.tagCache.get(entity);
+         Text nameWithHp;
+         float textWidth;
+         if (cachedTag == null || cachedTag.hpInt != hpInt || cachedTag.name != name) {
+            nameWithHp = name.copy().append(EntityESP.GRAY_OPEN).append(Text.literal(String.valueOf(hpInt)).setStyle(Style.EMPTY.withColor(Formatting.RED))).append(EntityESP.GRAY_CLOSE);
+            textWidth = Fonts.REGULAR.getWidth(nameWithHp.getString(), 6.5F);
+            if (cachedTag == null) {
+               cachedTag = new TagCache();
+               this.tagCache.put(entity, cachedTag);
             }
+            cachedTag.hpInt = hpInt;
+            cachedTag.name = name;
+            cachedTag.text = nameWithHp;
+            cachedTag.width = textWidth;
+         } else {
+            nameWithHp = cachedTag.text;
+            textWidth = cachedTag.width;
+         }
+         DrawUtil.drawRoundedRect(e.getContext().getMatrices(), (float)(position.x + (position.z - position.x) / 2.0D - (double)(textWidth / 2.0F) - 3.0D), posY - 2.5F, textWidth + 5.0F, 10.0F, BorderRadius.ZERO, HuihuiClient.getInstance().getFriendManager().isFriend(entity.getNameForScoreboard()) ? EntityESP.BG_FRIEND : EntityESP.BG_DARK);
+         e.getContext().drawText(Fonts.REGULAR.getFont(6.5F), nameWithHp, (float)(position.x + (position.z - position.x) / 2.0D - (double)(textWidth / 2.0F)), posY, 255.0F);
+         int itemCount = 0;
+         EquipmentSlot[] var18 = EntityESP.EQUIP_SLOTS;
+         int var19 = var18.length;
 
-            ItemStack mainHand = entity.getMainHandStack();
-            if (!mainHand.isEmpty()) {
-               itemArray[itemCount++] = mainHand;
+         for(int var20 = 0; var20 < var19; ++var20) {
+            EquipmentSlot slot = var18[var20];
+            ItemStack stack = entity.getEquippedStack(slot);
+            if (!stack.isEmpty()) {
+               this.itemArray[itemCount++] = stack;
             }
+         }
 
-            ItemStack offHand = entity.getOffHandStack();
-            if (!offHand.isEmpty()) {
-               itemArray[itemCount++] = offHand;
-            }
-         } while(itemCount == 0);
+         ItemStack mainHand = entity.getMainHandStack();
+         if (!mainHand.isEmpty()) {
+            this.itemArray[itemCount++] = mainHand;
+         }
+
+         ItemStack offHand = entity.getOffHandStack();
+         if (!offHand.isEmpty()) {
+            this.itemArray[itemCount++] = offHand;
+         }
+         if (itemCount == 0) {
+            continue;
+         }
 
          float iconSize = 16.0F;
          float spacing = 0.0F;
@@ -127,44 +181,45 @@ public final class EntityESP extends Module {
          MatrixStack matrices = e.getContext().getMatrices();
 
          for(int i = 0; i < itemCount; ++i) {
-            ItemStack stack = itemArray[i];
+            ItemStack stack = this.itemArray[i];
             if (stack != null && !stack.isEmpty()) {
                float x2 = startX + (float)i * (iconSize + spacing);
                ItemEnchantmentsComponent enchComp = EnchantmentHelper.getEnchantments(stack);
                float enchantmentY;
                if (!enchComp.isEmpty()) {
-                  Map<RegistryEntry<Enchantment>, Integer> enchMap = (Map)enchComp.getEnchantmentEntries().stream().collect(Collectors.toMap(Entry::getKey, it.unimi.dsi.fastutil.objects.Object2IntMap.Entry::getIntValue));
                   enchantmentY = iconY - 16.0F;
-                  Iterator var33 = enchMap.entrySet().iterator();
+                  EnchText[] cachedEnch = this.enchCache.get(stack);
+                  int enchSize = enchComp.getSize();
+                  if (cachedEnch == null || cachedEnch.length != enchSize) {
+                     cachedEnch = new EnchText[enchSize];
+                     int idx = 0;
 
-                  label134:
-                  while(true) {
-                     Entry enchEntry;
-                     int lvl;
-                     do {
-                        if (!var33.hasNext()) {
-                           break label134;
+                     for(Object2IntMap.Entry<RegistryEntry<Enchantment>> enchEntry : enchComp.getEnchantmentEntries()) {
+                        int lvl = enchEntry.getIntValue();
+                        if (lvl <= 0) {
+                           continue;
                         }
-
-                        enchEntry = (Entry)var33.next();
-                        lvl = (Integer)enchEntry.getValue();
-                     } while(lvl <= 0);
-
-                     String fullName = Enchantment.getName((RegistryEntry)enchEntry.getKey(), lvl).getString();
-                     String shortName = fullName.length() > 2 ? fullName.substring(0, 2) : fullName;
-                     String enchantmentText = shortName + lvl;
-                     float enchantmentTextWidth = Fonts.REGULAR.getWidth(enchantmentText, 6.0F);
-                     int color = -1;
-                     if (shortName.equalsIgnoreCase("Sh") && lvl > 5 || shortName.equalsIgnoreCase("Pr") && lvl > 4) {
-                        color = (new ColorRGBA(212, 45, 43, 255)).getRGB();
+                        EnchText enchText = new EnchText();
+                        String fullName = Enchantment.getName(enchEntry.getKey(), lvl).getString();
+                        String shortName = fullName.length() > 2 ? fullName.substring(0, 2) : fullName;
+                        enchText.text = shortName + lvl;
+                        enchText.width = Fonts.REGULAR.getWidth(enchText.text, 6.0F);
+                        enchText.color = shortName.equalsIgnoreCase("Sh") && lvl > 5 || shortName.equalsIgnoreCase("Pr") && lvl > 4 ? EntityESP.ENCH_DANGER_RGB : -1;
+                        cachedEnch[idx++] = enchText;
                      }
+                     this.enchCache.put(stack, cachedEnch);
+                  }
 
-                     e.getContext().drawText(Fonts.REGULAR.getFont(6.0F), enchantmentText, x2 - enchantmentTextWidth / 2.0F, enchantmentY, new ColorRGBA(color));
+                  for(EnchText enchText : cachedEnch) {
+                     if (enchText == null) {
+                        continue;
+                     }
+                     e.getContext().drawText(Fonts.REGULAR.getFont(6.0F), enchText.text, x2 - enchText.width / 2.0F, enchantmentY, new ColorRGBA(enchText.color));
                      enchantmentY -= 8.0F;
                   }
                }
 
-               DrawUtil.drawRoundedRect(matrices, x2 - 7.0F, iconY - 7.0F, 14.0F, 14.0F, BorderRadius.all(3.0F), new ColorRGBA(0, 0, 0, 123));
+               DrawUtil.drawRoundedRect(matrices, x2 - 7.0F, iconY - 7.0F, 14.0F, 14.0F, BorderRadius.all(3.0F), EntityESP.BG_DARK);
                float scale = 0.7F;
                enchantmentY = -18.0F;
                matrices.push();
@@ -181,13 +236,15 @@ public final class EntityESP extends Module {
    }
 
    private void renderItemTags(float tickDelta, EventRender2D e) {
-      Iterator var3 = mc.world.getEntities().iterator();
+      Vec3d playerPos = mc.player.getPos();
+      Box searchBox = new Box(playerPos.x - 64.0D, playerPos.y - 64.0D, playerPos.z - 64.0D, playerPos.x + 64.0D, playerPos.y + 64.0D, playerPos.z + 64.0D);
+      Iterator var3 = mc.world.getEntitiesByType(TypeFilter.instanceOf(ItemEntity.class), searchBox, (itemEntity) -> true).iterator();
 
       while(var3.hasNext()) {
          Entity entity = (Entity)var3.next();
          if (entity instanceof ItemEntity) {
             ItemEntity itemEntity = (ItemEntity)entity;
-            if (ProjectionUtil.canSee(itemEntity.getBoundingBox().getCenter())) {
+            if (itemEntity.squaredDistanceTo(mc.player) <= 4096.0D && ProjectionUtil.canSee(itemEntity.getBoundingBox().getCenter())) {
                double x = MathHelper.lerp((double)tickDelta, entity.lastRenderX, entity.getX());
                double y = MathHelper.lerp((double)tickDelta, entity.lastRenderY, entity.getY()) + (double)entity.getHeight() + 0.1D;
                double z = MathHelper.lerp((double)tickDelta, entity.lastRenderZ, entity.getZ());
@@ -214,16 +271,11 @@ public final class EntityESP extends Module {
                      }
 
                      Formatting rarityColor = var10000;
-                     String itemName = stack.getName().getString();
-                     Text nameText = Text.literal(itemName).setStyle(Style.EMPTY.withColor(rarityColor));
-                     if (!stack.getName().getSiblings().isEmpty()) {
-                        nameText = stack.getName();
-                     }
-
+                     Text nameText = this.cachedItemName(itemEntity, rarityColor);
                      Text countComponent = stack.getCount() > 1 ? Text.literal(" х" + stack.getCount()).setStyle(Style.EMPTY.withColor(Formatting.GRAY)) : Text.empty();
                      Text textComponent = ((Text)nameText).copy().append(countComponent);
                      float textWidth = Fonts.REGULAR.getFont(6.5F).width((Text)textComponent);
-                     DrawUtil.drawRoundedRect(e.getContext().getMatrices(), (float)(position.x + (position.z - position.x) / 2.0D - (double)(textWidth / 2.0F) - 3.0D), (float)(position.y - 13.5D), textWidth + 4.0F, 10.0F, BorderRadius.ZERO, new ColorRGBA(0, 0, 0, 123));
+                     DrawUtil.drawRoundedRect(e.getContext().getMatrices(), (float)(position.x + (position.z - position.x) / 2.0D - (double)(textWidth / 2.0F) - 3.0D), (float)(position.y - 13.5D), textWidth + 4.0F, 10.0F, BorderRadius.ZERO, EntityESP.BG_DARK);
                      e.getContext().drawText(Fonts.REGULAR.getFont(6.5F), textComponent, (float)(position.x + (position.z - position.x) / 2.0D - (double)(textWidth / 2.0F)), (float)position.y - 11.0F, 255.0F);
                   }
                }
@@ -231,6 +283,21 @@ public final class EntityESP extends Module {
          }
       }
 
+   }
+
+   private Text cachedItemName(ItemEntity itemEntity, Formatting rarityColor) {
+      Text cached = this.itemNameCache.get(itemEntity);
+      if (cached == null || mc.player.age - itemEntity.age > 20) {
+         ItemStack stack = itemEntity.getStack();
+         String itemName = stack.getName().getString();
+         Text nameText = Text.literal(itemName).setStyle(Style.EMPTY.withColor(rarityColor));
+         if (!stack.getName().getSiblings().isEmpty()) {
+            nameText = stack.getName();
+         }
+         cached = nameText;
+         this.itemNameCache.put(itemEntity, cached);
+      }
+      return cached;
    }
 
    public static void drawBox(double x, double y, double width, double height, double size, int color, BufferBuilder bufferbuilder) {

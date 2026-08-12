@@ -24,6 +24,7 @@ import tech.huihui.client.modules.api.setting.impl.BooleanSetting;
 import tech.huihui.client.modules.api.setting.impl.ModeSetting;
 import tech.huihui.client.modules.api.setting.impl.MultiBooleanSetting;
 import tech.huihui.client.modules.api.setting.impl.ModeSetting.Value;
+import tech.huihui.client.modules.impl.combat.Aimbow;
 import tech.huihui.client.modules.impl.combat.AntiBot;
 import tech.huihui.client.modules.impl.combat.Aura;
 import tech.huihui.client.modules.impl.combat.AutoCrystal;
@@ -31,7 +32,9 @@ import tech.huihui.client.modules.impl.combat.AutoGapple;
 import tech.huihui.client.modules.impl.combat.AutoSwap;
 import tech.huihui.client.modules.impl.combat.AutoTotem;
 import tech.huihui.client.modules.impl.combat.ClickPearl;
+import tech.huihui.client.modules.impl.combat.Surround;
 import tech.huihui.client.modules.impl.combat.TargetPearl;
+import tech.huihui.client.modules.impl.cosmetics.AnimalsModule;
 import tech.huihui.client.modules.impl.misc.AHHelper;
 import tech.huihui.client.modules.impl.misc.AutoAccept;
 import tech.huihui.client.modules.impl.misc.AutoDuel;
@@ -43,6 +46,7 @@ import tech.huihui.client.modules.impl.misc.AutoRespawn;
 import tech.huihui.client.modules.impl.misc.Autofarm;
 import tech.huihui.client.modules.impl.misc.ClickAction;
 import tech.huihui.client.modules.impl.misc.CreeperFarm;
+import tech.huihui.client.modules.impl.misc.DiscordRPC;
 import tech.huihui.client.modules.impl.misc.ElytraHelper;
 import tech.huihui.client.modules.impl.misc.FreeCam;
 import tech.huihui.client.modules.impl.misc.ItemScroller;
@@ -81,6 +85,7 @@ import tech.huihui.client.modules.impl.render.BlockESP;
 import tech.huihui.client.modules.impl.render.ChunkAnimator;
 import tech.huihui.client.modules.impl.render.Crosshair;
 import tech.huihui.client.modules.impl.render.CustomFog;
+import tech.huihui.client.modules.impl.render.CustomHotbar;
 import tech.huihui.client.modules.impl.render.CustomModel;
 import tech.huihui.client.modules.impl.render.ClickGUI;
 import tech.huihui.client.modules.impl.render.EditClickGUI;
@@ -95,10 +100,12 @@ import tech.huihui.client.modules.impl.render.ShulkerPreview;
 import tech.huihui.client.modules.impl.render.Predictions;
 import tech.huihui.client.modules.impl.render.AresMinePvPWarpChest;
 import tech.huihui.client.modules.impl.render.SwingAnimation;
+import tech.huihui.client.modules.impl.render.UseAnimation;
 import tech.huihui.client.modules.impl.render.TargetESP;
 import tech.huihui.client.modules.impl.render.TargetHud;
 import tech.huihui.client.modules.impl.render.ViewModel;
 import tech.huihui.client.modules.impl.render.Watermark;
+import tech.huihui.client.modules.impl.render.WingsModule;
 import tech.huihui.client.modules.impl.render.WorldTime;
 import tech.huihui.client.modules.impl.render.XRay;
 import tech.huihui.client.modules.impl.render.ScoreboardHud;
@@ -132,8 +139,10 @@ public final class ModuleManager implements IMinecraft {
 
    private void registerCombat() {
       registerModule(AntiBot.INSTANCE);
+      registerModule(Aimbow.INSTANCE);
       registerModule(Aura.INSTANCE);
-      registerModule(AutoCrystal.INSTANCE);
+       registerModule(AutoCrystal.INSTANCE);
+       registerModule(Surround.INSTANCE);
       registerModule(AutoSwap.INSTANCE);
       registerModule(AutoTotem.INSTANCE);
       registerModule(AutoGapple.INSTANCE);
@@ -186,6 +195,10 @@ public final class ModuleManager implements IMinecraft {
        registerModule(ChunkAnimator.INSTANCE);
        registerModule(XRay.INSTANCE);
        registerModule(ScoreboardHud.INSTANCE);
+       registerModule(WingsModule.INSTANCE);
+       registerModule(AnimalsModule.INSTANCE);
+       registerModule(CustomHotbar.INSTANCE);
+       registerModule(UseAnimation.INSTANCE);
     }
 
    private void registerPlayer() {
@@ -202,8 +215,9 @@ public final class ModuleManager implements IMinecraft {
        registerModule(ElytraHelper.INSTANCE);
        registerModule(PilotSettings.INSTANCE);
        registerModule(ItemScroller.INSTANCE);
-      registerModule(ClickAction.INSTANCE);
-      registerModule(FreeCam.INSTANCE);
+       registerModule(ClickAction.INSTANCE);
+       registerModule(FreeCam.INSTANCE);
+       registerModule(DiscordRPC.INSTANCE);
       registerModule(AHHelper.INSTANCE);
       registerModule(NoInteract.INSTANCE);
       registerModule(AutoAccept.INSTANCE);

@@ -16,7 +16,7 @@ import tech.huihui.client.modules.api.setting.impl.MultiBooleanSetting;
 )
 public final class NoRender extends Module {
    public static final NoRender INSTANCE = new NoRender();
-   private final MultiBooleanSetting settings = MultiBooleanSetting.create("Убрать", List.of("Огонь", "Плохие эффекты", "Камера клип"));
+   private final MultiBooleanSetting settings = MultiBooleanSetting.create("Убрать", List.of("Огонь", "Плохие эффекты", "Камера клип", "Bob"));
 
    @Native
    public boolean isRemoveFire() {
@@ -26,6 +26,11 @@ public final class NoRender extends Module {
    @Native
    public boolean isRemoveBadEffect() {
       return this.isEnabled() && this.settings.isEnable(1);
+   }
+
+   @Native
+   public boolean isRemoveBob() {
+      return this.isEnabled() && this.settings.isEnable(3);
    }
 
    @EventTarget

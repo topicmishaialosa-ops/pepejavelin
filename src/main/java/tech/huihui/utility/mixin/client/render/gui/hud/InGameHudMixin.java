@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import tech.huihui.base.events.impl.render.EventRender2D;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.impl.render.Crosshair;
+import tech.huihui.client.modules.impl.render.CustomHotbar;
 import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.client.modules.impl.render.ScoreboardHud;
 import tech.huihui.utility.interfaces.IMinecraft;
@@ -27,6 +28,38 @@ public abstract class InGameHudMixin {
    public void onRender(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
       CustomDrawContext customDrawContext = new CustomDrawContext(IMinecraft.mc.getBufferBuilders().getEntityVertexConsumers());
       EventManager.call(new EventRender2D(customDrawContext, tickCounter.getTickDelta(false)));
+   }
+
+   @Inject(
+      method = {"renderHotbar"},
+      at = {@At("HEAD")},
+      cancellable = true
+   )
+   private void removeVanillaHotbar(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
+      try {
+         CustomHotbar customHotbar = CustomHotbar.INSTANCE;
+         if (customHotbar.isEnabled() && customHotbar.hideVanilla.isEnabled()) {
+            ci.cancel();
+         }
+      } catch (Exception var5) {
+      }
+
+   }
+
+   @Inject(
+      method = {"renderStatusBars"},
+      at = {@At("HEAD")},
+      cancellable = true
+   )
+   private void removeVanillaStatusBars(DrawContext context, CallbackInfo ci) {
+      try {
+         CustomHotbar customHotbar = CustomHotbar.INSTANCE;
+         if (customHotbar.isEnabled() && customHotbar.hideVanilla.isEnabled() && customHotbar.showStatus.isEnabled()) {
+            ci.cancel();
+         }
+      } catch (Exception var4) {
+      }
+
    }
 
    @Inject(

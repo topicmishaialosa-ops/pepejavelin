@@ -20,16 +20,26 @@ import tech.huihui.utility.interfaces.IMinecraft;
 import tech.huihui.utility.render.level.Render3DUtil;
 
 public final class ProjectionUtil implements IMinecraft {
+   private static final int[] VIEWPORT = new int[4];
+   private static final Vector4f TRANSFORMED = new Vector4f();
+   private static final Vector3f TARGET = new Vector3f();
+   private static final Matrix4f PROJ = new Matrix4f();
+   private static final Vec3d[] CORNER_ARRAY = new Vec3d[8];
+   private static int viewportWidth = -1;
+   private static int viewportHeight = -1;
+
    @NotNull
    public static Vec3d worldSpaceToScreenSpace(Vec3d pos) {
-      Vector3f delta = pos.subtract(mc.getEntityRenderDispatcher().camera.getPos()).toVector3f();
-      int[] viewport = new int[4];
-      GL11.glGetIntegerv(2978, viewport);
-      Vector3f target = new Vector3f();
-      Vector4f transformedCoordinates = (new Vector4f(delta.x, delta.y, delta.z, 1.0F)).mul(Render3DUtil.getLastWorldSpaceMatrix());
-      Matrix4f matrixProj = new Matrix4f(Render3DUtil.getLastProjMat());
-      matrixProj.project(transformedCoordinates.x(), transformedCoordinates.y(), transformedCoordinates.z(), viewport, target);
-      return new Vec3d((double)target.x / mc.getWindow().getScaleFactor(), (double)((float)mc.getWindow().getHeight() - target.y) / mc.getWindow().getScaleFactor(), (double)target.z);
+      if (viewportWidth != mc.getWindow().getFramebufferWidth() || viewportHeight != mc.getWindow().getFramebufferHeight()) {
+         viewportWidth = mc.getWindow().getFramebufferWidth();
+         viewportHeight = mc.getWindow().getFramebufferHeight();
+         GL11.glGetIntegerv(2978, VIEWPORT);
+      }
+      Vec3d cameraPos = mc.getEntityRenderDispatcher().camera.getPos();
+      TRANSFORMED.set((float)(pos.x - cameraPos.x), (float)(pos.y - cameraPos.y), (float)(pos.z - cameraPos.z), 1.0F).mul(Render3DUtil.getLastWorldSpaceMatrix());
+      PROJ.set(Render3DUtil.getLastProjMat());
+      PROJ.project(TRANSFORMED.x(), TRANSFORMED.y(), TRANSFORMED.z(), VIEWPORT, TARGET);
+      return new Vec3d((double)TARGET.x / mc.getWindow().getScaleFactor(), (double)((float)mc.getWindow().getHeight() - TARGET.y) / mc.getWindow().getScaleFactor(), (double)TARGET.z);
    }
 
    public static boolean canSee(Vec3d vec3d) {
@@ -53,14 +63,32 @@ public final class ProjectionUtil implements IMinecraft {
 
    @NotNull
    public static Vec3d[] getVec3ds(Entity ent, Vec3d pos) {
+      fillVec3ds(ent, pos, CORNER_ARRAY);
+      return CORNER_ARRAY;
+   }
+
+   private static void fillVec3ds(Entity ent, Vec3d pos, Vec3d[] out) {
       Box axisAlignedBB2 = ent.getBoundingBox();
-      Box axisAlignedBB = new Box(axisAlignedBB2.minX - ent.getX() + pos.x - 0.10000000149011612D, axisAlignedBB2.minY - ent.getY() + pos.y - 0.10000000149011612D, axisAlignedBB2.minZ - ent.getZ() + pos.z - 0.10000000149011612D, axisAlignedBB2.maxX - ent.getX() + pos.x + 0.10000000149011612D, axisAlignedBB2.maxY - ent.getY() + pos.y + 0.10000000149011612D, axisAlignedBB2.maxZ - ent.getZ() + pos.z + 0.10000000149011612D);
-      return new Vec3d[]{new Vec3d(axisAlignedBB.minX, axisAlignedBB.minY, axisAlignedBB.minZ), new Vec3d(axisAlignedBB.minX, axisAlignedBB.maxY, axisAlignedBB.minZ), new Vec3d(axisAlignedBB.maxX, axisAlignedBB.minY, axisAlignedBB.minZ), new Vec3d(axisAlignedBB.maxX, axisAlignedBB.maxY, axisAlignedBB.minZ), new Vec3d(axisAlignedBB.minX, axisAlignedBB.minY, axisAlignedBB.maxZ), new Vec3d(axisAlignedBB.minX, axisAlignedBB.maxY, axisAlignedBB.maxZ), new Vec3d(axisAlignedBB.maxX, axisAlignedBB.minY, axisAlignedBB.maxZ), new Vec3d(axisAlignedBB.maxX, axisAlignedBB.maxY, axisAlignedBB.maxZ)};
+      double minX = axisAlignedBB2.minX - ent.getX() + pos.x - 0.10000000149011612D;
+      double minY = axisAlignedBB2.minY - ent.getY() + pos.y - 0.10000000149011612D;
+      double minZ = axisAlignedBB2.minZ - ent.getZ() + pos.z - 0.10000000149011612D;
+      double maxX = axisAlignedBB2.maxX - ent.getX() + pos.x + 0.10000000149011612D;
+      double maxY = axisAlignedBB2.maxY - ent.getY() + pos.y + 0.10000000149011612D;
+      double maxZ = axisAlignedBB2.maxZ - ent.getZ() + pos.z + 0.10000000149011612D;
+      out[0] = new Vec3d(minX, minY, minZ);
+      out[1] = new Vec3d(minX, maxY, minZ);
+      out[2] = new Vec3d(maxX, minY, minZ);
+      out[3] = new Vec3d(maxX, maxY, minZ);
+      out[4] = new Vec3d(minX, minY, maxZ);
+      out[5] = new Vec3d(minX, maxY, maxZ);
+      out[6] = new Vec3d(maxX, minY, maxZ);
+      out[7] = new Vec3d(maxX, maxY, maxZ);
    }
 
    public static Vector4d getVector4D(Entity ent) {
       Vector4d position = null;
-      Vec3d[] var2 = getVec3ds(ent, MathUtil.interpolate(ent));
+      fillVec3ds(ent, MathUtil.interpolate(ent), CORNER_ARRAY);
+      Vec3d[] var2 = CORNER_ARRAY;
       int var3 = var2.length;
 
       for(int var4 = 0; var4 < var3; ++var4) {

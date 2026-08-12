@@ -39,7 +39,9 @@ import net.minecraft.text.Text;
 public final class KeyFinder extends Module {
    public static final KeyFinder INSTANCE = new KeyFinder();
 
-    private static final int SEARCH_RADIUS = 24;
+    private static final int SEARCH_RADIUS_XZ = 24;
+    private static final int SEARCH_DEPTH_DOWN = 70;
+    private static final int SEARCH_HEIGHT_UP = 70;
     private static final int SPAWNER_RADIUS = 4;
     private static final int GLOBAL_SEARCH_RADIUS = 200;
     private static final long SCAN_DELAY = 1000L;
@@ -229,7 +231,16 @@ public final class KeyFinder extends Module {
           if (!(entity instanceof ChestMinecartEntity minecart)) {
              continue;
           }
-          if (minecart.squaredDistanceTo(mc.player) > (double) SEARCH_RADIUS * SEARCH_RADIUS) {
+          double px = mc.player.getX();
+          double py = mc.player.getY();
+          double pz = mc.player.getZ();
+          double mx = minecart.getX();
+          double my = minecart.getY();
+          double mz = minecart.getZ();
+          if (Math.abs(mx - px) > SEARCH_RADIUS_XZ
+                || Math.abs(mz - pz) > SEARCH_RADIUS_XZ
+                || py - my > SEARCH_DEPTH_DOWN
+                || my - py > SEARCH_HEIGHT_UP) {
              continue;
           }
 
@@ -263,16 +274,21 @@ public final class KeyFinder extends Module {
        this.targets.clear();
        this.targets.addAll(found);
        
-       if (!found.isEmpty()) {
-          MessageUtil.displayInfo(String.format("[SCAN] KeyFinder: Найдено %d цели(й) в радиусе %d блоков", found.size(), SEARCH_RADIUS));
-       }
+        if (!found.isEmpty()) {
+           MessageUtil.displayInfo(String.format("[SCAN] KeyFinder: Найдено %d цели(й) в радиусе %d по сторонам и %d вверх/вниз", found.size(), SEARCH_RADIUS_XZ, SEARCH_DEPTH_DOWN));
+        }
     }
 
    private List<BlockPos> findSpawners(BlockPos center) {
       List<BlockPos> result = new ArrayList<>();
-      for (BlockPos position : BlockPos.iterateOutwards(center, SEARCH_RADIUS, SEARCH_RADIUS, SEARCH_RADIUS)) {
-         if (mc.world.getBlockState(position).isOf(Blocks.SPAWNER)) {
-            result.add(position.toImmutable());
+      for (int dx = -SEARCH_RADIUS_XZ; dx <= SEARCH_RADIUS_XZ; dx++) {
+         for (int dy = -SEARCH_DEPTH_DOWN; dy <= SEARCH_HEIGHT_UP; dy++) {
+            for (int dz = -SEARCH_RADIUS_XZ; dz <= SEARCH_RADIUS_XZ; dz++) {
+               BlockPos position = center.add(dx, dy, dz);
+               if (mc.world.getBlockState(position).isOf(Blocks.SPAWNER)) {
+                  result.add(position.toImmutable());
+               }
+            }
          }
       }
       return result;

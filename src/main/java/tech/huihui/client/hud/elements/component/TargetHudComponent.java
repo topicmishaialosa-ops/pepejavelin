@@ -1,5 +1,6 @@
 package tech.huihui.client.hud.elements.component;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import net.minecraft.client.gui.screen.ChatScreen;
@@ -36,7 +37,9 @@ public class TargetHudComponent extends DraggableHudElement {
    private final Animation gappleAnimation;
    private final Animation toggleAnimation;
    private final Animation toggleAnimationMetanoise;
+   private final HashMap<LivingEntity, Identifier> skinCache = new HashMap();
    private LivingEntity target;
+   private int skinCacheTick;
 
    public TargetHudComponent(String name, float initialX, float initialY, float windowWidth, float windowHeight, float offsetX, float offsetY, DraggableHudElement.Align align) {
       super(name, initialX, initialY, windowWidth, windowHeight, offsetX, offsetY, align);
@@ -80,22 +83,30 @@ public class TargetHudComponent extends DraggableHudElement {
       DrawUtil.drawBlur(ctx.getMatrices(), posX, posY, width, height, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(255, 255, 255, 255.0F * animation));
       DrawUtil.drawMetanoise(ctx.getMatrices(), posX, posY, width, height, this.toggleAnimationMetanoise.getValue(), 3.0F, new ColorRGBA(0, 0, 0, 140), theme.getColor().withAlpha(255));
       Identifier skinTextures = null;
-      Iterator var11 = mc.getNetworkHandler().getPlayerList().iterator();
-
-      while(var11.hasNext()) {
-         PlayerListEntry playerListEntry = (PlayerListEntry)var11.next();
-         if (playerListEntry.getProfile().getName().equals(target.getNameForScoreboard())) {
-            skinTextures = playerListEntry.getSkinTextures().texture();
-         }
+      if (++this.skinCacheTick % 50 == 0) {
+         this.skinCache.entrySet().removeIf((entry) -> entry.getKey().isRemoved());
       }
+      if (this.skinCacheTick % 50 == 0 || (skinTextures = this.skinCache.get(target)) == null) {
+         Iterator var11 = mc.getNetworkHandler().getPlayerList().iterator();
 
-      if (skinTextures == null) {
-         skinTextures = DefaultSkinHelper.getSteve().texture();
+         while(var11.hasNext()) {
+            PlayerListEntry playerListEntry = (PlayerListEntry)var11.next();
+            if (playerListEntry.getProfile().getName().equals(target.getNameForScoreboard())) {
+               skinTextures = playerListEntry.getSkinTextures().texture();
+               this.skinCache.put(target, skinTextures);
+            }
+         }
+
+         if (skinTextures == null) {
+            skinTextures = DefaultSkinHelper.getSteve().texture();
+            this.skinCache.put(target, skinTextures);
+         }
       }
 
       DrawUtil.drawPlayerHeadWithRoundedShader(ctx.getMatrices(), skinTextures, posX + 4.0F, posY + 4.0F, 22.0F, BorderRadius.all(3.0F), ColorRGBA.WHITE.withAlpha(animation * 255.0F));
       MsdfRenderer.renderText(Fonts.REGULAR, target == mc.player ? NameProtect.getCustomName() : target.getNameForScoreboard(), 7.25F, ColorRGBA.WHITE.withAlpha(animation * 255.0F).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), posX + 29.0F, posY + 5.5F, 0.0F, true, 0.7F, 1.0F, 56.0F);
-      ctx.drawText(Fonts.REGULAR.getFont(6.5F), "HP: " + String.format("%.0f", hp) + (target.getAbsorptionAmount() > 0.0F ? String.format(" (%.1f)", target.getAbsorptionAmount()) : "").replace(",", "."), posX + 29.75F, posY + 14.25F, ColorRGBA.WHITE.withAlpha(animation * 255.0F));
+      float absorption = target.getAbsorptionAmount();
+      ctx.drawText(Fonts.REGULAR.getFont(6.5F), "HP: " + (int)hp + (absorption > 0.0F ? " (" + formatOneDecimal(absorption) + ")" : ""), posX + 29.75F, posY + 14.25F, ColorRGBA.WHITE.withAlpha(animation * 255.0F));
       DrawUtil.drawRoundedRect(ctx.getMatrices(), posX + 29.0F, posY + 22.0F, width - 33.0F, 3.25F, BorderRadius.all(0.25F), theme.getSecondColor().darker(0.5F).withAlpha(animation * 255.0F), theme.getSecondColor().darker(0.5F).withAlpha(animation * 255.0F), theme.getColor().darker(0.5F).withAlpha(animation * 255.0F), theme.getColor().darker(0.5F).withAlpha(animation * 255.0F));
       DrawUtil.drawRoundedRect(ctx.getMatrices(), posX + 29.0F, posY + 22.0F, MathHelper.clamp((width - 33.0F) * this.outdatedHealthAnimation.getValue(), 0.0F, width - 33.0F), 3.25F, BorderRadius.all(0.25F), theme.getSecondColor().darker(0.35F).withAlpha(animation * 255.0F), theme.getSecondColor().darker(0.35F).withAlpha(animation * 255.0F), theme.getColor().darker(0.35F).withAlpha(animation * 255.0F), theme.getColor().darker(0.35F).withAlpha(animation * 255.0F));
       if (this.gappleAnimation.getValue() < this.healthAnimation.getValue()) {
@@ -110,6 +121,10 @@ public class TargetHudComponent extends DraggableHudElement {
 
       this.width = width;
       this.height = height;
+   }
+
+   private static String formatOneDecimal(double value) {
+      return String.valueOf(Math.round(value * 10.0D) / 10.0D);
    }
 
    private void drawArmor(CustomDrawContext ctx, PlayerEntity player, float posX, float posY, float headSize, float padding, float fontSize) {

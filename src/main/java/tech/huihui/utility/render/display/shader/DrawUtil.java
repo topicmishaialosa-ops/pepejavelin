@@ -43,6 +43,7 @@ public final class DrawUtil implements IWindow {
       return new SimpleFramebuffer(1920, 1024, false);
    });
    private static final Framebuffer MAIN_FBO = MinecraftClient.getInstance().getFramebuffer();
+   private static long lastBlurSnapshot = 0L;
 
    public static void initializeShaders() {
       rectangleProgram = new GlProgram(HuihuiClient.id("rectangle/data"), VertexFormats.POSITION_COLOR);
@@ -515,9 +516,13 @@ public final class DrawUtil implements IWindow {
       RenderSystem.enableBlend();
       RenderSystem.defaultBlendFunc();
       RenderSystem.disableCull();
-      fbo.beginWrite(false);
-      MAIN_FBO.draw(fbo.textureWidth, fbo.textureHeight);
-      MAIN_FBO.beginWrite(false);
+      long now = System.currentTimeMillis();
+      if (now - lastBlurSnapshot >= 33L) {
+         lastBlurSnapshot = now;
+         fbo.beginWrite(false);
+         MAIN_FBO.draw(fbo.textureWidth, fbo.textureHeight);
+         MAIN_FBO.beginWrite(false);
+      }
       RenderSystem.setShaderTexture(0, fbo.getColorAttachment());
       blurProgram.use();
       blurProgram.findUniform("Size").set(width, height);

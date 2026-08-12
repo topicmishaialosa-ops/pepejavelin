@@ -50,7 +50,7 @@ public final class Dropdown3Screen extends Screen {
     private static int screenWidth;
     private static int screenHeight;
 
-    private final List<Category> categories = List.of(Category.COMBAT, Category.MOVEMENT, Category.PLAYER, Category.RENDER, Category.MISC);
+    private final List<Category> categories = List.of(Category.COMBAT, Category.MOVEMENT, Category.PLAYER, Category.RENDER, Category.COSMETICS, Category.MISC);
     private final EnumMap<Category, Float> scroll = new EnumMap<>(Category.class);
     private final Map<Module, Boolean> expanded = new HashMap<>();
     private final Map<Module, Float> hover = new HashMap<>();
@@ -65,6 +65,7 @@ public final class Dropdown3Screen extends Screen {
     private StringSetting editingString;
     private boolean bindCapturing;
     private KeySetting bindSetting;
+    private Module bindingModule;
     private String search = "";
     private boolean searchFocused;
     private float scale = 1.0F;
@@ -91,6 +92,7 @@ public final class Dropdown3Screen extends Screen {
         this.draggingPicker = null;
         this.bindCapturing = false;
         this.bindSetting = null;
+        this.bindingModule = null;
         this.editingString = null;
         super.init();
     }
@@ -419,6 +421,12 @@ public final class Dropdown3Screen extends Screen {
         }
         draw.drawText(Fonts.BOLD.getFont(8.0F), module.getName(), x + 10.0F, y + 8.0F, module.isEnabled() ? ColorRGBA.WHITE : new ColorRGBA(208, 214, 222));
 
+        if (this.bindingModule == module) {
+            draw.drawText(this.font(8.0F), "...", x + width - 34.0F, y + 8.0F, accent);
+        } else if (module.getKeyCode() != -1) {
+            draw.drawText(this.font(8.0F), Keyboard.getKeyName(module.getKeyCode()), x + width - 34.0F, y + 8.0F, new ColorRGBA(120, 130, 140));
+        }
+
         if (this.hasVisibleSettings(module)) {
             float cxp = x + width - 12.0F;
             float cyp = y + ROW_HEIGHT / 2.0F - 1.0F;
@@ -458,7 +466,7 @@ public final class Dropdown3Screen extends Screen {
                 currentY += 17.0F + SETTING_GAP;
             } else if (setting instanceof KeySetting key) {
                 draw.drawText(this.font(8.0F), key.getName(), x, currentY + 2.0F, TEXT_MAIN);
-                String keyName = key.getKeyCode() > 0 ? key.getNameKey() : "Нету";
+                String keyName = key.getKeyCode() != -1 ? key.getNameKey() : "Нету";
                 if (this.bindCapturing && this.bindSetting == key) {
                     keyName = "...";
                 }
@@ -593,6 +601,17 @@ public final class Dropdown3Screen extends Screen {
         if (this.closing) {
             return true;
         }
+        if (this.bindCapturing && this.bindSetting != null && button >= 0 && button <= 7) {
+            this.bindSetting.setKeyCode(button);
+            this.bindCapturing = false;
+            this.bindSetting = null;
+            return true;
+        }
+        if (this.bindingModule != null && button >= 0 && button <= 7) {
+            this.bindingModule.setKeyCode(button);
+            this.bindingModule = null;
+            return true;
+        }
         float mx = this.inverseX(mouseX);
         float my = this.inverseY(mouseY);
         float startX = this.startX();
@@ -624,12 +643,21 @@ public final class Dropdown3Screen extends Screen {
                     this.expanded.put(module, value);
                     return true;
                 }
+            } else if (button == 2) {
+                Module module = this.getModuleAt(this.categories.get(i), mx, my, x, startY);
+                if (module != null) {
+                    this.bindingModule = this.bindingModule == module ? null : module;
+                    this.bindCapturing = false;
+                    this.bindSetting = null;
+                    return true;
+                }
             }
         }
         if (button == 0) {
             this.searchFocused = false;
             this.editingString = null;
             this.bindCapturing = false;
+            this.bindingModule = null;
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -679,7 +707,7 @@ public final class Dropdown3Screen extends Screen {
                         continue;
                     }
                     if (setting instanceof KeySetting key) {
-                        float bx = contentX + this.contentWidth() - Math.max(30.0F, this.textWidth(key.getKeyCode() > 0 ? key.getNameKey() : "Нету", 8.0F) + 12.0F);
+                        float bx = contentX + this.contentWidth() - Math.max(30.0F, this.textWidth(key.getKeyCode() != -1 ? key.getNameKey() : "Нету", 8.0F) + 12.0F);
                         if (mouseY >= settingY + 1.0F && mouseY <= settingY + 12.0F && mouseX >= bx && mouseX <= contentX + this.contentWidth()) {
                             this.bindCapturing = true;
                             this.bindSetting = key;
@@ -848,6 +876,15 @@ public final class Dropdown3Screen extends Screen {
             this.bindSetting = null;
             return true;
         }
+        if (this.bindingModule != null) {
+            if (keyCode == 261) {
+                this.bindingModule.setKeyCode(-1);
+            } else if (keyCode != 256) {
+                this.bindingModule.setKeyCode(keyCode);
+            }
+            this.bindingModule = null;
+            return true;
+        }
         if (this.editingString != null) {
             if (keyCode == 259) {
                 String current = this.editingString.getValue();
@@ -908,6 +945,8 @@ public final class Dropdown3Screen extends Screen {
         this.draggingSlider = null;
         this.draggingPicker = null;
         this.bindCapturing = false;
+        this.bindSetting = null;
+        this.bindingModule = null;
         this.editingString = null;
     }
 }

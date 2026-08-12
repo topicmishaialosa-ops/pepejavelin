@@ -29,6 +29,7 @@ import tech.huihui.base.events.impl.render.EventHudRender;
 import tech.huihui.base.events.impl.render.EventRender3D;
 import tech.huihui.base.events.impl.render.EventRenderScreen;
 import tech.huihui.client.modules.impl.render.Interface;
+import tech.huihui.client.modules.impl.render.NoRender;
 import tech.huihui.utility.interfaces.IMinecraft;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
 import tech.huihui.utility.render.display.base.UIContext;
@@ -127,6 +128,17 @@ public abstract class MixinGameRenderer {
    )
    void renderHudHook(RenderTickCounter tickCounter, boolean tick, CallbackInfo callbackInfo) {
       this.triggerHudRenderEvent(tickCounter);
+   }
+
+   @Inject(
+      method = {"bobView"},
+      at = {@At("HEAD")},
+      cancellable = true
+   )
+   private void hookBobView(MatrixStack matrixStack, float tickDelta, CallbackInfo ci) {
+      if (NoRender.INSTANCE.isRemoveBob()) {
+         ci.cancel();
+      }
    }
 
    @Unique

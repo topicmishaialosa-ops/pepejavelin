@@ -20,12 +20,18 @@ import tech.huihui.client.screens.swing.SwingEditorScreen;
 public final class SwingAnimation extends Module {
    public static final SwingAnimation INSTANCE = new SwingAnimation();
    public static float previewProgress = -1.0F;
-   public ModeSetting animationMode = new ModeSetting("Режим", new String[]{"Smooth", "Self", "Self2", "Down", "Forward", "Touch", "Pander", "Curt", "BlockHit", "Spin", "Backhand", "Overhead", "Stab", "Slash", "Reverse", "Flick", "Whip", "Rush", "Upswing", "Hammer", "Tornado", "Rotor", "Bounce", "Jab", "Cross", "Power", "Ghost", "Shake", "Blink", "ReverseSpin", "Swing360", "Flip", "Boomerang", "Cannon", "Pierce", "Wave", "Claw", "Wide", "Aim", "Precise", "Drop", "Vertical", "Custom"});
+   public ModeSetting animationMode = new ModeSetting("Режим", new String[]{"HMI Взмахи", "HMI Вперед", "HMI Обычная", "Smooth", "Self", "Self2", "Down", "Forward", "Touch", "Pander", "Curt", "BlockHit", "Spin", "Backhand", "Overhead", "Stab", "Slash", "Reverse", "Flick", "Whip", "Rush", "Upswing", "Hammer", "Tornado", "Rotor", "Bounce", "Jab", "Cross", "Power", "Ghost", "Shake", "Blink", "ReverseSpin", "Swing360", "Flip", "Boomerang", "Cannon", "Pierce", "Wave", "Claw", "Wide", "Aim", "Precise", "Drop", "Vertical", "Custom"});
    public NumberSetting swingPower = new NumberSetting("Сила", 5.0F, 1.0F, 10.0F, 1.0F);
    public NumberSetting speed = new NumberSetting("Скорость", 7.0F, 0.0F, 20.0F, 1.0F);
    public NumberSetting angle = new NumberSetting("Угол", 0.0F, 0.0F, 360.0F, 1.0F, () -> {
       return this.animationMode.is("Self") || this.animationMode.is("Self2") || this.animationMode.is("Aim") || this.animationMode.is("Precise");
    });
+   public NumberSetting rightX = new NumberSetting("Правая-X", 0.0F, -2.0F, 2.0F, 0.05F);
+   public NumberSetting rightY = new NumberSetting("Правая-Y", 0.0F, -2.0F, 2.0F, 0.05F);
+   public NumberSetting rightZ = new NumberSetting("Правая-Z", 0.0F, -2.0F, 2.0F, 0.05F);
+   public NumberSetting leftX = new NumberSetting("Левая-X", 0.0F, -2.0F, 2.0F, 0.05F);
+   public NumberSetting leftY = new NumberSetting("Левая-Y", 0.0F, -2.0F, 2.0F, 0.05F);
+   public NumberSetting leftZ = new NumberSetting("Левая-Z", 0.0F, -2.0F, 2.0F, 0.05F);
    public NumberSetting customStartX = new NumberSetting("Старт X", 0.0F, -180.0F, 180.0F, 1.0F, this::isCustomMode);
    public NumberSetting customStartY = new NumberSetting("Старт Y", 0.0F, -180.0F, 180.0F, 1.0F, this::isCustomMode);
    public NumberSetting customStartZ = new NumberSetting("Старт Z", 0.0F, -180.0F, 180.0F, 1.0F, this::isCustomMode);
@@ -78,12 +84,17 @@ public final class SwingAnimation extends Module {
    }
 
    public void renderSwordAnimation(MatrixStack matrices, float swingProgress, float equipProgress, Arm arm) {
-       if (this.isPreviewing()) {
-          swingProgress = this.getPreviewProgress();
-       } else {
-          float speedFactor = Math.max(this.speed.getCurrent(), 0.1F) / 7.0F;
-          swingProgress = MathHelper.clamp(swingProgress * speedFactor, 0.0F, 1.0F);
-       }
+        if (this.isPreviewing()) {
+           swingProgress = this.getPreviewProgress();
+        } else {
+           float speedFactor = Math.max(this.speed.getCurrent(), 0.1F) / 7.0F;
+           swingProgress = MathHelper.clamp(swingProgress * speedFactor, 0.0F, 1.0F);
+        }
+      if (arm == Arm.RIGHT) {
+         matrices.translate(this.rightX.getCurrent(), this.rightY.getCurrent(), this.rightZ.getCurrent());
+      } else {
+         matrices.translate(this.leftX.getCurrent(), this.leftY.getCurrent(), this.leftZ.getCurrent());
+      }
       float anim = (float)Math.sin((double)swingProgress * 1.5707963267948966D * 2.0D);
       float sin2 = MathHelper.sin(MathHelper.sqrt(swingProgress) * 3.1415927F);
       float power = this.swingPower.getCurrent();
@@ -93,6 +104,40 @@ public final class SwingAnimation extends Module {
       float g;
       float sinExtra;
       switch(mode) {
+      case "HMI Взмахи": {
+         float swingRot = hmiSwingRot(swingProgress);
+         float swing = hmiEase(MathHelper.sin(swingProgress * 3.1415927F));
+         matrices.translate(0.56F, -0.52F, -0.72F);
+         matrices.translate(0.8F * swingRot, 0.3F * swingRot, -0.5F * swing);
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(15.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-20.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-70.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(40.0F * swing));
+         break;
+      }
+      case "HMI Вперед": {
+         float swingRot = hmiSwingRot(swingProgress);
+         float swing = hmiEase(MathHelper.sin(swingProgress * 3.1415927F));
+         matrices.translate(0.56F, -0.52F, -0.72F);
+         matrices.translate(0.12F * swingRot, 0.04F * swingRot, -0.95F * swing);
+         matrices.translate(0.02F * swing, 0.1F * swing, -0.1F * swingRot);
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(8.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-14.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-18.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(32.0F * swing));
+         break;
+      }
+      case "HMI Обычная": {
+         float swingRot = hmiSwingRot(swingProgress);
+         float swing = hmiEase(MathHelper.sin(swingProgress * 3.1415927F));
+         matrices.translate(0.56F, -0.52F, -0.72F);
+         matrices.translate(0.1F * swingRot, 0.1F * swingRot, -0.1F * swing);
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-30.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-10.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(40.0F * swing));
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(10.0F * swing));
+         break;
+      }
       case "Smooth":
          matrices.translate(0.56F, -0.52F, -0.72F);
          f = power * 10.0F;
@@ -354,6 +399,47 @@ public final class SwingAnimation extends Module {
 
    }
 
+   public void renderArmAnimation(MatrixStack matrices, float swingProgress, Arm arm) {
+      if (this.isPreviewing()) {
+         swingProgress = this.getPreviewProgress();
+      } else {
+         float speedFactor = Math.max(this.speed.getCurrent(), 0.1F) / 7.0F;
+         swingProgress = MathHelper.clamp(swingProgress * speedFactor, 0.0F, 1.0F);
+      }
+      if (arm == Arm.RIGHT) {
+         matrices.translate(this.rightX.getCurrent(), this.rightY.getCurrent(), this.rightZ.getCurrent());
+      } else {
+         matrices.translate(this.leftX.getCurrent(), this.leftY.getCurrent(), this.leftZ.getCurrent());
+      }
+      String mode = this.animationMode.get();
+      float swingRot = hmiSwingRot(swingProgress);
+      float swing = hmiEase(MathHelper.sin(swingProgress * 3.1415927F));
+      switch(mode) {
+      case "HMI Взмахи":
+         matrices.translate(0.8F * swingRot, 0.3F * swingRot, -0.5F * swing);
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(15.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-20.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-70.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(40.0F * swing));
+         break;
+      case "HMI Вперед":
+         matrices.translate(0.12F * swingRot, 0.04F * swingRot, -0.95F * swing);
+         matrices.translate(0.02F * swing, 0.1F * swing, -0.1F * swingRot);
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(8.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-14.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-18.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(32.0F * swing));
+         break;
+      case "HMI Обычная":
+         matrices.translate(0.1F * swingRot, 0.1F * swingRot, -0.1F * swing);
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-30.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-10.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(40.0F * swing));
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(10.0F * swing));
+         break;
+      }
+   }
+
    private void applyEquipOffset(MatrixStack matrices, Arm arm, float equipProgress) {
       int i = arm == Arm.RIGHT ? 1 : -1;
       matrices.translate((float)i * 0.56F, -0.52F + equipProgress * -0.6F, -0.72F);
@@ -367,5 +453,23 @@ public final class SwingAnimation extends Module {
       matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees((float)i * g * -20.0F));
       matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(g * -80.0F));
       matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees((float)i * -45.0F));
+   }
+
+   private static float hmiSwingRot(float swingProgress) {
+      if (swingProgress < 0.6F) {
+         return MathHelper.sin(MathHelper.clamp(swingProgress, 0.0F, 0.12506F) * 12.56F);
+      }
+      return MathHelper.sin(MathHelper.clamp(swingProgress, 0.62532F, 0.75038F) * 12.56F);
+   }
+
+   private static float hmiEase(float value) {
+      float c1 = 1.70158F;
+      float c2 = c1 * 1.525F;
+      if (value < 0.5F) {
+         float doubled = 2.0F * value;
+         return doubled * doubled * ((c2 + 1.0F) * doubled - c2) * 0.5F;
+      }
+      float shifted = 2.0F * value - 2.0F;
+      return (shifted * shifted * ((c2 + 1.0F) * shifted + c2) + 2.0F) * 0.5F;
    }
 }

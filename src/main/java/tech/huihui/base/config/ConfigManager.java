@@ -10,6 +10,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -93,22 +95,18 @@ public class ConfigManager {
                config = new Config(configName);
             }
 
-            String contentPrettyPrint = (new GsonBuilder()).setPrettyPrinting().create().toJson(config.save());
-            contentPrettyPrint = Base64.getEncoder().encodeToString(CryptUtility.encryptData(contentPrettyPrint.getBytes(), "config"));
+             String contentPrettyPrint = (new GsonBuilder()).setPrettyPrinting().create().toJson(config.save());
+             contentPrettyPrint = Base64.getEncoder().encodeToString(CryptUtility.encryptData(contentPrettyPrint.getBytes(), "config"));
 
-            try {
-               FileWriter writer = new FileWriter(config.getFile());
-               writer.write(contentPrettyPrint);
-               writer.close();
-               return true;
-            } catch (IOException var5) {
-               return false;
-            }
-         }
-      } catch (Exception var6) {
-         return false;
-      }
-   }
+             try (java.io.BufferedWriter writer = Files.newBufferedWriter(config.getFile().toPath(), StandardCharsets.UTF_8)) {
+                writer.write(contentPrettyPrint);
+             }
+             return true;
+          }
+       } catch (Exception var6) {
+          return false;
+       }
+    }
 
    @Native
    public Config findConfig(String configName) {

@@ -5,6 +5,9 @@ import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.block.BlockState;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.vehicle.ChestMinecartEntity;
+import net.minecraft.entity.vehicle.MinecartEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.shape.VoxelShape;
@@ -31,6 +34,8 @@ import tech.huihui.utility.render.level.Render3DUtil;
 public final class BlockESP extends Module {
    private static final int MAX_SECTIONS_PER_FRAME = 48;
    private static final long REBUILD_INTERVAL = 1000L;
+   private static final int MINECART_COLOR = 0xFF9E9E9E;
+   private static final int CHEST_MINECART_COLOR = 0xFFD9A800;
 
    public static final BlockESP INSTANCE = new BlockESP();
    private final BooleanSetting radiusEnabled = new BooleanSetting("Радиус", true);
@@ -39,6 +44,8 @@ public final class BlockESP extends Module {
    private final ButtonSetting openPicker = new ButtonSetting("Выбрать блок", BlockPickerScreen::open);
    private final NumberSetting lineWidth = new NumberSetting("Толщина линии", 1.5F, 0.5F, 5.0F, 0.5F);
    private final BooleanSetting fill = new BooleanSetting("Заливка", true);
+   private final BooleanSetting minecarts = new BooleanSetting("Вагонетки", false);
+   private final BooleanSetting chestMinecarts = new BooleanSetting("Вагонетки с сундуком", false);
 
    private final Map<BlockPos, Integer> found = new HashMap();
    private final ArrayDeque<ChunkSectionPos> scanQueue = new ArrayDeque();
@@ -65,6 +72,7 @@ public final class BlockESP extends Module {
       if (mc.world == null || mc.player == null) {
          return;
       }
+      this.renderMinecarts();
       if (this.blocks.isEmpty()) {
          this.found.clear();
          this.scanQueue.clear();
@@ -86,6 +94,40 @@ public final class BlockESP extends Module {
          }
          Box box = shape.isEmpty() ? new Box(pos) : shape.getBoundingBox().offset(pos);
          Render3DUtil.drawBox(box, entry.getValue(), width, true, doFill, false);
+      }
+   }
+
+   private void renderMinecarts() {
+      boolean showMinecarts = this.minecarts.isEnabled();
+      boolean showChestMinecarts = this.chestMinecarts.isEnabled();
+      if (!showMinecarts && !showChestMinecarts) {
+         return;
+      }
+      float width = this.lineWidth.getCurrent();
+      boolean doFill = this.fill.isEnabled();
+      double radiusSq = this.radiusEnabled.isEnabled() ? (double)this.range.getCurrent() * (double)this.range.getCurrent() : Double.MAX_VALUE;
+      for (Entity entity : mc.world.getEntities()) {
+         if (entity.isRemoved()) {
+            continue;
+         }
+         int color;
+         if (entity instanceof ChestMinecartEntity) {
+            if (!showChestMinecarts) {
+               continue;
+            }
+            color = CHEST_MINECART_COLOR;
+         } else if (entity instanceof MinecartEntity) {
+            if (!showMinecarts) {
+               continue;
+            }
+            color = MINECART_COLOR;
+         } else {
+            continue;
+         }
+         if (entity.squaredDistanceTo(mc.player) > radiusSq) {
+            continue;
+         }
+         Render3DUtil.drawBox(entity.getBoundingBox(), color, width, true, doFill, false);
       }
    }
 

@@ -2,8 +2,11 @@ package tech.huihui.base.comand.impl;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import net.minecraft.command.CommandSource;
 import net.minecraft.util.Formatting;
 import ru.nexusguard.protection.annotations.Native;
@@ -40,23 +43,39 @@ public class ConfigCommand extends CommandAbstract {
 
          return 1;
       })));
-      builder.then(literal("dir").executes((context) -> {
-         try {
-            File dir = new File("huihui/configs/");
-            if (!dir.exists()) {
-               MessageUtil.displayInfo(String.valueOf(Formatting.GRAY) + "Ты нахуя папку удалил фрик");
-               dir.mkdirs();
-            } else {
-               MessageUtil.displayInfo(String.valueOf(Formatting.GRAY) + "Открываю папку с конфигами...");
-            }
+builder.then(literal("dir").executes((context) -> {
+          try {
+             File dir = new File("huihui/configs/");
+             if (!dir.exists()) {
+                MessageUtil.displayInfo(String.valueOf(Formatting.GRAY) + "Ты нахуя папку удалил фрик");
+                dir.mkdirs();
+             } else {
+                MessageUtil.displayInfo(String.valueOf(Formatting.GRAY) + "Открываю папку с конфигами...");
+             }
 
-            Runtime.getRuntime().exec("explorer " + dir.getAbsolutePath());
-         } catch (IOException var2) {
-            String var10000 = String.valueOf(Formatting.GRAY);
-            MessageUtil.displayInfo(var10000 + "Ошибка при открытии папки: " + String.valueOf(Formatting.WHITE) + var2.getMessage());
-         }
+             try {
+                Desktop.getDesktop().open(dir);
+             } catch (Exception var3) {
+                try {
+                   String os = System.getProperty("os.name").toLowerCase();
+                   if (os.contains("win")) {
+                      Runtime.getRuntime().exec(new String[]{"explorer", dir.getAbsolutePath()});
+                   } else if (os.contains("mac")) {
+                      Runtime.getRuntime().exec(new String[]{"open", dir.getAbsolutePath()});
+                   } else {
+                      Runtime.getRuntime().exec(new String[]{"xdg-open", dir.getAbsolutePath()});
+                   }
+                } catch (IOException var2) {
+                   String var10000 = String.valueOf(Formatting.GRAY);
+                   MessageUtil.displayInfo(var10000 + "Ошибка при открытии папки: " + String.valueOf(Formatting.WHITE) + var2.getMessage());
+                }
+             }
+          } catch (Exception var5) {
+             String var10001 = String.valueOf(Formatting.GRAY);
+             MessageUtil.displayInfo(var10001 + "Ошибка при открытии папки: " + String.valueOf(Formatting.WHITE) + var5.getMessage());
+          }
 
-         return 1;
-      }));
+          return 1;
+       }));
    }
 }

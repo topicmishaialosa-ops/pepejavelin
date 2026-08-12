@@ -114,12 +114,12 @@ public enum Keyboard {
    KEY_RIGHT_SHIFT("RIGHT_SHIFT", 344),
    KEY_RIGHT_CONTROL("RIGHT_CONTROL", 345),
    KEY_RIGHT_ALT("RIGHT_ALT", 346),
-   MOUSE_1("MOUSE1", 0),
-   MOUSE_2("MOUSE2", 1),
-   MOUSE_3("MOUSE3", 2),
-   MOUSE_4("MOUSE4", 3),
-   MOUSE_5("MOUSE5", 4),
-   KEY_NONE("", -1);
+    MOUSE_1("MOUSE1", 0),
+    MOUSE_2("MOUSE2", 1),
+    MOUSE_3("MOUSE3", 2),
+    MOUSE_4("MOUSE4", 3),
+    MOUSE_5("MOUSE5", 4),
+    KEY_NONE("", -1);
 
    public final String name;
    public final int keyCode;

@@ -60,8 +60,7 @@ public final class Predictions extends Module {
          if (ProjectionUtil.canSee(point.pos)) {
             Font font = Fonts.REGULAR.getFont(7.0F);
             double time = (double)(ticks * 50) / 1000.0D;
-            Object[] var10001 = new Object[]{time};
-            String text = String.format("%.1f", var10001) + " сек";
+            String text = Math.round(time * 10.0D) / 10.0D + " сек";
             float textWidth = font.width(text);
             float padding = 2.0F;
             float centerX = (float)vec3d.getX();

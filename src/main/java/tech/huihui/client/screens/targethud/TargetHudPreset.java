@@ -11,6 +11,9 @@ public class TargetHudPreset {
    private float x = 4.0F;
    private float y = 4.0F;
    private float barThickness = 1.0F;
+   private boolean showSecondBar;
+   private boolean matchBarThickness = true;
+   private float secondBarThickness = 1.0F;
    private float headSize = 1.0F;
    private float headYaw;
    private float headPitch;

@@ -6,9 +6,10 @@ public enum Category {
    COMBAT("Combat", "0"),
    MOVEMENT("Movement", "1"),
    PLAYER("Player", "2"),
-   RENDER("Render", "3"),
-   MISC("Misc", "4"),
-   THEMES("Themes", "G");
+    RENDER("Render", "3"),
+    MISC("Misc", "4"),
+    COSMETICS("Cosmetics", "C"),
+    THEMES("Themes", "G");
 
    private final String name;
    private final String icon;
@@ -30,6 +31,6 @@ public enum Category {
 
 
    private static Category[] $values() {
-      return new Category[]{COMBAT, MOVEMENT, PLAYER, RENDER, MISC, THEMES};
+      return new Category[]{COMBAT, MOVEMENT, PLAYER, RENDER, MISC, COSMETICS, THEMES};
    }
 }

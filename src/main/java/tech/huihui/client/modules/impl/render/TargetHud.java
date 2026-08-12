@@ -74,6 +74,9 @@ public final class TargetHud extends Module {
    public final NumberSetting y = new NumberSetting("Y", 4.0F, 0.0F, 1080.0F, 1.0F);
    private final BooleanSetting hover = new BooleanSetting("Наведение", true);
    public final NumberSetting barThickness = new NumberSetting("Толщина полоски", 1.0F, 0.5F, 3.0F, 0.05F);
+   public final BooleanSetting showSecondBar = new BooleanSetting("Золотая полоска", false);
+   public final BooleanSetting matchBarThickness = new BooleanSetting("Полоски одного размера", true);
+   public final NumberSetting secondBarThickness = new NumberSetting("Толщина золотой полоски", 1.0F, 0.5F, 3.0F, 0.05F);
    public final NumberSetting headSize = new NumberSetting("Размер иконки головы", 1.0F, 0.5F, 2.0F, 0.05F);
    public final NumberSetting headYaw = new NumberSetting("Поворот головы", 0.0F, -180.0F, 180.0F, 1.0F);
    public final NumberSetting headPitch = new NumberSetting("Наклон головы", 0.0F, -90.0F, 90.0F, 1.0F);
@@ -239,6 +242,9 @@ public final class TargetHud extends Module {
       this.x.setCurrent(preset.getX());
       this.y.setCurrent(preset.getY());
       this.barThickness.setCurrent(preset.getBarThickness());
+      this.showSecondBar.setEnabled(preset.isShowSecondBar());
+      this.matchBarThickness.setEnabled(preset.isMatchBarThickness());
+      this.secondBarThickness.setCurrent(preset.getSecondBarThickness());
       this.headSize.setCurrent(preset.getHeadSize());
       this.headYaw.setCurrent(preset.getHeadYaw());
       this.headPitch.setCurrent(preset.getHeadPitch());
@@ -272,6 +278,9 @@ public final class TargetHud extends Module {
       preset.setX(this.x.getCurrent());
       preset.setY(this.y.getCurrent());
       preset.setBarThickness(this.barThickness.getCurrent());
+      preset.setShowSecondBar(this.showSecondBar.isEnabled());
+      preset.setMatchBarThickness(this.matchBarThickness.isEnabled());
+      preset.setSecondBarThickness(this.secondBarThickness.getCurrent());
       preset.setHeadSize(this.headSize.getCurrent());
       preset.setHeadYaw(this.headYaw.getCurrent());
       preset.setHeadPitch(this.headPitch.getCurrent());
@@ -298,30 +307,38 @@ public final class TargetHud extends Module {
       return preset;
    }
 
+   private String cachedSizeType = "";
+   private float[] cachedSize = new float[]{110.0F, 22.0F};
+
    public float[] currentSize() {
-      if (this.type.is("Крупный")) {
-         return new float[]{132.0F, 48.0F};
-      } else if (this.type.is("Маленький")) {
-         return new float[]{84.0F, 20.0F};
-      } else if (this.type.is("Проценты")) {
-         return new float[]{112.0F, 42.0F};
-      } else if (this.type.is("Большая полоса")) {
-         return new float[]{124.0F, 34.0F};
-      } else if (this.type.is("Вертикальный")) {
-         return new float[]{74.0F, 58.0F};
-      } else if (this.type.is("Метал")) {
-         return new float[]{86.0F, 30.0F};
-      } else if (this.type.is("Мини")) {
-         return new float[]{64.0F, 16.0F};
-      } else if (this.type.is("Градиент")) {
-         return new float[]{112.0F, 38.0F};
-       } else if (this.type.is("Боссбар")) {
-          return new float[]{180.0F, 34.0F};
-       } else if (this.type.is("Кружок")) {
-          return new float[]{132.0F, 48.0F};
-       } else {
-          return new float[]{110.0F, 22.0F};
-       }
+      String type = this.type.get();
+      if (!this.cachedSizeType.equals(type)) {
+         this.cachedSizeType = type;
+         if (type.equals("Крупный")) {
+            this.cachedSize = new float[]{132.0F, 48.0F + this.secondBarExtra(4.0F)};
+         } else if (type.equals("Маленький")) {
+            this.cachedSize = new float[]{84.0F, 20.0F + this.secondBarExtra(2.0F)};
+         } else if (type.equals("Проценты")) {
+            this.cachedSize = new float[]{112.0F, 42.0F + this.secondBarExtra(4.0F)};
+         } else if (type.equals("Большая полоса")) {
+            this.cachedSize = new float[]{124.0F, 34.0F + this.secondBarExtra(10.0F)};
+         } else if (type.equals("Вертикальный")) {
+            this.cachedSize = new float[]{74.0F, 58.0F};
+         } else if (type.equals("Метал")) {
+            this.cachedSize = new float[]{86.0F, 30.0F + this.secondBarExtra(3.25F)};
+         } else if (type.equals("Мини")) {
+            this.cachedSize = new float[]{64.0F, 16.0F + this.secondBarExtra(2.0F)};
+         } else if (type.equals("Градиент")) {
+            this.cachedSize = new float[]{112.0F, 38.0F + this.secondBarExtra(5.0F)};
+         } else if (type.equals("Боссбар")) {
+            this.cachedSize = new float[]{180.0F, 34.0F + this.secondBarExtra(8.0F)};
+         } else if (type.equals("Кружок")) {
+            this.cachedSize = new float[]{132.0F, 48.0F + this.secondBarExtra(5.0F)};
+         } else {
+            this.cachedSize = new float[]{110.0F, 22.0F};
+         }
+      }
+      return this.cachedSize;
    }
 
    private void setTarget(LivingEntity target) {      if (target == null) {
@@ -365,12 +382,14 @@ public final class TargetHud extends Module {
    }
 
    private String hpText() {
-      return String.format("%.1f", this.hp()).replace(",", ".");
+      float hp = this.hp();
+      int tenth = Math.round(hp * 10.0F);
+      return tenth / 10 + "." + Math.abs(tenth % 10);
    }
 
    private String percentText() {
       float percent = this.hp() / this.target.getMaxHealth() * 100.0F;
-      return String.format("%.0f", percent) + "%";
+      return Math.round(percent) + "%";
    }
 
    private String bigText() {
@@ -518,6 +537,20 @@ public final class TargetHud extends Module {
 
    private void drawBar(CustomDrawContext ctx, float x, float y, float width, float height, float radius, float alpha) {
       float barHeight = height * this.barThickness.getCurrent();
+      if (this.showSecondBar.isEnabled()) {
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, barHeight, BorderRadius.all(radius), this.trackColor(alpha));
+         float outdatedW = MathHelper.clamp(width * this.outdatedHealthAnimation.getValue(), 0.0F, width);
+         ColorRGBA[] outdated = this.outdatedColors(alpha);
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, outdatedW, barHeight, BorderRadius.all(radius), outdated[0], outdated[1], outdated[2], outdated[3]);
+         float mainW = MathHelper.clamp(width * this.healthAnimation.getValue(), 0.0F, width);
+         ColorRGBA[] main = this.hpColors(this.theme(), alpha);
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, mainW, barHeight, BorderRadius.all(radius), main[0], main[1], main[2], main[3]);
+         float goldH = this.goldBarHeight(height);
+         float goldY = y + barHeight + 2.0F;
+         this.drawGoldTrack(ctx, x, goldY, width, goldH, radius, alpha);
+         this.drawGoldFill(ctx, x, goldY, width, goldH, radius, alpha);
+         return;
+      }
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, barHeight, BorderRadius.all(radius), this.trackColor(alpha));
       float outdatedW = MathHelper.clamp(width * this.outdatedHealthAnimation.getValue(), 0.0F, width);
       ColorRGBA[] outdated = this.outdatedColors(alpha);
@@ -529,6 +562,24 @@ public final class TargetHud extends Module {
       }
       float absW = MathHelper.clamp(width * this.gappleAnimation.getValue(), 0.0F, width);
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, absW, barHeight, BorderRadius.all(radius), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha));
+   }
+
+   private float goldBarHeight(float height) {
+      float thickness = this.matchBarThickness.isEnabled() ? this.barThickness.getCurrent() : this.secondBarThickness.getCurrent();
+      return height * thickness;
+   }
+
+   private void drawGoldTrack(CustomDrawContext ctx, float x, float y, float width, float height, float radius, float alpha) {
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(radius), (new ColorRGBA(84, 64, 10)).withAlpha(170.0F * alpha));
+   }
+
+   private void drawGoldFill(CustomDrawContext ctx, float x, float y, float width, float height, float radius, float alpha) {
+      float absW = MathHelper.clamp(width * this.gappleAnimation.getValue(), 0.0F, width);
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, absW, height, BorderRadius.all(radius), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha));
+   }
+
+   private float secondBarExtra(float heightParam) {
+      return this.showSecondBar.isEnabled() ? this.goldBarHeight(heightParam) + 2.0F : 0.0F;
    }
 
    private Identifier skinTexture() {
@@ -736,7 +787,7 @@ public final class TargetHud extends Module {
       float x = this.x.getCurrent();
       float y = this.y.getCurrent();
       float width = 132.0F;
-      float height = 48.0F;
+      float height = 48.0F + this.secondBarExtra(4.0F);
       this.drawBackground(ctx, x, y, width, height, alpha);
       this.drawHead(ctx, x + 5.0F, y + 5.0F, 32.0F, alpha);
       MsdfRenderer.renderText(Fonts.ROUND_BOLD, this.name(), 8.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 43.0F, y + 6.0F, 0.0F, true, 0.7F, 1.0F, 82.0F);
@@ -745,7 +796,7 @@ public final class TargetHud extends Module {
       ctx.drawText(Fonts.REGULAR.getFont(6.5F), this.secondaryText(), x + 43.0F + Fonts.REGULAR.getWidth(big, 6.5F) + 3.0F, y + 18.0F, this.textColor(alpha));
       this.drawBar(ctx, x + 43.0F, y + 28.0F, 84.0F, 4.0F, 2.0F, alpha);
       if (this.showArmor.isEnabled()) {
-         this.drawArmor(ctx, x + 4.0F, y + 37.0F, 10.0F, alpha);
+         this.drawArmor(ctx, x + 4.0F, y + 37.0F + this.secondBarExtra(4.0F), 10.0F, alpha);
       }
    }
 
@@ -754,7 +805,7 @@ public final class TargetHud extends Module {
       float x = this.x.getCurrent();
       float y = this.y.getCurrent();
       float width = 84.0F;
-      float height = 20.0F;
+      float height = 20.0F + this.secondBarExtra(2.0F);
       this.drawBackground(ctx, x, y, width, height, alpha);
       this.drawHead(ctx, x + 3.0F, y + 3.0F, 14.0F, alpha);
       MsdfRenderer.renderText(Fonts.REGULAR, this.name(), 6.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 20.0F, y + 3.0F, 0.0F, true, 0.7F, 1.0F, 58.0F);
@@ -768,7 +819,7 @@ public final class TargetHud extends Module {
       float x = this.x.getCurrent();
       float y = this.y.getCurrent();
       float width = 112.0F;
-      float height = 42.0F;
+      float height = 42.0F + this.secondBarExtra(4.0F);
       this.drawBackground(ctx, x, y, width, height, alpha);
       MsdfRenderer.renderText(Fonts.REGULAR, this.name(), 7.0F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 56.0F - Fonts.REGULAR.getWidth(this.name(), 7.0F) / 2.0F, y + 4.0F, 0.0F, true, 0.7F, 1.0F, 106.0F);
       ColorRGBA[] colors = this.hpColors(this.theme(), alpha);
@@ -783,7 +834,7 @@ public final class TargetHud extends Module {
       float x = this.x.getCurrent();
       float y = this.y.getCurrent();
       float width = 124.0F;
-      float height = 34.0F;
+      float height = 34.0F + this.secondBarExtra(10.0F);
       this.drawBackground(ctx, x, y, width, height, alpha);
       MsdfRenderer.renderText(Fonts.SEMIBOLD, this.name(), 7.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 6.0F, y + 3.0F, 0.0F, true, 0.7F, 1.0F, 112.0F);
       ctx.drawText(Fonts.REGULAR.getFont(6.0F), this.infoText(), x + 6.0F, y + 11.5F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
@@ -800,23 +851,39 @@ public final class TargetHud extends Module {
       float height = 58.0F;
       this.drawBackground(ctx, x, y, width, height, alpha);
       float barHeight = 50.0F * this.barThickness.getCurrent();
-      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 4.0F, 8.0F, barHeight, BorderRadius.all(2.0F), this.trackColor(alpha));
-      float outdatedH = MathHelper.clamp(barHeight * this.outdatedHealthAnimation.getValue(), 0.0F, barHeight);
       Theme theme = this.theme();
-      ColorRGBA[] outdated = this.outdatedColors(alpha);
-      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 4.0F + barHeight - outdatedH, 8.0F, outdatedH, BorderRadius.all(2.0F), outdated[0], outdated[1], outdated[2], outdated[3]);
-      if (this.gappleAnimation.getValue() < this.healthAnimation.getValue()) {
+      float headX = x + 17.0F;
+      if (this.showSecondBar.isEnabled()) {
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 4.0F, 8.0F, barHeight, BorderRadius.all(2.0F), this.trackColor(alpha));
+         float outdatedH = MathHelper.clamp(barHeight * this.outdatedHealthAnimation.getValue(), 0.0F, barHeight);
+         ColorRGBA[] outdated = this.outdatedColors(alpha);
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 4.0F + barHeight - outdatedH, 8.0F, outdatedH, BorderRadius.all(2.0F), outdated[0], outdated[1], outdated[2], outdated[3]);
          float mainH = MathHelper.clamp(barHeight * this.healthAnimation.getValue(), 0.0F, barHeight);
          ColorRGBA[] main = this.hpColors(theme, alpha);
          DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 4.0F + barHeight - mainH, 8.0F, mainH, BorderRadius.all(2.0F), main[0], main[1], main[2], main[3]);
+         float goldH = this.goldBarHeight(50.0F);
+         this.drawGoldTrack(ctx, x + 14.0F, y + 4.0F, 8.0F, goldH, 2.0F, alpha);
+         float absH = MathHelper.clamp(goldH * this.gappleAnimation.getValue(), 0.0F, goldH);
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 14.0F, y + 4.0F + goldH - absH, 8.0F, absH, BorderRadius.all(2.0F), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha));
+         headX = x + 27.0F;
+      } else {
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 4.0F, 8.0F, barHeight, BorderRadius.all(2.0F), this.trackColor(alpha));
+         float outdatedH = MathHelper.clamp(barHeight * this.outdatedHealthAnimation.getValue(), 0.0F, barHeight);
+         ColorRGBA[] outdated = this.outdatedColors(alpha);
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 4.0F + barHeight - outdatedH, 8.0F, outdatedH, BorderRadius.all(2.0F), outdated[0], outdated[1], outdated[2], outdated[3]);
+         if (this.gappleAnimation.getValue() < this.healthAnimation.getValue()) {
+            float mainH = MathHelper.clamp(barHeight * this.healthAnimation.getValue(), 0.0F, barHeight);
+            ColorRGBA[] main = this.hpColors(theme, alpha);
+            DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 4.0F + barHeight - mainH, 8.0F, mainH, BorderRadius.all(2.0F), main[0], main[1], main[2], main[3]);
+         }
+         float absH = MathHelper.clamp(barHeight * this.gappleAnimation.getValue(), 0.0F, barHeight);
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 4.0F + barHeight - absH, 8.0F, absH, BorderRadius.all(2.0F), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha));
       }
-      float absH = MathHelper.clamp(barHeight * this.gappleAnimation.getValue(), 0.0F, barHeight);
-      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 4.0F + barHeight - absH, 8.0F, absH, BorderRadius.all(2.0F), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha));
-      this.drawHead(ctx, x + 17.0F, y + 4.0F, 22.0F, alpha);
-      MsdfRenderer.renderText(Fonts.REGULAR, this.name(), 7.0F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 17.0F, y + 29.0F, 0.0F, true, 0.7F, 1.0F, 52.0F);
+      this.drawHead(ctx, headX, y + 4.0F, 22.0F, alpha);
+      MsdfRenderer.renderText(Fonts.REGULAR, this.name(), 7.0F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), headX, y + 29.0F, 0.0F, true, 0.7F, 1.0F, 52.0F);
       ColorRGBA[] colors = this.hpColors(theme, alpha);
-      ctx.drawText(Fonts.REGULAR.getFont(6.5F), this.bigText(), x + 17.0F, y + 39.0F, colors[0]);
-      ctx.drawText(Fonts.REGULAR.getFont(5.5F), this.secondaryText(), x + 17.0F, y + 48.0F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
+      ctx.drawText(Fonts.REGULAR.getFont(6.5F), this.bigText(), headX, y + 39.0F, colors[0]);
+      ctx.drawText(Fonts.REGULAR.getFont(5.5F), this.secondaryText(), headX, y + 48.0F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
    }
 
    private void renderMetanoise(CustomDrawContext ctx, float alpha) {
@@ -824,7 +891,7 @@ public final class TargetHud extends Module {
       float x = this.x.getCurrent();
       float y = this.y.getCurrent();
       float width = 86.0F;
-      float height = 30.0F;
+      float height = 30.0F + this.secondBarExtra(3.25F);
       ColorRGBA metanoiseBg = this.customColorsEnabled() ? this.bgColor.getColor().withAlpha(140.0F * alpha) : (new ColorRGBA(0, 0, 0)).withAlpha(140.0F * alpha);
       ColorRGBA metanoiseTint = this.customColorsEnabled() ? this.barColor.getColor().withAlpha(255.0F * alpha) : this.theme().getColor().withAlpha(255.0F * alpha);
       StencilUtil.push();
@@ -847,7 +914,7 @@ public final class TargetHud extends Module {
       float x = this.x.getCurrent();
       float y = this.y.getCurrent();
       float width = 64.0F;
-      float height = 16.0F;
+      float height = 16.0F + this.secondBarExtra(2.0F);
       this.drawBackground(ctx, x, y, width, height, alpha);
       MsdfRenderer.renderText(Fonts.REGULAR, this.name(), 6.0F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 4.0F, y + 1.5F, 0.0F, true, 0.7F, 1.0F, 38.0F);
       ctx.drawText(Fonts.REGULAR.getFont(5.5F), this.bigText(), x + 44.0F, y + 2.0F, this.hpColors(this.theme(), alpha)[0]);
@@ -859,7 +926,7 @@ public final class TargetHud extends Module {
       float x = this.x.getCurrent();
       float y = this.y.getCurrent();
       float width = 112.0F;
-      float height = 38.0F;
+      float height = 38.0F + this.secondBarExtra(5.0F);
       LoadedImage bg = this.loadImage(this.bgImage.getValue());
       if (bg != null) {
          this.drawImageCover(ctx, bg, x, y, width, height, this.radius.getCurrent(), alpha);
@@ -882,8 +949,15 @@ public final class TargetHud extends Module {
       float mainW = MathHelper.clamp(70.0F * this.healthAnimation.getValue(), 0.0F, 70.0F);
       ColorRGBA[] mainBar = this.barColors(alpha);
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 36.0F, y + 27.0F, mainW, barH, BorderRadius.all(2.5F), mainBar[0], mainBar[1], mainBar[2], mainBar[3]);
-      float absW = MathHelper.clamp(70.0F * this.gappleAnimation.getValue(), 0.0F, 70.0F);
-      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 36.0F, y + 27.0F, absW, barH, BorderRadius.all(2.5F), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha));
+      if (this.showSecondBar.isEnabled()) {
+         float goldH = this.goldBarHeight(5.0F);
+         float goldY = y + 27.0F + barH + 2.0F;
+         this.drawGoldTrack(ctx, x + 36.0F, goldY, 70.0F, goldH, 2.5F, alpha);
+         this.drawGoldFill(ctx, x + 36.0F, goldY, 70.0F, goldH, 2.5F, alpha);
+      } else {
+         float absW = MathHelper.clamp(70.0F * this.gappleAnimation.getValue(), 0.0F, 70.0F);
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 36.0F, y + 27.0F, absW, barH, BorderRadius.all(2.5F), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha));
+      }
    }
 
    private void renderBossbar(CustomDrawContext ctx, float alpha) {
@@ -891,7 +965,7 @@ public final class TargetHud extends Module {
       float x = this.x.getCurrent();
       float y = this.y.getCurrent();
       float width = 180.0F;
-      float height = 34.0F;
+      float height = 34.0F + this.secondBarExtra(8.0F);
       this.drawBackground(ctx, x, y, width, height, alpha);
       MsdfRenderer.renderText(Fonts.SEMIBOLD, this.name(), 7.0F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 6.0F, y + 3.0F, 0.0F, true, 0.7F, 1.0F, 168.0F);
       float barH = 8.0F * this.barThickness.getCurrent();
@@ -899,12 +973,23 @@ public final class TargetHud extends Module {
       float mainW = MathHelper.clamp((width - 8.0F) * this.healthAnimation.getValue(), 0.0F, width - 8.0F);
       ColorRGBA[] main = this.hpColors(this.theme(), alpha);
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 13.0F, mainW, barH, BorderRadius.all(2.0F), main[0], main[1], main[2], main[3]);
-      float absW = MathHelper.clamp((width - 8.0F) * this.gappleAnimation.getValue(), 0.0F, width - 8.0F);
-      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 13.0F, absW, barH, BorderRadius.all(2.0F), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha));
+      if (this.showSecondBar.isEnabled()) {
+         float goldH = this.goldBarHeight(8.0F);
+         float goldY = y + 13.0F + barH + 2.0F;
+         this.drawGoldTrack(ctx, x + 4.0F, goldY, width - 8.0F, goldH, 2.0F, alpha);
+         this.drawGoldFill(ctx, x + 4.0F, goldY, width - 8.0F, goldH, 2.0F, alpha);
+      } else {
+         float absW = MathHelper.clamp((width - 8.0F) * this.gappleAnimation.getValue(), 0.0F, width - 8.0F);
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 13.0F, absW, barH, BorderRadius.all(2.0F), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha), (new ColorRGBA(255, 246, 20)).withAlpha(255.0F * alpha));
+      }
       String big = this.bigText();
       MsdfRenderer.renderText(Fonts.BOLD, big, 6.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 90.0F - Fonts.BOLD.getWidth(big, 6.5F) / 2.0F, y + 14.4F, 0.0F);
-      String hpInfo = this.displayMode.is("Проценты") ? this.percentText() : "HP: " + this.hpText() + " / " + String.format("%.0f", this.target.getMaxHealth());
-      ctx.drawText(Fonts.REGULAR.getFont(5.5F), hpInfo, x + 6.0F, y + 25.0F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
+      String hpInfo = this.displayMode.is("Проценты") ? this.percentText() : "HP: " + this.hpText() + " / " + Math.round(this.target.getMaxHealth());
+      float infoY = y + 25.0F;
+      if (this.showSecondBar.isEnabled()) {
+         infoY = y + 13.0F + barH + 2.0F + this.goldBarHeight(8.0F) + 2.0F;
+      }
+      ctx.drawText(Fonts.REGULAR.getFont(5.5F), hpInfo, x + 6.0F, infoY, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
    }
 
    private void renderMinimal(CustomDrawContext ctx, float alpha) {
@@ -922,6 +1007,12 @@ public final class TargetHud extends Module {
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y + 17.0F, mainW, barH, BorderRadius.all(0.75F), main[0], main[1], main[2], main[3]);
       ColorRGBA emptyBar = this.customColorsEnabled() ? this.bgColor.getColor().withAlpha(120.0F * alpha) : (new ColorRGBA(255, 255, 255)).withAlpha(40.0F * alpha);
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x + mainW, y + 17.0F, width - mainW, barH, BorderRadius.all(0.75F), emptyBar, emptyBar, emptyBar, emptyBar);
+      if (this.showSecondBar.isEnabled()) {
+         float goldH = this.goldBarHeight(1.5F);
+         float goldY = y + 17.0F + barH + 2.0F;
+         this.drawGoldTrack(ctx, x, goldY, width, goldH, 0.75F, alpha);
+         this.drawGoldFill(ctx, x, goldY, width, goldH, 0.75F, alpha);
+      }
    }
 
    private void renderCircle(CustomDrawContext ctx, float alpha) {
@@ -929,7 +1020,7 @@ public final class TargetHud extends Module {
       float x = this.x.getCurrent();
       float y = this.y.getCurrent();
       float width = 132.0F;
-      float height = 48.0F;
+      float height = 48.0F + this.secondBarExtra(5.0F);
       this.drawBackground(ctx, x, y, width, height, alpha);
       this.drawHead(ctx, x + 5.0F, y + 5.0F, 32.0F, alpha);
       MsdfRenderer.renderText(Fonts.ROUND_BOLD, this.name(), 8.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), x + 43.0F, y + 6.0F, 0.0F, true, 0.7F, 1.0F, 82.0F);
@@ -947,9 +1038,19 @@ public final class TargetHud extends Module {
       float hp = MathHelper.clamp(this.healthAnimation.getValue(), 0.0F, 1.0F);
       ColorRGBA[] mainColors = this.hpColors(this.theme(), alpha);
       this.drawRing(ctx, centerX, centerY, outerRadius, thickness, -0.25F, -0.25F + hp, mainColors[0]);
-      float abs = MathHelper.clamp(this.gappleAnimation.getValue(), 0.0F, 1.0F);
-      if (abs > 0.0F) {
-         this.drawRing(ctx, centerX, centerY, outerRadius, thickness, -0.25F, -0.25F + abs, (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha));
+      if (this.showSecondBar.isEnabled()) {
+         float goldT = this.goldBarHeight(4.5F);
+         float goldRadius = outerRadius + thickness + 2.5F;
+         this.drawRing(ctx, centerX, centerY, goldRadius, goldT, -0.25F, 0.75F, (new ColorRGBA(84, 64, 10)).withAlpha(170.0F * alpha));
+         float abs = MathHelper.clamp(this.gappleAnimation.getValue(), 0.0F, 1.0F);
+         if (abs > 0.0F) {
+            this.drawRing(ctx, centerX, centerY, goldRadius, goldT, -0.25F, -0.25F + abs, (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha));
+         }
+      } else {
+         float abs = MathHelper.clamp(this.gappleAnimation.getValue(), 0.0F, 1.0F);
+         if (abs > 0.0F) {
+            this.drawRing(ctx, centerX, centerY, outerRadius, thickness, -0.25F, -0.25F + abs, (new ColorRGBA(255, 209, 0)).withAlpha(255.0F * alpha));
+         }
       }
       String big = this.bigText();
       MsdfRenderer.renderText(Fonts.ROUND_BOLD, big, 8.5F, this.textColor(alpha).getRGB(), ctx.getMatrices().peek().getPositionMatrix(), centerX - Fonts.ROUND_BOLD.getWidth(big, 8.5F) / 2.0F, centerY - 3.5F, 0.0F, true, 0.7F, 1.0F, 24.0F);

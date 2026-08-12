@@ -22,6 +22,7 @@ public final class MsdfFont implements IMinecraft {
    private final FontData.MetricsData metrics;
    private final Map<Integer, MsdfGlyph> glyphs;
    private final Map<Integer, Map<Integer, Float>> kernings;
+   private final Map<Float, Font> fontCache = new HashMap<>();
 
    private MsdfFont(String name, AbstractTexture texture, FontData.AtlasData atlas, FontData.MetricsData metrics, Map<Integer, MsdfGlyph> glyphs, Map<Integer, Map<Integer, Float>> kernings) {
       this.name = name;
@@ -134,7 +135,12 @@ public final class MsdfFont implements IMinecraft {
    }
 
    public Font getFont(float size) {
-      return new Font(this, size);
+      Font cached = this.fontCache.get(size);
+      if (cached == null) {
+         cached = new Font(this, size);
+         this.fontCache.put(size, cached);
+      }
+      return cached;
    }
 
    public static MsdfFont.Builder builder() {

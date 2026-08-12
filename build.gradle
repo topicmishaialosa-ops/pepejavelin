@@ -24,6 +24,7 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:${project.loader_version}")
     modImplementation("net.fabricmc.fabric-api:fabric-api:${project.fabric_version}")
     implementation(shadow("dev.redstones.mediaplayerinfo:media-player-info:0.1.0"))
+    implementation(shadow("net.java.dev.jna:jna-platform:5.14.0"))
     compileOnly("org.projectlombok:lombok:1.18.38")
     annotationProcessor("org.projectlombok:lombok:1.18.38")
 }

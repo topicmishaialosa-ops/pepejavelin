@@ -54,7 +54,7 @@ public final class Csgui1Screen extends Screen {
     private static int screenWidth;
     private static int screenHeight;
 
-    private final List<Category> categories = List.of(Category.COMBAT, Category.MOVEMENT, Category.PLAYER, Category.RENDER, Category.MISC);
+    private final List<Category> categories = List.of(Category.COMBAT, Category.MOVEMENT, Category.PLAYER, Category.RENDER, Category.COSMETICS, Category.MISC);
     private final EnumMap<Category, Float> scroll = new EnumMap<>(Category.class);
     private final Map<Module, Boolean> expanded = new HashMap<>();
     private final Map<Module, Float> hover = new HashMap<>();

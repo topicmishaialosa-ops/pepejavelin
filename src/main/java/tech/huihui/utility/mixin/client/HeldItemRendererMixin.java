@@ -10,6 +10,7 @@ import net.minecraft.client.render.item.HeldItemRenderer;
 import net.minecraft.client.render.item.HeldItemRenderer.HandRenderType;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.component.DataComponentTypes;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Arm;
 import net.minecraft.util.Hand;
@@ -23,6 +24,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.At.Shift;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import tech.huihui.client.modules.impl.render.SwingAnimation;
+import tech.huihui.client.modules.impl.render.UseAnimation;
 import tech.huihui.client.modules.impl.render.ViewModel;
 
 @Mixin({HeldItemRenderer.class})
@@ -74,6 +76,13 @@ public abstract class HeldItemRendererMixin {
        if (viewModel.isEnabled() && viewModel.scaleHand.isEnabled()) {
           viewModel.applyHandTransform(matrices, arm);
        }
+       SwingAnimation swingAnimation = SwingAnimation.INSTANCE;
+       if (swingAnimation.isEnabled() && !swingAnimation.isEditorOpen()) {
+          ClientPlayerEntity player = MinecraftClient.getInstance().player;
+          if (player != null && arm == player.getMainArm()) {
+             swingAnimation.renderArmAnimation(matrices, player.getHandSwingProgress(1.0F), arm);
+          }
+       }
     }
 
     @Inject(
@@ -101,15 +110,32 @@ public abstract class HeldItemRendererMixin {
 )}
    )
     public void injectBeforeRenderItem(AbstractClientPlayerEntity player, float tickDelta, float pitch, Hand hand, float swingProgress, ItemStack item, float equipProgress, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, CallbackInfo ci) {
-       ViewModel viewModel = ViewModel.INSTANCE;
-       boolean isMainHand = hand == Hand.MAIN_HAND;
-       Arm arm = isMainHand ? player.getMainArm() : player.getMainArm().getOpposite();
-       SwingAnimation swingAnimation = SwingAnimation.INSTANCE;
-       if (!swingAnimation.isEditorOpen() && viewModel.isEnabled()) {
-          viewModel.applyHandScale(matrices, arm);
-       }
-       viewModel.captureHandScreenPosition(matrices, arm);
-    }
+        ViewModel viewModel = ViewModel.INSTANCE;
+        boolean isMainHand = hand == Hand.MAIN_HAND;
+        Arm arm = isMainHand ? player.getMainArm() : player.getMainArm().getOpposite();
+        SwingAnimation swingAnimation = SwingAnimation.INSTANCE;
+        if (!swingAnimation.isEditorOpen() && viewModel.isEnabled()) {
+           viewModel.applyHandScale(matrices, arm);
+        }
+        viewModel.captureHandScreenPosition(matrices, arm);
+     }
+
+     @Inject(
+        method = {"applyEatOrDrinkTransformation"},
+        at = {@At("HEAD")},
+        cancellable = true
+     )
+     public void injectEatOrDrinkTransformation(MatrixStack matrices, float tickDelta, Arm arm, ItemStack stack, PlayerEntity player, CallbackInfo ci) {
+        UseAnimation useAnimation = UseAnimation.INSTANCE;
+        if (!useAnimation.isEnabled() || useAnimation.mode.is("Vanilla")) {
+           return;
+        }
+        if (!useAnimation.shouldApply(stack, player)) {
+           return;
+        }
+        ci.cancel();
+        useAnimation.apply(matrices, tickDelta, arm, stack, player);
+     }
 
    @Inject(
       method = {"renderFirstPersonItem"},
