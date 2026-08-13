@@ -5,8 +5,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import net.minecraft.command.CommandSource;
 import net.minecraft.text.ClickEvent;
@@ -17,6 +15,7 @@ import net.minecraft.util.Formatting;
 import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.comand.api.CommandAbstract;
+import tech.huihui.client.screens.config.ConfigManagerScreen;
 import tech.huihui.utility.game.other.MessageUtil;
 
 public class ConfigCommand extends CommandAbstract {
@@ -26,6 +25,10 @@ public class ConfigCommand extends CommandAbstract {
 
    @Native
    public void execute(LiteralArgumentBuilder<CommandSource> builder) {
+      builder.then(literal("gui").executes((context) -> {
+         ConfigManagerScreen.open();
+         return 1;
+      }));
       builder.then(literal("save").then(arg("name", StringArgumentType.word()).executes((context) -> {
          String name = (String)context.getArgument("name", String.class);
          boolean success = HuihuiClient.getInstance().getConfigManager().saveConfig(name);

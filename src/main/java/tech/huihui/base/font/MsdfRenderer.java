@@ -66,9 +66,11 @@ public final class MsdfRenderer {
       RenderSystem.setShaderTexture(0, font.getBakedTextureId());
       BufferBuilder builder = Tessellator.getInstance().begin(DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
 
-      for(Iterator var16 = segments.iterator(); var16.hasNext(); currentX += font.getWidth(((FormattedTextProcessor.TextSegment)var16.next()).text(), size)) {
-         FormattedTextProcessor.TextSegment segment = (FormattedTextProcessor.TextSegment)var16.next();
+      Iterator<FormattedTextProcessor.TextSegment> var16 = segments.iterator();
+      while(var16.hasNext()) {
+         FormattedTextProcessor.TextSegment segment = var16.next();
          font.applyGlyphs(matrix, builder, segment.text(), size, thickness * 0.5F * size, spacing - 0.3F, currentX - 0.75F, y + size * 0.7F, z, segment.color(), enableFadeout, fadeoutStart, fadeoutEnd, maxWidth);
+         currentX += font.getWidth(segment.text(), size);
       }
 
       BuiltBuffer builtBuffer = builder.endNullable();
@@ -93,14 +95,16 @@ public final class MsdfRenderer {
       RenderSystem.setShaderTexture(0, font.getBakedTextureId());
       BufferBuilder builder = Tessellator.getInstance().begin(DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
 
-      for(Iterator var17 = segments.iterator(); var17.hasNext(); currentX += font.getWidth(((FormattedTextProcessor.TextSegment)var17.next()).text(), size)) {
-         FormattedTextProcessor.TextSegment segment = (FormattedTextProcessor.TextSegment)var17.next();
+      Iterator<FormattedTextProcessor.TextSegment> var17 = segments.iterator();
+      while(var17.hasNext()) {
+         FormattedTextProcessor.TextSegment segment = var17.next();
          int color = segment.color();
          if (alpha != 255) {
             color = color & 16777215 | (alpha & 255) << 24;
          }
 
          font.applyGlyphs(matrix, builder, segment.text(), size, thickness * 0.5F * size, spacing - 0.3F, currentX - 0.75F, y + size * 0.7F, z, color, enableFadeout, fadeoutStart, fadeoutEnd, maxWidth);
+         currentX += font.getWidth(segment.text(), size);
       }
 
       BuiltBuffer builtBuffer = builder.endNullable();

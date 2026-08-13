@@ -1,9 +1,38 @@
 package tech.huihui.utility.os;
 
+import java.awt.Desktop;
+import java.io.File;
+import java.io.IOException;
+
 public final class OperatingSystem {
     private static final boolean IS_WINDOWS = isWindows();
     private static final boolean IS_MACOS = isMacOS();
-    
+
+    public static boolean openFolder(File folder) {
+        if (folder == null || !folder.exists()) {
+            return false;
+        }
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+            try {
+                Desktop.getDesktop().open(folder);
+                return true;
+            } catch (IOException | UnsupportedOperationException ignored) {
+            }
+        }
+        try {
+            if (IS_WINDOWS) {
+                Runtime.getRuntime().exec(new String[]{"explorer", folder.getAbsolutePath()});
+            } else if (IS_MACOS) {
+                Runtime.getRuntime().exec(new String[]{"open", folder.getAbsolutePath()});
+            } else {
+                Runtime.getRuntime().exec(new String[]{"xdg-open", folder.getAbsolutePath()});
+            }
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     public static boolean isWindows() {
         return isWindowsFallback() || isWindowsRaw();
     }

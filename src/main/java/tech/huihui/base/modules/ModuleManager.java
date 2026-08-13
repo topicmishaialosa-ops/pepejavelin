@@ -28,6 +28,7 @@ import tech.huihui.client.modules.impl.combat.Aimbow;
 import tech.huihui.client.modules.impl.combat.AntiBot;
 import tech.huihui.client.modules.impl.combat.Aura;
 import tech.huihui.client.modules.impl.combat.AutoCrystal;
+import tech.huihui.client.modules.impl.combat.AutoExplosion;
 import tech.huihui.client.modules.impl.combat.AutoGapple;
 import tech.huihui.client.modules.impl.combat.AutoSwap;
 import tech.huihui.client.modules.impl.combat.AutoTotem;
@@ -39,12 +40,13 @@ import tech.huihui.client.modules.impl.misc.AHHelper;
 import tech.huihui.client.modules.impl.misc.AutoAccept;
 import tech.huihui.client.modules.impl.misc.AutoDuel;
 import tech.huihui.client.modules.impl.misc.AutoWarden;
+import tech.huihui.client.modules.impl.misc.BpAuto;
 import tech.huihui.client.modules.impl.misc.BaseFinder;
-import tech.huihui.client.modules.impl.misc.AutoJoiner;
-import tech.huihui.client.modules.impl.misc.AutoKit;
+import tech.huihui.client.modules.impl.misc.AutoJoiner;import tech.huihui.client.modules.impl.misc.AutoKit;
 import tech.huihui.client.modules.impl.misc.AutoRespawn;
 import tech.huihui.client.modules.impl.misc.Autofarm;
 import tech.huihui.client.modules.impl.misc.ClickAction;
+import tech.huihui.client.modules.impl.misc.ChestStealer;
 import tech.huihui.client.modules.impl.misc.CreeperFarm;
 import tech.huihui.client.modules.impl.misc.DiscordRPC;
 import tech.huihui.client.modules.impl.misc.ElytraHelper;
@@ -65,6 +67,7 @@ import tech.huihui.client.modules.impl.movement.AutoSprint;
 import tech.huihui.client.modules.impl.movement.ElytraAccelerate;
 import tech.huihui.client.modules.impl.movement.ElytraBooster;
 import tech.huihui.client.modules.impl.movement.ElytraMotion;
+import tech.huihui.client.modules.impl.movement.ElytraPredict;
 import tech.huihui.client.modules.impl.movement.ElytraRecast;
 import tech.huihui.client.modules.impl.movement.Fly;
 import tech.huihui.client.modules.impl.movement.GuiWalk;
@@ -82,6 +85,7 @@ import tech.huihui.client.modules.impl.player.FastBreak;
 import tech.huihui.client.modules.impl.player.NoDelay;
 import tech.huihui.client.modules.impl.player.NoPush;
 import tech.huihui.client.modules.impl.render.AntiInvisible;
+import tech.huihui.client.modules.impl.render.AspectRatio;
 import tech.huihui.client.modules.impl.render.BlockESP;
 import tech.huihui.client.modules.impl.render.ChunkAnimator;
 import tech.huihui.client.modules.impl.render.Crosshair;
@@ -143,6 +147,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(Aimbow.INSTANCE);
       registerModule(Aura.INSTANCE);
        registerModule(AutoCrystal.INSTANCE);
+       registerModule(AutoExplosion.INSTANCE);
        registerModule(Surround.INSTANCE);
       registerModule(AutoSwap.INSTANCE);
       registerModule(AutoTotem.INSTANCE);
@@ -163,6 +168,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(AirStuck.INSTANCE);
       registerModule(AntiElytraTarget.INSTANCE);
       registerModule(ElytraMotion.INSTANCE);
+      registerModule(ElytraPredict.INSTANCE);
        registerModule(NoWeb.INSTANCE);
         registerModule(SpiderMatrix.INSTANCE);
         registerModule(Scaffold.INSTANCE);
@@ -171,6 +177,7 @@ public final class ModuleManager implements IMinecraft {
 
    private void registerRender() {
       registerModule(Interface.INSTANCE);
+      registerModule(AspectRatio.INSTANCE);
       registerModule(AntiInvisible.INSTANCE);
       registerModule(Menu.INSTANCE);
       registerModule(NoRender.INSTANCE);
@@ -237,6 +244,8 @@ public final class ModuleManager implements IMinecraft {
         registerModule(MineHelper.INSTANCE);
         registerModule(KeyFinder.INSTANCE);
         registerModule(AutoWarden.INSTANCE);
+        registerModule(BpAuto.INSTANCE);
+        registerModule(ChestStealer.INSTANCE);
      }
 
    private void registerModule(Module module) {

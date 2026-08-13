@@ -23,6 +23,7 @@
     "accessors.HandledScreenAccessor",
     "accessors.InGameHudAccessor",
     "accessors.MinecraftClientAccessor",
+    "accessors.ShaderProgramAccessor",
     "client.BackGroundRendererMixin",
     "client.CameraMixin",
     "client.ChatInputSuggestorMixin",

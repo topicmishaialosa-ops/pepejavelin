@@ -15,6 +15,7 @@ import org.joml.Matrix4f;
 import tech.huihui.HuihuiClient;
 import tech.huihui.utility.interfaces.IWindow;
 import tech.huihui.utility.math.MathUtil;
+import tech.huihui.utility.render.VulkanCompatibility;
 import tech.huihui.utility.render.display.Render2DUtil;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomSprite;
@@ -25,9 +26,15 @@ public final class DrawUtil implements IWindow {
    public static final float DEFAULT_SMOOTHNESS = 0.8F;
 
    public static void initializeShaders() {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.initializeShaders();
+      }
    }
 
    public static void updateBuffer() {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.updateBuffer();
+      }
    }
 
    public static void drawLine(MatrixStack matrices, Vec2f from, Vec2f to, ColorRGBA color) {
@@ -123,19 +130,35 @@ public final class DrawUtil implements IWindow {
    }
 
    public static void drawSquircle(MatrixStack matrices, float x, float y, float width, float height, float squirt, BorderRadius borderRadius, ColorRGBA color) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawSquircle(matrices, x, y, width, height, squirt, borderRadius, color);
+         return;
+      }
       ShapeRenderer.drawRoundedRect(matrices, x, y, width, height, borderRadius, color);
    }
 
    public static void drawLoadingRect(MatrixStack matrices, float x, float y, float width, float height, float progress, BorderRadius borderRadius, ColorRGBA color) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawLoadingRect(matrices, x, y, width, height, progress, borderRadius, color);
+         return;
+      }
       float p = Math.max(0.0F, Math.min(1.0F, progress));
       ShapeRenderer.drawRoundedRect(matrices, x, y, width * p, height, borderRadius, color);
    }
 
    public static void drawRoundedRect(MatrixStack matrices, float x, float y, float width, float height, BorderRadius borderRadius, ColorRGBA color) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawRoundedRect(matrices, x, y, width, height, borderRadius, color);
+         return;
+      }
       ShapeRenderer.drawRoundedRect(matrices, x, y, width, height, borderRadius, color);
    }
 
    public static void drawRoundedRect(MatrixStack matrices, float x, float y, float width, float height, BorderRadius borderRadius, ColorRGBA color1, ColorRGBA color2, ColorRGBA color3, ColorRGBA color4) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawRoundedRect(matrices, x, y, width, height, borderRadius, color1, color2, color3, color4);
+         return;
+      }
       ShapeRenderer.drawGradientRoundedRect(matrices, x, y, width, height, borderRadius, color1, color2, color3, color4);
    }
 
@@ -148,14 +171,26 @@ public final class DrawUtil implements IWindow {
          drawRoundedRect(matrices, x, y, width, height, borderRadius, borderColor);
          return;
       }
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawRoundedBorder(matrices, x, y, width, height, borderThickness, borderRadius, borderColor);
+         return;
+      }
       ShapeRenderer.drawRoundedBorder(matrices, x, y, width, height, borderThickness, borderRadius, borderColor);
    }
 
    public static void drawMetanoise(MatrixStack matrices, float x, float y, float w, float h, float time, float radius, ColorRGBA bgColor, ColorRGBA outlineColor) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawMetanoise(matrices, x, y, w, h, time, radius, bgColor, outlineColor);
+         return;
+      }
       drawRoundedRect(matrices, x, y, w, h, BorderRadius.all(radius), bgColor);
    }
 
    public static void drawRoundedCorner(MatrixStack matrices, float x, float y, float width, float height, float borderThikenes, float delta, ColorRGBA color, BorderRadius radius) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawRoundedCorner(matrices, x, y, width, height, borderThikenes, delta, color, radius);
+         return;
+      }
       x -= 0.3F;
       y -= 0.3F;
       width += 0.6F;
@@ -167,6 +202,10 @@ public final class DrawUtil implements IWindow {
    }
 
    public static void drawRoundedCornerOnly(MatrixStack matrices, float x, float y, float width, float height, float borderThickness, BorderRadius borderRadius, ColorRGBA borderColor, float cornerIdex) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawRoundedCornerOnly(matrices, x, y, width, height, borderThickness, borderRadius, borderColor, cornerIdex);
+         return;
+      }
       if (borderThickness <= 0.0F) {
          drawRect(matrices, x, y, width, height, borderColor);
          return;
@@ -239,17 +278,31 @@ public final class DrawUtil implements IWindow {
    }
 
    public static void drawRoundedTexture(MatrixStack matrices, Identifier identifier, float x, float y, float width, float height, BorderRadius borderRadius, ColorRGBA color) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawRoundedTexture(matrices, identifier, x, y, width, height, borderRadius, color);
+         return;
+      }
       ShapeRenderer.drawRoundedTexture(matrices, identifier, x, y, width, height, 0.0F, 0.0F, 1.0F, 1.0F, borderRadius, color);
    }
 
    public static void drawShadow(MatrixStack matrices, float x, float y, float width, float height, float softness, BorderRadius borderRadius, ColorRGBA color) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawShadow(matrices, x, y, width, height, softness, borderRadius, color);
+         return;
+      }
       ShapeRenderer.drawSoftRoundedRect(matrices, x, y, width, height, borderRadius, softness, color);
    }
 
    public static void drawBlurHud(MatrixStack matrices, float x, float y, float width, float height, float blurRadius, BorderRadius borderRadius, ColorRGBA color) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawBlurHud(matrices, x, y, width, height, blurRadius, borderRadius, color);
+      }
    }
 
    public static void drawBlurHudBooleanCheck(MatrixStack matrices, float x, float y, float width, float height, float blurRadius, BorderRadius borderRadius, ColorRGBA color, boolean d, boolean f) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawBlurHudBooleanCheck(matrices, x, y, width, height, blurRadius, borderRadius, color, d, f);
+      }
    }
 
    public static void drawGlow(MatrixStack matrixStack, float x, float y, float width, float height, int glowRadius) {
@@ -257,6 +310,10 @@ public final class DrawUtil implements IWindow {
    }
 
    public static void drawBlur(MatrixStack matrices, float x, float y, float width, float height, float blurRadius, BorderRadius borderRadius, ColorRGBA color) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawBlur(matrices, x, y, width, height, blurRadius, borderRadius, color);
+         return;
+      }
       drawRoundedRect(matrices, x, y, width, height, borderRadius, color);
    }
 
@@ -280,6 +337,10 @@ public final class DrawUtil implements IWindow {
    }
 
    public static void drawPlayerHeadWithRoundedShader(MatrixStack matrices, Identifier skinTexture, float x, float y, float size, BorderRadius borderRadius, ColorRGBA color) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawPlayerHeadWithRoundedShader(matrices, skinTexture, x, y, size, borderRadius, color);
+         return;
+      }
       drawRoundedTextureWithUV(matrices, skinTexture, x, y, size, size, borderRadius, color, 0.125F, 0.125F, 0.25F, 0.25F);
    }
 
@@ -291,6 +352,10 @@ public final class DrawUtil implements IWindow {
    }
 
    public static void drawRoundedTextureWithUV(MatrixStack matrices, Identifier identifier, float x, float y, float width, float height, BorderRadius borderRadius, ColorRGBA color, float u1, float v1, float u2, float v2) {
+      if (!VulkanCompatibility.isVulkanModLoaded()) {
+         GlDrawRenderer.drawRoundedTextureWithUV(matrices, identifier, x, y, width, height, borderRadius, color, u1, v1, u2, v2);
+         return;
+      }
       ShapeRenderer.drawRoundedTexture(matrices, identifier, x, y, width, height, u1, v1, u2, v2, borderRadius, color);
    }
 

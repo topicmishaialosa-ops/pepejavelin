@@ -89,10 +89,11 @@ public class StaffComponent extends DraggableHudElement {
       }
 
       Theme theme = HuihuiClient.getInstance().getThemeManager().getCurrentTheme();
+      String headerText = Lang.t(Interface.INSTANCE.lang.get(), "Администрация", "StaffList", "管理列表");
       DrawUtil.drawBlur(ctx.getMatrices(), posX, posY, this.widthAnimation.getValue(), 14.5F, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, 255.0F * this.alpha.getValue()));
       DrawUtil.drawRoundedRect(ctx.getMatrices(), posX + 15.0F, posY + 1.5F, 0.5F, 12.25F, BorderRadius.all(0.0F), new ColorRGBA(166, 166, 166, 255.0F * this.alpha.getValue()));
       ctx.drawText(Fonts.ICONS2.getFont(7.0F), "\uf728", posX + 5.0F, posY + 4.75F, theme.getColor().withAlpha(255.0F * this.alpha.getValue()));
-      ctx.drawText(Fonts.REGULAR.getFont(7.0F), Lang.t(Interface.INSTANCE.lang.get(), "Администрация", "StaffList", "管理列表"), posX + 19.5F, posY + 4.75F, (new ColorRGBA(-1)).withAlpha(255.0F * this.alpha.getValue()));
+      ctx.drawText(Fonts.REGULAR.getFont(7.0F), headerText, posX + 19.5F, posY + 4.75F, (new ColorRGBA(-1)).withAlpha(255.0F * this.alpha.getValue()));
       posY += 14.5F;
       Iterator var16 = this.modules.entrySet().iterator();
 
@@ -130,7 +131,8 @@ public class StaffComponent extends DraggableHudElement {
          }
       }
 
-      this.widthAnimation.update(defaultWidth);
+      float headerTextWidth = Fonts.REGULAR.getWidth(headerText, 7.0F) + 19.5F + 6.0F;
+      this.widthAnimation.update(Math.max(defaultWidth, headerTextWidth));
       this.width = this.widthAnimation.getValue();
       this.height = height;
    }

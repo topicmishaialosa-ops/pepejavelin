@@ -82,6 +82,7 @@ public final class Aura extends Module {
    private final BooleanSetting predictOnElytra;
    private final BooleanSetting elytraTarget;
    public final NumberSetting predict;
+   public final NumberSetting predictTicks;
    public final BooleanSetting critsOnlyWithSpace;
    private LivingEntity target;
    private float acceleration;
@@ -116,6 +117,7 @@ public final class Aura extends Module {
       this.predictOnElytra = new BooleanSetting("Перегонять противника", true);
       this.elytraTarget = new BooleanSetting("Элитра-таргет", false);
       this.predict = new NumberSetting("Насколько перегонять", 2.0F, 1.0F, 4.0F, 0.1F);
+      this.predictTicks = new NumberSetting("Тики предикта", 10.0F, 1.0F, 60.0F, 1.0F);
       this.critsOnlyWithSpace = new BooleanSetting("Только с пробелом", true);
       this.target = null;
       this.hurtTimer = new Timer();
@@ -242,7 +244,7 @@ public final class Aura extends Module {
          Vec3d eyes = mc.player.getEyePos();
          Vec3d point = this.hvh.isSelected() ? this.target.getBoundingBox().getCenter() : (this.legendsGrief.isSelected() ? MultipointUtils.getNearestPoint(this.target, (double)this.distance.getCurrent()) : MultipointUtils.getMultipoint(this.target, (double)this.distance.getCurrent()));
          if (this.target instanceof PlayerEntity && this.predictOnElytra.isEnabled() && mc.player.isGliding() && this.target.isGliding()) {
-            point = PredictUtils.predict(this.target, this.target.getPos(), mc.player.getEyePos().distanceTo(this.target.getBoundingBox().getCenter()) > 8.0D ? 8.0F : this.predict.getCurrent());
+            point = PredictUtils.predict(this.target, this.target.getPos(), this.predictTicks.getCurrent());
          }
 
          Rotation angle = RotationUtil.fromVec3d(point.subtract(eyes));
@@ -387,7 +389,7 @@ public final class Aura extends Module {
          return false;
       } else if (!AttackUtil.canAttack()) {
          return false;
-      } else if (this.target instanceof PlayerEntity && this.predictOnElytra.isEnabled() && mc.player.isGliding() && this.target.isGliding() && mc.player.getEyePos().distanceTo(PredictUtils.predict(this.target, this.target.getPos(), this.predict.getCurrent())) > 3.0D && mc.player.getEyePos().distanceTo(this.target.getBoundingBox().getCenter()) > 3.0D) {
+      } else if (this.target instanceof PlayerEntity && this.predictOnElytra.isEnabled() && mc.player.isGliding() && this.target.isGliding() && mc.player.getEyePos().distanceTo(PredictUtils.predict(this.target, this.target.getPos(), this.predictTicks.getCurrent())) > 3.0D && mc.player.getEyePos().distanceTo(this.target.getBoundingBox().getCenter()) > 3.0D) {
          return false;
       } else if ((!mc.player.isGliding() || !this.target.isGliding()) && mc.player.getEyePos().distanceTo(MultipointUtils.getNearestPoint(this.target, (double)this.distance.getCurrent())) > (double)this.distance.getCurrent()) {
          return false;
@@ -396,8 +398,7 @@ public final class Aura extends Module {
       }
    }
 
-   private LivingEntity updateTarget() {
-      List<LivingEntity> targets = new ArrayList();
+   private LivingEntity updateTarget() {      List<LivingEntity> targets = new ArrayList();
       Iterator var2 = mc.world.getEntities().iterator();
 
       while(var2.hasNext()) {
@@ -449,7 +450,14 @@ public final class Aura extends Module {
                   if (this.elytraTarget.isEnabled() && entity instanceof PlayerEntity && entity.isGliding()) {
                      reach = Math.max(reach, 20.0F);
                   }
-                  if (mc.player.getEyePos().distanceTo(MultipointUtils.getNearestPoint(entity, (double)reach)) > (double)(mc.player.isGliding() ? 20.0F : reach)) {
+                  boolean glidingPredict = this.predictOnElytra.isEnabled() && mc.player.isGliding() && entity instanceof PlayerEntity && entity.isGliding();
+                  double targetDistance;
+                  if (glidingPredict) {
+                     targetDistance = mc.player.getEyePos().distanceTo(PredictUtils.predict(entity, entity.getPos(), this.predictTicks.getCurrent()));
+                  } else {
+                     targetDistance = mc.player.getEyePos().distanceTo(MultipointUtils.getNearestPoint(entity, reach));
+                  }
+                  if (targetDistance > (double)(mc.player.isGliding() ? 20.0F : reach)) {
                      return false;
                   } else {
                      return !(entity instanceof ArmorStandEntity);
