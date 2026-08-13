@@ -10,8 +10,10 @@ import tech.huihui.base.animations.base.Animation;
 import tech.huihui.base.animations.base.Easing;
 import tech.huihui.base.events.impl.other.EventWindowResize;
 import tech.huihui.base.font.Fonts;
+import tech.huihui.base.lang.Lang;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
+import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
@@ -52,15 +54,16 @@ public class InformationComponent extends DraggableHudElement {
       int pz = (int)Math.floor(mc.player.getZ());
       double speed = Math.hypot(mc.player.getX() - mc.player.prevX, mc.player.getZ() - mc.player.prevZ);
       String coordsText = px + " " + py + " " + pz;
+      String speedUnit = Lang.t(Interface.INSTANCE.lang.get(), " Б/С", " b/s", " 格/秒");
       long scaledSpeed = Math.round(speed * 20.0D * 100.0D);
       String speedText = scaledSpeed / 100L + "." + (scaledSpeed % 100L < 10L ? "0" : "") + scaledSpeed % 100L;
       float coordsWidth = Fonts.REGULAR.getWidth(coordsText, 7.75F);
-      float speedWidth = Fonts.REGULAR.getWidth(speedText, 7.75F);
+      float speedWidth = Fonts.REGULAR.getWidth(speedText + speedUnit, 7.75F);
       DrawUtil.drawBlur(ctx.getMatrices(), 4.0F, this.yAnimation.getValue() - 17.0F, coordsWidth + speedWidth + 49.5F, 14.0F, 11.0F, BorderRadius.all(2.0F), new ColorRGBA(80, 80, 80, 255));
       ctx.drawText(Fonts.ICONS2.getFont(7.5F), "\uf57d", 7.75F, this.yAnimation.getValue() - 12.5F, theme.getColor());
       ctx.drawText(Fonts.REGULAR.getFont(7.5F), coordsText, 18.0F, this.yAnimation.getValue() - 12.5F, ColorRGBA.WHITE);
       DrawUtil.drawRoundedRect(ctx.getMatrices(), 18.5F + coordsWidth + 3.0F, this.yAnimation.getValue() - 11.0F, 2.0F, 2.0F, BorderRadius.all(0.5F), theme.getColor());
       ctx.drawText(Fonts.ICONS2.getFont(7.5F), "\uf70c", 24.0F + coordsWidth + 3.5F, this.yAnimation.getValue() - 12.5F, theme.getColor());
-      ctx.drawText(Fonts.REGULAR.getFont(7.5F), speedText + " Б/С", 24.0F + coordsWidth + 12.0F, this.yAnimation.getValue() - 12.5F, ColorRGBA.WHITE);
+      ctx.drawText(Fonts.REGULAR.getFont(7.5F), speedText + speedUnit, 24.0F + coordsWidth + 12.0F, this.yAnimation.getValue() - 12.5F, ColorRGBA.WHITE);
    }
 }

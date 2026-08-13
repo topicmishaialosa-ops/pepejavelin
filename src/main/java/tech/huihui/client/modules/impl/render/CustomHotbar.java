@@ -4,6 +4,7 @@ import com.darkmagician6.eventapi.EventTarget;
 import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.util.math.Vector2f;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
 import ru.nexusguard.protection.annotations.Native;
@@ -43,6 +44,7 @@ public final class CustomHotbar extends Module {
       "Классика", "Полоска", "Пиксель", "Неон", "Металл", "Градиент", "Радуга", "Стекло", "Минимал", "Цифры"
    };
    private static final ColorRGBA GOLD = new ColorRGBA(255, 200, 40);
+   private static final Identifier STEAK = Identifier.of("minecraft", "textures/item/cooked_beef.png");
    private static final int[] PANEL_RADIUS = new int[]{4, 0, 0, 4, 4, 6, 0, 4, 2, 5, 2, 10, 4, 0, 4, 0, 0, 6, 4, 3};
    private static final int[] SLOT_RADIUS = new int[]{3, 0, 0, 2, 3, 5, 8, 2, 1, 3, 1, 10, 2, 0, 8, 0, 0, 4, 3, 2};
    private static final int[] OFFHAND_POS = new int[]{0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0};
@@ -910,7 +912,20 @@ public final class CustomHotbar extends Module {
       if (fill <= 0.0F) {
          return;
       }
-      ctx.drawRoundedRect(x, y, cell, cell * (fill / 2.0F), BorderRadius.all(cell * 0.22F), color);
+      ColorRGBA tint = ColorRGBA.WHITE;
+      if (fill >= 2.0F) {
+         this.drawStatusSteak(ctx, x, y, cell, tint);
+      } else {
+         float visible = cell * (fill / 2.0F);
+         int sy = (int)(y + cell - visible);
+         ctx.enableScissor((int)x, sy, (int)cell, (int)visible);
+         this.drawStatusSteak(ctx, x, y, cell, tint);
+         ctx.disableScissor();
+      }
+   }
+
+   private void drawStatusSteak(CustomDrawContext ctx, float x, float y, float size, ColorRGBA color) {
+      ctx.drawTexture(STEAK, x, y, size, size, color);
    }
 
    private void renderStatusClassic(CustomDrawContext ctx) {
@@ -1098,8 +1113,9 @@ public final class CustomHotbar extends Module {
          ctx.drawRoundedRect(cx, fy, cell, cell, round, empty);
          if (ff > 0.0F) {
             float visible = cell * (ff / 2.0F);
-            ctx.enableScissor((int)cx, (int)(fy + cell - visible), (int)cell, (int)visible);
-            DrawUtil.drawRoundedRect(ctx.getMatrices(), cx, fy, cell, cell, round, accent, borderColor, borderColor, accent);
+            int sy = (int)(fy + cell - visible);
+            ctx.enableScissor((int)cx, sy, (int)cell, (int)visible);
+            ctx.drawTexture(STEAK, cx, fy, cell, cell, ColorRGBA.WHITE);
             ctx.disableScissor();
          }
       }

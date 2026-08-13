@@ -18,9 +18,11 @@ import tech.huihui.HuihuiClient;
 import tech.huihui.base.animations.base.Animation;
 import tech.huihui.base.animations.base.Easing;
 import tech.huihui.base.font.Fonts;
+import tech.huihui.base.lang.Lang;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
 import tech.huihui.client.modules.api.setting.impl.BooleanSetting;
+import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
@@ -52,6 +54,7 @@ public class PotionsComponent extends DraggableHudElement {
    public void render(CustomDrawContext ctx) {
       if (mc.player != null) {
          this.updatePotions();
+         float spacing = Interface.INSTANCE.hudSpacing.getCurrent();
          float posX = this.getX();
          float posY = this.getY();
          float defaultWidth = 47.0F;
@@ -76,7 +79,7 @@ public class PotionsComponent extends DraggableHudElement {
                int sec = seconds % 60;
                duration = minutes + ":" + (sec < 10 ? "0" : "") + sec;
                durationWidth = Fonts.REGULAR.getWidth(duration, 6.75F) + 4.0F;
-               height += 11.0F * item.animation.getValue();
+               height += spacing * item.animation.getValue();
                if (item.animation.getValue() != 0.0F) {
                   this.alpha.update(1.0F);
                   isFound = true;
@@ -97,7 +100,7 @@ public class PotionsComponent extends DraggableHudElement {
          DrawUtil.drawBlur(ctx.getMatrices(), posX, posY, this.widthAnimation.getValue(), 14.5F, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, 255.0F * this.alpha.getValue()));
          DrawUtil.drawRoundedRect(ctx.getMatrices(), posX + 15.0F, posY + 1.5F, 0.5F, 12.25F, BorderRadius.all(0.0F), new ColorRGBA(166, 166, 166, 255.0F * this.alpha.getValue()));
          ctx.drawText(Fonts.ICONS2.getFont(7.0F), "\uf6e1", posX + 5.0F, posY + 5.0F, theme.getColor().withAlpha(255.0F * this.alpha.getValue()));
-         ctx.drawText(Fonts.REGULAR.getFont(7.0F), "Potions", posX + 19.5F, posY + 4.75F, (new ColorRGBA(-1)).withAlpha(255.0F * this.alpha.getValue()));
+         ctx.drawText(Fonts.REGULAR.getFont(7.0F), Lang.t(Interface.INSTANCE.lang.get(), "Зелья", "Potions", "效果"), posX + 19.5F, posY + 4.75F, (new ColorRGBA(-1)).withAlpha(255.0F * this.alpha.getValue()));
          posY += 14.5F;
          if (this.s1.isEnabled()) {
             Iterator var17 = this.potionItems.iterator();
@@ -109,11 +112,11 @@ public class PotionsComponent extends DraggableHudElement {
                   String amp = this.getAmplifierText(item.amplifier);
                   duration = this.formatDuration(item.durationTicks);
                   Identifier icon = this.getEffectIcon((StatusEffect)item.effect.getEffectType().value());
-                  height += 11.0F;
+                  height += spacing;
                   float elementsWidth = Fonts.REGULAR.getWidth(name, 6.75F) + Fonts.REGULAR.getWidth(amp, 6.75F) + Fonts.REGULAR.getWidth(duration, 6.75F) + 40.0F;
-                  if (this.s2.isEnabled()) {
-                     DrawUtil.drawBlur(ctx.getMatrices(), posX, posY + item.animation.getValue() * 3.0F - 3.0F, this.widthAnimation.getValue(), 11.0F, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, 255.0F * item.animation.getValue() * this.alpha.getValue()));
-                  }
+               if (this.s2.isEnabled()) {
+                  DrawUtil.drawBlur(ctx.getMatrices(), posX, posY + item.animation.getValue() * 3.0F - 3.0F, this.widthAnimation.getValue(), spacing, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, 255.0F * item.animation.getValue() * this.alpha.getValue()));
+               }
 
                   if (this.s3.isEnabled()) {
                      DrawUtil.drawRoundedRect(ctx.getMatrices(), posX + this.widthAnimation.getValue() - 6.5F - this.xLine.getValue(), posY + item.animation.getValue() * 3.0F - 3.0F + 1.5F, 0.5F, 8.75F, BorderRadius.all(0.0F), new ColorRGBA(166, 166, 166, 255.0F * item.animation.getValue() * this.alpha.getValue()));
@@ -139,7 +142,7 @@ public class PotionsComponent extends DraggableHudElement {
                      defaultWidth = elementsWidth;
                   }
 
-                  posY += 11.0F * item.animation.getValue();
+                  posY += spacing * item.animation.getValue();
                }
             }
          }

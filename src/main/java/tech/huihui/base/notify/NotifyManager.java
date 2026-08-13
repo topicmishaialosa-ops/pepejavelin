@@ -17,8 +17,10 @@ import tech.huihui.base.events.impl.other.EventModuleToggle;
 import tech.huihui.base.events.impl.player.EventPickupItem;
 import tech.huihui.base.events.impl.player.EventUpdate;
 import tech.huihui.base.events.impl.server.EventPacket;
+import tech.huihui.base.lang.Lang;
 import tech.huihui.client.hud.elements.component.NotifyComponent;
 import tech.huihui.client.modules.api.Module;
+import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.utility.game.other.NetworkUtils;
 
 public class NotifyManager {
@@ -45,12 +47,16 @@ public class NotifyManager {
       this.notifyComponent = component;
    }
 
+   private String t(String ru, String en, String zh) {
+      return Lang.t(Interface.INSTANCE.lang.get(), ru, en, zh);
+   }
+
    @EventTarget
    private void onUpdate(EventUpdate e) {
       if (this.notifyComponent != null && MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().world != null) {
          if (!MinecraftClient.getInstance().player.getInventory().getArmorStack(3).isEmpty() && Math.abs(MinecraftClient.getInstance().player.getInventory().getArmorStack(3).getDamage() - MinecraftClient.getInstance().player.getInventory().getArmorStack(3).getMaxDamage()) < MinecraftClient.getInstance().player.getInventory().getArmorStack(3).getMaxDamage() / 5) {
             if (!this.notifedHelmet) {
-               this.notifyComponent.addTextNotification("\uf06a", Text.of("Шлем скоро сломается"));
+               this.notifyComponent.addTextNotification("\uf06a", Text.of(this.t("Шлем скоро сломается", "Helmet is about to break", "头盔即将损坏")));
                this.notifedHelmet = true;
             }
          } else {
@@ -59,7 +65,7 @@ public class NotifyManager {
 
          if (!MinecraftClient.getInstance().player.getInventory().getArmorStack(2).isEmpty() && Math.abs(MinecraftClient.getInstance().player.getInventory().getArmorStack(2).getDamage() - MinecraftClient.getInstance().player.getInventory().getArmorStack(2).getMaxDamage()) < MinecraftClient.getInstance().player.getInventory().getArmorStack(2).getMaxDamage() / 5) {
             if (!this.notifedChestplate) {
-               this.notifyComponent.addTextNotification("\uf06a", Text.of(" Нагрудник скоро сломается"));
+               this.notifyComponent.addTextNotification("\uf06a", Text.of(this.t("Нагрудник скоро сломается", "Chestplate is about to break", "胸甲即将损坏")));
                this.notifedChestplate = true;
             }
          } else {
@@ -68,7 +74,7 @@ public class NotifyManager {
 
          if (!MinecraftClient.getInstance().player.getInventory().getArmorStack(1).isEmpty() && Math.abs(MinecraftClient.getInstance().player.getInventory().getArmorStack(1).getDamage() - MinecraftClient.getInstance().player.getInventory().getArmorStack(1).getMaxDamage()) < MinecraftClient.getInstance().player.getInventory().getArmorStack(1).getMaxDamage() / 5) {
             if (!this.notifedLeggings) {
-               this.notifyComponent.addTextNotification("\uf06a", Text.of("Поножи скоро сломаются"));
+               this.notifyComponent.addTextNotification("\uf06a", Text.of(this.t("Поножи скоро сломаются", "Leggings are about to break", "护腿即将损坏")));
                this.notifedLeggings = true;
             }
          } else {
@@ -77,7 +83,7 @@ public class NotifyManager {
 
          if (!MinecraftClient.getInstance().player.getInventory().getArmorStack(0).isEmpty() && Math.abs(MinecraftClient.getInstance().player.getInventory().getArmorStack(0).getDamage() - MinecraftClient.getInstance().player.getInventory().getArmorStack(0).getMaxDamage()) < MinecraftClient.getInstance().player.getInventory().getArmorStack(0).getMaxDamage() / 5) {
             if (!this.notifedBoots) {
-               this.notifyComponent.addTextNotification("\uf06a", Text.of("Ботинки скоро сломаются"));
+               this.notifyComponent.addTextNotification("\uf06a", Text.of(this.t("Ботинки скоро сломаются", "Boots are about to break", "靴子即将损坏")));
                this.notifedBoots = true;
             }
          } else {
@@ -121,7 +127,7 @@ public class NotifyManager {
                   } while(!message.content().getString().contains(player.getNameForScoreboard()));
                } while(!message.content().getString().contains("спек") && !message.content().getString().contains("спеk") && !message.content().getString().contains("spec") && !message.content().getString().contains("spek") && !message.content().getString().contains("911"));
 
-               this.notifyComponent.addTextNotification("\uf06a", Text.of("Игрок %s просит о наблюдении".formatted(new Object[]{player.getNameForScoreboard()})));
+               this.notifyComponent.addTextNotification("\uf06a", Text.of(this.t("Игрок %s просит о наблюдении", "Player %s asks for spectating", "玩家 %s 请求旁观").formatted(new Object[]{player.getNameForScoreboard()})));
             }
          }
 
@@ -151,7 +157,7 @@ public class NotifyManager {
    private void onPickup(EventPickupItem e) {
       if (this.notifyComponent != null && MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().world != null) {
          if (e.getEntity() == MinecraftClient.getInstance().player && (!e.getItemStack().getName().getSiblings().isEmpty() || e.getItemStack().getItem() == Items.ELYTRA)) {
-            this.notifyComponent.addTextNotification("\uf05a", Text.of("Подобран предмет").copy().append(e.getItemStack().getName()));
+            this.notifyComponent.addTextNotification("\uf05a", Text.of(this.t("Подобран предмет", "Picked up item", "拾起物品")).copy().append(e.getItemStack().getName()));
          }
       }
    }

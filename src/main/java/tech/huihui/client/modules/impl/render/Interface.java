@@ -25,7 +25,9 @@ import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
 import tech.huihui.client.modules.api.setting.impl.ButtonSetting;
+import tech.huihui.client.modules.api.setting.impl.ModeSetting;
 import tech.huihui.client.modules.api.setting.impl.MultiBooleanSetting;
+import tech.huihui.client.modules.api.setting.impl.NumberSetting;
 import tech.huihui.client.screens.hud.EditHudScreen;
 import tech.huihui.utility.math.MathUtil;
 import tech.huihui.utility.render.display.Render2DUtil;
@@ -45,6 +47,8 @@ public final class Interface extends Module {
    };
    private static final float[] DEFAULT_OFFSET_X = new float[]{10.0F, 119.15234F, 10.0F, 157.03516F, 10.0F, -122.0F};
    private static final float[] DEFAULT_OFFSET_Y = new float[]{10.0F, 73.0F, 73.0F, -72.5F, 41.5F, 73.0F};
+   public final ModeSetting lang = new ModeSetting("Язык", "Русский", "English", "中文");
+   public final NumberSetting hudSpacing = new NumberSetting("Отступ элементов", 11.0F, 6.0F, 20.0F, 1.0F);
    private final MultiBooleanSetting elementsSetting = MultiBooleanSetting.create("Элементы", List.of("Ватермарка", "Эффекты", "Модераторы", "Уведомления", "Информация", "Бинды"));
    private final List<DraggableHudElement> elements = new ArrayList();
    private DraggableHudElement draggingElement = null;

@@ -7,10 +7,13 @@ import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.font.Fonts;
 import tech.huihui.base.font.MsdfFont;
+import tech.huihui.base.lang.Lang;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
 import tech.huihui.client.modules.impl.misc.NameProtect;
 import tech.huihui.client.modules.impl.misc.RenamePasterClient;
+import tech.huihui.client.modules.impl.render.Watermark;
+import tech.huihui.client.screens.watermark.WatermarkLogo;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
@@ -25,6 +28,8 @@ public class WatermarkComponent extends DraggableHudElement {
 
    @Native
    public void render(CustomDrawContext ctx) {
+      Watermark module = Watermark.INSTANCE;
+      float scale = module.logoScale.getCurrent();
       float x = this.getX();
       float y = this.getY();
       Theme theme = HuihuiClient.getInstance().getThemeManager().getCurrentTheme();
@@ -38,41 +43,52 @@ public class WatermarkComponent extends DraggableHudElement {
       float fpsWidth = Fonts.REGULAR.getWidth(fps, 7.25F);
       float width = 92.5F + nameWidth + latencyWidth + fpsWidth;
       DrawUtil.drawBlur(ctx.getMatrices(), x - 0.5F, y - 1.5F, width, 14.25F, 5.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, 255));
-      ctx.drawText(Fonts.ICONS.getFont(6.5F), "B", x + 3.5F, y + 3.0F, theme.getColor());
+      this.renderCustomIcon(ctx, module, "logo", "B", x + 3.5F, y + 3.0F, 6.5F, theme.getColor());
       ctx.drawText(Fonts.REGULAR.getFont(7.25F), name, x + 12.75F, y + 3.25F, new ColorRGBA(255, 255, 255, 255));
       x += 34.0F;
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.0F, y + 5.25F, 2.0F, 2.0F, BorderRadius.all(0.5F), theme.getColor());
-      ctx.drawText(Fonts.ICONS2.getFont(6.0F), "\uf007", x + 10.0F, y + 3.75F, theme.getColor());
+      this.renderCustomIcon(ctx, module, "nick", "\uf007", x + 10.0F, y + 3.75F, 6.0F, theme.getColor());
       ctx.drawText(Fonts.REGULAR.getFont(7.25F), playerName, x + 18.0F, y + 3.25F, new ColorRGBA(255, 255, 255, 255));
       x += nameWidth + 14.0F;
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 6.0F, y + 5.25F, 2.0F, 2.0F, BorderRadius.all(0.5F), theme.getColor());
-      ctx.drawText(Fonts.ICONS2.getFont(6.0F), "\uf1eb", x + 12.0F, y + 3.65F, theme.getColor());
+      this.renderCustomIcon(ctx, module, "ping", "\uf1eb", x + 12.0F, y + 3.65F, 6.0F, theme.getColor());
       ctx.drawText(Fonts.REGULAR.getFont(7.25F), latency, x + 21.5F, y + 3.25F, new ColorRGBA(255, 255, 255, 255));
       x += latencyWidth + 21.0F;
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 4.5F, y + 5.25F, 2.0F, 2.0F, BorderRadius.all(0.5F), theme.getColor());
-      ctx.drawText(Fonts.ICONS2.getFont(6.0F), "\uf624", x + 11.0F, y + 3.95F, theme.getColor());
+      this.renderCustomIcon(ctx, module, "fps", "\uf624", x + 11.0F, y + 3.95F, 6.0F, theme.getColor());
       ctx.drawText(Fonts.REGULAR.getFont(7.25F), fps, x + 19.0F, y + 3.25F, new ColorRGBA(255, 255, 255, 255));
       float x2 = this.getX();
       float y2 = this.getY() + 15.0F;
       String time = LocalTime.now().format(TIME_FORMAT);
       String tpsText = formatTps(HuihuiClient.getInstance().getServerHandler().getTPS());
-      float serverWidth = Fonts.REGULAR.getWidth(mc.getCurrentServerEntry() != null && mc.getCurrentServerEntry().address != null ? mc.getCurrentServerEntry().address : "Неизвестно", 7.25F);
+      String serverName = mc.getCurrentServerEntry() != null && mc.getCurrentServerEntry().address != null ? mc.getCurrentServerEntry().address : Lang.t(module.lang.get(), "Неизвестно", "Unknown", "未知");
+      float serverWidth = Fonts.REGULAR.getWidth(serverName, 7.25F);
       float timeWidth = Fonts.REGULAR.getWidth(time, 7.25F);
       float tpsWidth = Fonts.REGULAR.getWidth(tpsText + "tps", 7.25F);
       float width2 = 54.0F + serverWidth + timeWidth + tpsWidth;
       DrawUtil.drawBlur(ctx.getMatrices(), x2 - 0.5F, y2 - 1.5F, width2, 14.25F, 5.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, 255));
-      ctx.drawText(Fonts.ICONS2.getFont(6.0F), "\uf0ac", x2 + 3.0F, y2 + 4.0F, theme.getColor());
-      ctx.drawText(Fonts.REGULAR.getFont(7.25F), mc.getCurrentServerEntry() != null && mc.getCurrentServerEntry().address != null ? mc.getCurrentServerEntry().address : "Неизвестно", x2 + 11.5F, y2 + 3.5F, new ColorRGBA(255, 255, 255, 255));
+      this.renderCustomIcon(ctx, module, "server", "\uf0ac", x2 + 3.0F, y2 + 4.0F, 6.0F, theme.getColor());
+      ctx.drawText(Fonts.REGULAR.getFont(7.25F), serverName, x2 + 11.5F, y2 + 3.5F, new ColorRGBA(255, 255, 255, 255));
       x2 += serverWidth + 13.0F;
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x2 + 4.0F, y2 + 5.25F, 2.0F, 2.0F, BorderRadius.all(0.5F), theme.getColor());
-      ctx.drawText(Fonts.ICONS2.getFont(6.0F), "\uf017", x2 + 10.0F, y2 + 3.85F, theme.getColor());
+      this.renderCustomIcon(ctx, module, "time", "\uf017", x2 + 10.0F, y2 + 3.85F, 6.0F, theme.getColor());
       ctx.drawText(Fonts.REGULAR.getFont(7.25F), time, x2 + 18.5F, y2 + 3.25F, new ColorRGBA(255, 255, 255, 255));
       x2 += timeWidth + 17.0F;
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x2 + 5.0F, y2 + 5.25F, 2.0F, 2.0F, BorderRadius.all(0.5F), theme.getColor());
-      ctx.drawText(Fonts.ICONS2.getFont(6.0F), "\uf68f", x2 + 11.5F, y2 + 3.5F, theme.getColor());
+      this.renderCustomIcon(ctx, module, "tps", "\uf68f", x2 + 11.5F, y2 + 3.5F, 6.0F, theme.getColor());
       ctx.drawText(Fonts.REGULAR.getFont(7.25F), tpsText + "tps", x2 + 19.0F, y2 + 3.25F, new ColorRGBA(255, 255, 255, 255));
       this.width = width;
       this.height = 29.0F;
+   }
+
+   private void renderCustomIcon(CustomDrawContext ctx, Watermark module, String id, String fallback, float x, float y, float fontSize, ColorRGBA color) {
+      WatermarkLogo custom = WatermarkLogo.deserialize(module.getIconLogoData(id));
+      if (custom != null && !custom.isEmpty()) {
+         float slot = 8.0F * module.logoScale.getCurrent();
+         custom.renderFit(ctx.getMatrices(), x, y + 0.5F, slot, slot, color);
+      } else {
+         ctx.drawText(Fonts.ICONS2.getFont(fontSize), fallback, x, y, color);
+      }
    }
 
    private static String formatTps(double tps) {

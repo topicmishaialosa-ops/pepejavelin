@@ -56,24 +56,24 @@ public class ConfigManager {
                    return false;
                 }
 
-                try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                   JsonParser parser = new JsonParser();
-                   String encryptedDataBase64 = reader.readLine();
-                   if (encryptedDataBase64 == null || encryptedDataBase64.isBlank()) {
-                      return false;
-                   }
-                   byte[] encryptedData = Base64.getDecoder().decode(encryptedDataBase64);
+                String content = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8).trim();
+                String json;
+                if (content.startsWith("{")) {
+                   json = content;
+                } else {
+                   byte[] encryptedData = Base64.getDecoder().decode(content);
                    byte[] decryptedData = CryptUtility.decryptData(encryptedData, "config");
                    if (decryptedData == null || decryptedData.length == 0) {
                       return false;
                    }
-                   String json = new String(decryptedData, StandardCharsets.UTF_8);
-                   JsonObject object = (JsonObject)parser.parse(json);
-                   config.load(object);
-                   return true;
+                   json = new String(decryptedData, StandardCharsets.UTF_8);
                 }
-             } catch (Exception var13) {
-                var13.printStackTrace();
+
+                JsonObject object = (JsonObject)(new JsonParser()).parse(json);
+                config.load(object);
+                return true;
+             } catch (Exception var12) {
+                var12.printStackTrace();
                 return false;
              }
           }
@@ -95,7 +95,6 @@ public class ConfigManager {
               if (contentPrettyPrint == null || contentPrettyPrint.isBlank()) {
                  return false;
               }
-              contentPrettyPrint = Base64.getEncoder().encodeToString(CryptUtility.encryptData(contentPrettyPrint.getBytes(), "config"));
 
               try (java.io.BufferedWriter writer = Files.newBufferedWriter(config.getFile().toPath(), StandardCharsets.UTF_8)) {
                  writer.write(contentPrettyPrint);

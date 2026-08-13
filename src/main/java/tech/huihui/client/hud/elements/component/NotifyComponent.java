@@ -13,9 +13,11 @@ import tech.huihui.base.animations.base.Animation;
 import tech.huihui.base.animations.base.Easing;
 import tech.huihui.base.font.Font;
 import tech.huihui.base.font.Fonts;
+import tech.huihui.base.lang.Lang;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
 import tech.huihui.client.modules.api.Module;
+import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
@@ -41,6 +43,25 @@ public class NotifyComponent extends DraggableHudElement {
 
    public void addTotemNotification(String name, boolean enchanted) {
       this.notifications.addLast(new NotifyComponent.TotemNotification(name, enchanted));
+   }
+
+   private String lang() {
+      return Interface.INSTANCE.lang.get();
+   }
+
+   private String t(String ru, String en, String zh) {
+      return Lang.t(this.lang(), ru, en, zh);
+   }
+
+   private boolean isSpectateRequest(Text text) {
+      String s = text.getString();
+      if (this.lang().equals("English")) {
+         return s.contains("asks for");
+      }
+      if (this.lang().equals("中文")) {
+         return s.contains("请求");
+      }
+      return s.contains("Игрок ") && s.contains("просит о наблюдении");
    }
 
    @Native
@@ -81,12 +102,13 @@ public class NotifyComponent extends DraggableHudElement {
          ctx.drawText(iconFont, icon, x + (14.5F - iconFont.width(icon)) / 2.0F, y + 0.25F + (notificationHeight - iconFont.height()) / 2.0F, color.withAlpha(255.0F * this.toggleAnimation.getValue()));
       }
 
-      ctx.drawText(textFont, "Пример уведомления", x + 17.0F, y + (12.0F - textFont.height()) / 2.0F, ColorRGBA.WHITE.withAlpha(255.0F * this.toggleAnimation.getValue()));
+      ctx.drawText(textFont, this.t("Пример уведомления", "Example notification", "示例通知"), x + 17.0F, y + (12.0F - textFont.height()) / 2.0F, ColorRGBA.WHITE.withAlpha(255.0F * this.toggleAnimation.getValue()));
 
       NotifyComponent.BaseNotification n;
-      for(Iterator var11 = Lists.reverse(this.notifications).iterator(); var11.hasNext(); y += 8.0F * n.alphaAnimation.getValue()) {
+      float spacing = Interface.INSTANCE.hudSpacing.getCurrent();
+      for(Iterator var11 = Lists.reverse(this.notifications).iterator(); var11.hasNext(); y += spacing * 0.73F * n.alphaAnimation.getValue()) {
          n = (NotifyComponent.BaseNotification)var11.next();
-         y += 4.0F * n.alphaAnimation.getValue();
+         y += spacing * 0.36F * n.alphaAnimation.getValue();
          n.render(ctx, (float)mc.getWindow().getScaledWidth() / 2.0F, y - 4.0F, textFont, theme, notificationHeight, this);
       }
 
@@ -128,7 +150,7 @@ public class NotifyComponent extends DraggableHudElement {
          ColorRGBA textColor = this.enabled ? new ColorRGBA(76, 255, 76, this.alphaAnimation.getValue() * 255.0F) : new ColorRGBA(255, 76, 76, this.alphaAnimation.getValue() * 255.0F);
          String var10000 = this.module.getName();
          String moduleName = " " + var10000;
-         String statusText = this.enabled ? " включена" : " выключена";
+         String statusText = this.enabled ? parent.t(" включена", " enabled", " 已启用") : parent.t(" выключена", " disabled", " 已禁用");
          float moduleNameWidth = Fonts.REGULAR.getWidth(moduleName, 7.25F);
          float statusTextWidth = textFont.width(statusText);
          float width = iconBgWidth + 4.0F + moduleNameWidth + statusTextWidth;
@@ -161,11 +183,12 @@ public class NotifyComponent extends DraggableHudElement {
             this.timestamp = System.currentTimeMillis();
          }
 
-         float iconBgWidth = this.text.getString().contains("Игрок ") && this.text.getString().contains("просит о наблюдении") ? 9.0F : 14.0F;
+         boolean spectate = parent.isSpectateRequest(this.text);
+         float iconBgWidth = spectate ? 9.0F : 14.0F;
          ColorRGBA textColor = this.icon.equals("\uf06a") ? new ColorRGBA(255, 234, 13, this.alphaAnimation.getValue() * 255.0F) : ColorRGBA.WHITE.withAlpha(this.alphaAnimation.getValue() * 255.0F);
          Text moduleName = this.text;
          float moduleNameWidth = textFont.width(moduleName);
-         float width = iconBgWidth + (float)(this.text.getString().contains("Игрок ") && this.text.getString().contains("просит о наблюдении") ? 8 : 6) + moduleNameWidth;
+         float width = iconBgWidth + (float)(spectate ? 8 : 6) + moduleNameWidth;
          Font iconFont = Fonts.ICONS2.getFont(6.75F);
          String icon = this.icon;
          x -= width / 2.0F;
@@ -176,7 +199,7 @@ public class NotifyComponent extends DraggableHudElement {
          ctx.drawText(iconFont, icon, iconX, iconY, textColor);
          float textX = x + iconBgWidth + 3.0F;
          float textY = y + (notificationHeight - textFont.height()) / 2.0F;
-         ctx.drawText(textFont, moduleName, textX + (this.text.getString().contains("Игрок ") && this.text.getString().contains("просит о наблюдении") ? 5.5F : 0.0F), textY, this.alphaAnimation.getValue() * 255.0F);
+         ctx.drawText(textFont, moduleName, textX + (spectate ? 5.5F : 0.0F), textY, this.alphaAnimation.getValue() * 255.0F);
       }
    }
 
@@ -195,7 +218,7 @@ public class NotifyComponent extends DraggableHudElement {
          }
 
          float iconBgWidth = 32.0F;
-         String moduleName = "Игрок %s потерял тотем, зачарован: ".formatted(new Object[]{this.name});
+         String moduleName = parent.t("Игрок %s потерял тотем, зачарован: ", "Player %s lost a totem, enchanted: ", "玩家 %s 失去图腾，已附魔: ").formatted(new Object[]{this.name});
          float moduleNameWidth = textFont.width(moduleName);
          float width = iconBgWidth + 4.0F + moduleNameWidth;
          x -= width / 2.0F;

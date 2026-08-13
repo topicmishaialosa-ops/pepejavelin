@@ -6,6 +6,7 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.font.Fonts;
+import tech.huihui.base.lang.Lang;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
 import tech.huihui.client.modules.api.setting.impl.MultiBooleanSetting;
@@ -43,6 +44,24 @@ public final class EditHudScreen extends Screen implements IMinecraft {
       mc.setScreen(new EditHudScreen());
    }
 
+   private String lang() {
+      return this.module.lang.get();
+   }
+
+   private String t(String ru, String en, String zh) {
+      return Lang.t(this.lang(), ru, en, zh);
+   }
+
+   private String elementName(int index) {
+      if (this.lang().equals("English")) {
+         return new String[]{"Watermark", "Potions", "Staff", "Notifications", "Information", "Keybinds"}[index];
+      }
+      if (this.lang().equals("中文")) {
+         return new String[]{"水印", "效果", "管理", "通知", "信息", "按键"}[index];
+      }
+      return new String[]{"Ватермарка", "Зелья", "Администрация", "Уведомления", "Информация", "Бинды"}[index];
+   }
+
    @Override
    public boolean shouldPause() {
       return false;
@@ -77,10 +96,11 @@ public final class EditHudScreen extends Screen implements IMinecraft {
       float exitY = EXIT_OFFSET;
       boolean exitHovered = MathUtil.isHovered(mouseX, mouseY, exitX, exitY, EXIT_WIDTH, EXIT_HEIGHT);
       DrawUtil.drawRoundedRect(draw.getMatrices(), exitX, exitY, EXIT_WIDTH, EXIT_HEIGHT, BorderRadius.all(3.0F), exitHovered ? themeColor.withAlpha(110) : new ColorRGBA(15, 15, 15).withAlpha(180));
-      draw.drawText(Fonts.REGULAR.getFont(5.5F), "Выход", exitX + EXIT_WIDTH / 2.0F - Fonts.REGULAR.getWidth("Выход", 5.5F) / 2.0F, exitY + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+      String exitText = this.t("Выход", "Exit", "退出");
+      draw.drawText(Fonts.REGULAR.getFont(5.5F), exitText, exitX + EXIT_WIDTH / 2.0F - Fonts.REGULAR.getWidth(exitText, 5.5F) / 2.0F, exitY + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
 
-      draw.drawText(Fonts.REGULAR.getFont(6.0F), "Редактор HUD", EXIT_OFFSET, EXIT_OFFSET, new ColorRGBA(222, 222, 222).withAlpha(255));
-      draw.drawText(Fonts.REGULAR.getFont(5.0F), "Тащи элементы мышью. Чекбоксы справа скрывают их. В чате тоже можно тащить", EXIT_OFFSET, EXIT_OFFSET + 12.0F, new ColorRGBA(153, 153, 153).withAlpha(255));
+      draw.drawText(Fonts.REGULAR.getFont(6.0F), this.t("Редактор HUD", "HUD Editor", "HUD 编辑器"), EXIT_OFFSET, EXIT_OFFSET, new ColorRGBA(222, 222, 222).withAlpha(255));
+      draw.drawText(Fonts.REGULAR.getFont(5.0F), this.t("Тащи элементы мышью. Чекбоксы справа скрывают их. В чате тоже можно тащить", "Drag elements with mouse. Checkboxes on the right hide them. You can also drag in chat", "用鼠标拖动元素。右侧复选框隐藏它们。聊天中也可拖动"), EXIT_OFFSET, EXIT_OFFSET + 12.0F, new ColorRGBA(153, 153, 153).withAlpha(255));
 
       this.renderElements(draw, theme, mouseX, mouseY);
       this.renderPanel(draw, theme, mouseX, mouseY);
@@ -116,25 +136,27 @@ public final class EditHudScreen extends Screen implements IMinecraft {
 
       DrawUtil.drawRoundedRect(draw.getMatrices(), x, y, PANEL_WIDTH, boxH, BorderRadius.all(5.0F), new ColorRGBA(15, 15, 15).withAlpha(210));
       DrawUtil.drawRoundedBorder(draw.getMatrices(), x, y, PANEL_WIDTH, boxH, 1.0F, BorderRadius.all(5.0F), theme.getSecondColor().darker(0.5F).withAlpha(180));
-      draw.drawText(Fonts.REGULAR.getFont(6.0F), "Элементы", x + PANEL_PADDING, y + 12.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+      draw.drawText(Fonts.REGULAR.getFont(6.0F), this.t("Элементы", "Elements", "元素"), x + PANEL_PADDING, y + 12.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
 
       List<DraggableHudElement> elements = this.module.getElements();
       MultiBooleanSetting setting = this.module.getElementsSetting();
       for (int i = 0; i < elements.size(); i++) {
          float rowY = y + 32.0F + (float)i * ROW_HEIGHT;
          boolean enabled = this.isElementEnabled(i);
-         String name = i < setting.getBooleanSettings().size() ? setting.getBooleanSettings().get(i).getName() : elements.get(i).getName();
+         String name = this.elementName(i);
          draw.drawText(Fonts.REGULAR.getFont(5.0F), name, x + PANEL_PADDING, rowY + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
          float tx = x + PANEL_WIDTH - PANEL_PADDING - 50.0F;
          boolean hovered = MathUtil.isHovered(mouseX, mouseY, tx, rowY, 50.0F, 16.0F);
          DrawUtil.drawRoundedRect(draw.getMatrices(), tx, rowY, 50.0F, 16.0F, BorderRadius.all(8.0F), enabled ? theme.getColor().withAlpha(hovered ? 210 : 180) : hovered ? new ColorRGBA(58, 58, 58).withAlpha(255) : new ColorRGBA(40, 40, 40).withAlpha(255));
-         draw.drawText(Fonts.REGULAR.getFont(5.0F), enabled ? "Вкл" : "Выкл", tx + 25.0F - Fonts.REGULAR.getWidth(enabled ? "Вкл" : "Выкл", 5.0F) / 2.0F, rowY + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+         String toggleText = this.t(enabled ? "Вкл" : "Выкл", enabled ? "On" : "Off", enabled ? "开" : "关");
+         draw.drawText(Fonts.REGULAR.getFont(5.0F), toggleText, tx + 25.0F - Fonts.REGULAR.getWidth(toggleText, 5.0F) / 2.0F, rowY + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
       }
 
       float resetY = y + 32.0F + (float)elements.size() * ROW_HEIGHT + 10.0F;
       boolean resetHovered = MathUtil.isHovered(mouseX, mouseY, x + PANEL_PADDING, resetY, PANEL_WIDTH - PANEL_PADDING * 2.0F, 16.0F);
       DrawUtil.drawRoundedRect(draw.getMatrices(), x + PANEL_PADDING, resetY, PANEL_WIDTH - PANEL_PADDING * 2.0F, 16.0F, BorderRadius.all(3.0F), resetHovered ? theme.getColor().withAlpha(110) : new ColorRGBA(40, 40, 40).withAlpha(255));
-      draw.drawText(Fonts.REGULAR.getFont(5.0F), "Сбросить позиции", x + PANEL_WIDTH / 2.0F - Fonts.REGULAR.getWidth("Сбросить позиции", 5.0F) / 2.0F, resetY + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
+      String resetText = this.t("Сбросить позиции", "Reset positions", "重置位置");
+      draw.drawText(Fonts.REGULAR.getFont(5.0F), resetText, x + PANEL_WIDTH / 2.0F - Fonts.REGULAR.getWidth(resetText, 5.0F) / 2.0F, resetY + 5.0F, new ColorRGBA(222, 222, 222).withAlpha(255));
    }
 
    private boolean isElementEnabled(int index) {
