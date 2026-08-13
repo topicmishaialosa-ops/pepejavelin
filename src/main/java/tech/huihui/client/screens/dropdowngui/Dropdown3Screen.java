@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -14,6 +15,7 @@ import net.minecraft.util.math.Vec2f;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.font.Font;
 import tech.huihui.base.font.Fonts;
+import tech.huihui.base.theme.Theme;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.setting.Setting;
@@ -30,6 +32,7 @@ import tech.huihui.client.modules.impl.render.EditClickGUI;
 import tech.huihui.utility.render.display.Keyboard;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
+import tech.huihui.utility.render.display.base.ToggleSwitch;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
 import tech.huihui.utility.render.display.shader.DrawUtil;
 
@@ -52,10 +55,13 @@ public final class Dropdown3Screen extends Screen {
 
     private final List<Category> categories = List.of(Category.COMBAT, Category.MOVEMENT, Category.PLAYER, Category.RENDER, Category.COSMETICS, Category.MISC);
     private final EnumMap<Category, Float> scroll = new EnumMap<>(Category.class);
+    private final Map<Category, Float> displayScroll = new HashMap<>();
+    private final Map<Category, Float> displayVelocity = new HashMap<>();
     private final Map<Module, Boolean> expanded = new HashMap<>();
     private final Map<Module, Float> hover = new HashMap<>();
     private final Map<Module, Float> expandProgress = new HashMap<>();
     private final Map<Setting, Float> toggleProgress = new HashMap<>();
+    private final Map<Setting, Float> sliderProgress = new HashMap<>();
     private final Map<ColorSetting, float[]> hsb = new HashMap<>();
 
     private boolean closing;
@@ -69,6 +75,7 @@ public final class Dropdown3Screen extends Screen {
     private String search = "";
     private boolean searchFocused;
     private float scale = 1.0F;
+    private final ThemePicker themePicker = new ThemePicker();
 
     public Dropdown3Screen() {
         super(Text.literal("Dark Client ClickGUI"));
@@ -94,6 +101,7 @@ public final class Dropdown3Screen extends Screen {
         this.bindSetting = null;
         this.bindingModule = null;
         this.editingString = null;
+        this.themePicker.reset();
         super.init();
     }
 
@@ -157,6 +165,29 @@ public final class Dropdown3Screen extends Screen {
 
     private float panelX(int index) {
         return this.startX() + (float) index * (this.panelWidth() + this.panelGap());
+    }
+
+    private float themeX() {
+        return this.startX() + (this.totalWidth() - this.themePicker.width()) / 2.0F;
+    }
+
+    private float themeY() {
+        return this.startY() - 34.0F - 8.0F - ThemePicker.BOX_HEIGHT;
+    }
+
+    private void renderTheme(CustomDrawContext draw, float mouseX, float mouseY) {
+        Theme theme = HuihuiClient.getInstance().getThemeManager().getCurrentTheme();
+        this.themePicker.render(draw, theme, this.panelBg(), GREEN_BAR, TEXT_MAIN, 1.0F, this.themeX(), this.themeY(), mouseX, mouseY, new ThemePicker.Scissor() {
+            @Override
+            public void enable(float x, float y, float width, float height) {
+                Dropdown3Screen.this.scissor(draw, x, y, width, height);
+            }
+
+            @Override
+            public void disable() {
+                draw.disableScissor();
+            }
+        });
     }
 
     private void updateLayout() {
@@ -320,6 +351,7 @@ public final class Dropdown3Screen extends Screen {
         for (int i = 0; i < this.categories.size(); i++) {
             this.renderPanel(draw, this.categories.get(i), i, this.panelX(i), startY, lx, ly);
         }
+        this.renderTheme(draw, lx, ly);
         context.getMatrices().pop();
     }
 
@@ -360,8 +392,16 @@ public final class Dropdown3Screen extends Screen {
 
         List<Module> mods = this.modulesOf(cat);
         float maxScroll = this.calculateMaxScroll(mods);
-        float offset = MathHelper.clamp(this.scroll.getOrDefault(cat, 0.0F), 0.0F, maxScroll);
-        this.scroll.put(cat, offset);
+        float targetScroll = MathHelper.clamp(this.scroll.getOrDefault(cat, 0.0F), 0.0F, maxScroll);
+        this.scroll.put(cat, targetScroll);
+        float display = this.displayScroll.getOrDefault(cat, targetScroll);
+        if (EditClickGUI.INSTANCE.isSmoothScroll()) {
+            display = this.updateScroll(display, targetScroll, cat, false);
+        } else {
+            display = targetScroll;
+        }
+        this.displayScroll.put(cat, display);
+        float offset = display;
 
         this.scissor(draw, x + 1.0F, y + HEADER_HEIGHT, width - 2.0F, height - HEADER_HEIGHT - 3.0F);
         float currentY = y + HEADER_HEIGHT + 7.0F - offset;
@@ -407,6 +447,39 @@ public final class Dropdown3Screen extends Screen {
             }
         }
         return Math.max(0.0F, total - (this.panelHeight() - HEADER_HEIGHT - 10.0F));
+    }
+
+    private float scrollSmoothing() {
+        float speed = EditClickGUI.INSTANCE.getScrollSpeed();
+        float dt = Math.max(1.0F, this.getTickDelta());
+        float k = 1.0F - (float) Math.pow(1.0D - Math.min(1.0D, (double) speed / 60.0D), (double) dt);
+        return Math.max(0.001F, Math.min(1.0F, k));
+    }
+
+    private float updateScroll(float display, float target, Category cat, boolean edge) {
+        float elasticity = EditClickGUI.INSTANCE.getScrollElasticity();
+        if (elasticity <= 0.001F) {
+            float k = this.scrollSmoothing();
+            float next = display + (target - display) * k;
+            if (Math.abs(target - next) < 0.05F) {
+                next = target;
+            }
+            return next;
+        }
+        float dt = Math.max(1.0F, this.getTickDelta());
+        this.displayScroll.put(cat, display);
+        float vel = this.displayVelocity.getOrDefault(cat, 0.0F);
+        float stiffness = 0.05F + elasticity / 100.0F * 0.35F;
+        float damping = Math.max(0.55F, 0.92F - elasticity / 100.0F * 0.30F);
+        vel += (target - display) * stiffness * dt;
+        vel *= (float) Math.pow((double) damping, (double) dt);
+        float next = display + vel * dt;
+        this.displayVelocity.put(cat, vel);
+        return next;
+    }
+
+    private float getTickDelta() {
+        return MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(false);
     }
 
     private void renderModule(CustomDrawContext draw, Module module, float x, float y, float width, float totalHeight, float mouseX, float mouseY, ColorRGBA accent) {
@@ -461,8 +534,9 @@ public final class Dropdown3Screen extends Screen {
                     toggle = bool.isEnabled() ? 1.0F : 0.0F;
                 }
                 this.toggleProgress.put(setting, toggle);
-                DrawUtil.drawRoundedRect(draw.getMatrices(), x + width - 22.0F, currentY + 1.0F, 22.0F, 11.0F, BorderRadius.all(6.0F), toggle > 0.01F ? GREEN_SWITCH : new ColorRGBA(255, 255, 255, 24));
-                DrawUtil.drawRoundedRect(draw.getMatrices(), x + width - 17.0F + toggle * 12.0F - 5.0F, currentY + 1.5F, 10.0F, 10.0F, BorderRadius.all(999.0F), ColorRGBA.WHITE);
+                float sw = 26.0F;
+                float sh = 13.0F;
+                ToggleSwitch.render(draw, x + width - sw - 6.0F, currentY + 1.0F, sw, sh, toggle, accent, new ColorRGBA(255, 255, 255, 22));
                 currentY += 17.0F + SETTING_GAP;
             } else if (setting instanceof KeySetting key) {
                 draw.drawText(this.font(8.0F), key.getName(), x, currentY + 2.0F, TEXT_MAIN);
@@ -480,9 +554,17 @@ public final class Dropdown3Screen extends Screen {
                 draw.drawText(this.font(8.0F), value, x + width - this.textWidth(value, 8.0F), currentY, TEXT_DIM);
                 float trackY = currentY + 14.0F;
                 float pct = (slider.getMax() - slider.getMin()) <= 0.0F ? 0.0F : (slider.getCurrent() - slider.getMin()) / (slider.getMax() - slider.getMin());
+                float smooth = this.sliderProgress.getOrDefault(slider, pct);
+                float k = EditClickGUI.INSTANCE.getSliderSmoothness();
+                float kk = this.draggingSlider == slider ? Math.max(k, 0.45F) : k;
+                smooth += (pct - smooth) * kk;
+                if (Math.abs(pct - smooth) < 0.001F) {
+                    smooth = pct;
+                }
+                this.sliderProgress.put(slider, smooth);
                 DrawUtil.drawRoundedRect(draw.getMatrices(), x, trackY, width, 3.0F, BorderRadius.all(2.0F), new ColorRGBA(255, 255, 255, 18));
-                DrawUtil.drawRoundedRect(draw.getMatrices(), x, trackY, Math.max(3.0F, width * pct), 3.0F, BorderRadius.all(2.0F), accent);
-                DrawUtil.drawRoundedRect(draw.getMatrices(), x + width * pct - 4.0F, trackY - 2.5F, 8.0F, 8.0F, BorderRadius.all(999.0F), ColorRGBA.WHITE);
+                DrawUtil.drawRoundedRect(draw.getMatrices(), x, trackY, Math.max(3.0F, width * smooth), 3.0F, BorderRadius.all(2.0F), accent);
+                DrawUtil.drawRoundedRect(draw.getMatrices(), x + width * smooth - 4.0F, trackY - 2.5F, 8.0F, 8.0F, BorderRadius.all(999.0F), ColorRGBA.WHITE);
                 currentY += 24.0F + SETTING_GAP;
             } else if (setting instanceof ModeSetting mode) {
                 draw.drawText(this.font(8.0F), mode.getName() + ": " + mode.get(), x, currentY, TEXT_MAIN);
@@ -558,10 +640,7 @@ public final class Dropdown3Screen extends Screen {
         DrawUtil.drawRoundedRect(draw.getMatrices(), knobX - 3.0F, knobY - 3.0F, 6.0F, 6.0F, BorderRadius.all(999.0F), ColorRGBA.WHITE);
 
         float sliderX = x + pickerW + 5.0F;
-        for (int i = 0; i < (int) PICKER_H; i++) {
-            float rowHue = (float) i / PICKER_H;
-            DrawUtil.drawRect(draw.getMatrices(), sliderX, y + (float) i, 4.0F, 1.0F, ColorRGBA.fromHSB(rowHue, 1.0F, 1.0F));
-        }
+        DrawUtil.drawHueBar(draw.getMatrices(), sliderX, y, 4.0F, PICKER_H, 255.0F);
         float hueKnobY = y + hsb[0] * PICKER_H;
         DrawUtil.drawRoundedRect(draw.getMatrices(), sliderX - 2.5F, hueKnobY - 4.0F, 9.0F, 8.0F, BorderRadius.all(4.0F), ColorRGBA.BLACK);
         DrawUtil.drawRoundedRect(draw.getMatrices(), sliderX - 1.5F, hueKnobY - 3.0F, 7.0F, 6.0F, BorderRadius.all(3.0F), ColorRGBA.WHITE);
@@ -616,6 +695,12 @@ public final class Dropdown3Screen extends Screen {
         float my = this.inverseY(mouseY);
         float startX = this.startX();
         float startY = this.startY();
+        if (this.themePicker.mouseClicked(mx, my, this.themeX(), this.themeY())) {
+            this.searchFocused = false;
+            this.editingString = null;
+            this.bindCapturing = false;
+            return true;
+        }
         if (my >= startY - 34.0F && my <= startY - 10.0F && mx >= startX && mx <= startX + this.totalWidth()) {
             this.searchFocused = true;
             this.editingString = null;
@@ -663,7 +748,7 @@ public final class Dropdown3Screen extends Screen {
     }
 
     private Module getModuleAt(Category cat, float mouseX, float mouseY, float x, float y) {
-        float currentY = y + HEADER_HEIGHT + 7.0F - this.scroll.getOrDefault(cat, 0.0F);
+        float currentY = y + HEADER_HEIGHT + 7.0F - this.displayScroll.getOrDefault(cat, this.scroll.getOrDefault(cat, 0.0F));
         for (Module module : this.modulesOf(cat)) {
             if (!this.visible(module)) {
                 continue;
@@ -680,7 +765,7 @@ public final class Dropdown3Screen extends Screen {
     }
 
     private boolean handleSettingClick(Category cat, float mouseX, float mouseY, float panelX, float panelY) {
-        float currentY = panelY + HEADER_HEIGHT + 7.0F - this.scroll.getOrDefault(cat, 0.0F);
+        float currentY = panelY + HEADER_HEIGHT + 7.0F - this.displayScroll.getOrDefault(cat, this.scroll.getOrDefault(cat, 0.0F));
         for (Module module : this.modulesOf(cat)) {
             if (!this.visible(module)) {
                 continue;
@@ -697,9 +782,9 @@ public final class Dropdown3Screen extends Screen {
                     }
                     float height = this.settingHeight(setting);
                     if (setting instanceof BooleanSetting bool) {
-                        float switchX = panelX + this.panelWidth() - 39.0F;
+                        float switchX = panelX + this.panelWidth() - 42.0F;
                         float switchY = settingY + 1.0F;
-                        if (mouseX >= switchX && mouseX <= switchX + 22.0F && mouseY >= switchY && mouseY <= switchY + 11.0F) {
+                        if (mouseX >= switchX && mouseX <= switchX + 26.0F && mouseY >= switchY && mouseY <= switchY + 13.0F) {
                             bool.setEnabled(!bool.isEnabled());
                             return true;
                         }

@@ -47,6 +47,9 @@ public class ClickGuiScreen extends Screen implements IClient {
    private boolean searchFocused;
    private float scale = 1.0F;
    private Module hoveredModule;
+   private String searchLower = "";
+   private String searchQwerty = "";
+   private boolean searchDirty = true;
 
    private static float transformScale = 1.0F;
    private static int screenWidth;
@@ -73,6 +76,11 @@ public class ClickGuiScreen extends Screen implements IClient {
       this.searchText = "";
       this.searchFocused = false;
       this.themeOpen = false;
+      this.searchDirty = true;
+   }
+
+   public float getTickDelta() {
+      return mc.getRenderTickCounter().getTickDelta(false);
    }
 
    public void setHoveredModule(Module module) {
@@ -206,10 +214,13 @@ public class ClickGuiScreen extends Screen implements IClient {
       if (this.searchText.isEmpty()) {
          return true;
       }
-      String text = this.searchText.toLowerCase(Locale.ROOT);
+      if (this.searchDirty) {
+         this.searchLower = this.searchText.toLowerCase(Locale.ROOT);
+         this.searchQwerty = ReplaceUtil.toQwerty(this.searchText).toLowerCase(Locale.ROOT);
+         this.searchDirty = false;
+      }
       String name = module.getName().toLowerCase(Locale.ROOT);
-      String qwerty = ReplaceUtil.toQwerty(this.searchText).toLowerCase(Locale.ROOT);
-      return name.contains(text) || text.contains(name) || name.contains(qwerty) || qwerty.contains(name);
+      return name.contains(this.searchLower) || this.searchLower.contains(name) || name.contains(this.searchQwerty) || this.searchQwerty.contains(name);
    }
 
    public void scissor(CustomDrawContext draw, float x, float y, float width, float height) {
@@ -231,6 +242,7 @@ public class ClickGuiScreen extends Screen implements IClient {
       this.closing = false;
       this.searchText = "";
       this.searchFocused = false;
+      this.searchDirty = true;
       this.openAnimation.animateTo(1.0F);
       super.init();
    }
@@ -459,6 +471,7 @@ public class ClickGuiScreen extends Screen implements IClient {
          if (keyCode == 259) {
             if (!this.searchText.isEmpty()) {
                this.searchText = this.searchText.substring(0, this.searchText.length() - 1);
+               this.searchDirty = true;
             }
          } else if (keyCode == 256 || keyCode == 257) {
             this.searchFocused = false;
@@ -490,6 +503,7 @@ public class ClickGuiScreen extends Screen implements IClient {
       if (this.searchFocused) {
          if (this.searchText.length() < 24) {
             this.searchText = this.searchText + chr;
+            this.searchDirty = true;
          }
          return true;
       }

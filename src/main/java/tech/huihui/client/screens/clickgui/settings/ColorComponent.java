@@ -92,10 +92,7 @@ public class ColorComponent extends Component {
       DrawUtil.drawRoundedRect(draw.getMatrices(), knobX - 4.0F, knobY - 4.0F, 8.0F, 8.0F, BorderRadius.all(4.0F), ColorRGBA.BLACK.withAlpha(255.0F * alpha));
       DrawUtil.drawRoundedRect(draw.getMatrices(), knobX - 3.0F, knobY - 3.0F, 6.0F, 6.0F, BorderRadius.all(3.0F), ColorRGBA.WHITE.withAlpha(255.0F * alpha));
 
-      for (int i = 0; i < (int) PICKER_HEIGHT; i++) {
-         float rowHue = (float) i / PICKER_HEIGHT;
-         DrawUtil.drawRect(draw.getMatrices(), this.sliderX(), this.sliderY() + (float) i, 3.0F, 1.0F, ColorRGBA.fromHSB(rowHue, 1.0F, 1.0F).withAlpha(255.0F * alpha));
-      }
+      DrawUtil.drawHueBar(draw.getMatrices(), this.sliderX(), this.sliderY(), 3.0F, PICKER_HEIGHT, 255.0F * alpha);
 
       float knobY2 = this.sliderY() + this.hsb[0] * PICKER_HEIGHT;
       DrawUtil.drawRoundedRect(draw.getMatrices(), this.sliderX() - 2.5F, knobY2 - 4.0F, 8.0F, 8.0F, BorderRadius.all(4.0F), ColorRGBA.BLACK.withAlpha(255.0F * alpha));

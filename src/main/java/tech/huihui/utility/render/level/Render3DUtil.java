@@ -28,7 +28,6 @@ import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4i;
-import org.lwjgl.opengl.GL11;
 import tech.huihui.utility.interfaces.IMinecraft;
 import tech.huihui.utility.math.ProjectionUtil;
 import tech.huihui.utility.render.display.base.color.ColorUtil;
@@ -78,7 +77,6 @@ public final class Render3DUtil implements IMinecraft {
 
       Set<Float> widths;
       if (!LINE.isEmpty()) {
-         GL11.glEnable(2881);
          widths = LINE.stream().map((line) -> {
             return line.width;
          }).collect(Collectors.toCollection(LinkedHashSet::new));
@@ -101,11 +99,9 @@ public final class Render3DUtil implements IMinecraft {
          RenderSystem.enableCull();
          RenderSystem.disableBlend();
          LINE.clear();
-         GL11.glDisable(2881);
       }
 
       if (!LINE_DEPTH.isEmpty()) {
-         GL11.glEnable(2881);
          widths = LINE_DEPTH.stream().map((line) -> {
             return line.width;
          }).collect(Collectors.toCollection(LinkedHashSet::new));
@@ -129,7 +125,6 @@ public final class Render3DUtil implements IMinecraft {
          RenderSystem.enableCull();
          RenderSystem.disableBlend();
          LINE_DEPTH.clear();
-         GL11.glDisable(2881);
       }
 
       if (!QUAD_DEPTH.isEmpty()) {

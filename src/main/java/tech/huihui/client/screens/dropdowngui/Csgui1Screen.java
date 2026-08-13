@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -30,6 +31,7 @@ import tech.huihui.client.modules.impl.render.ClickGUI;
 import tech.huihui.client.modules.impl.render.EditClickGUI;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
+import tech.huihui.utility.render.display.base.ToggleSwitch;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
 import tech.huihui.utility.render.display.shader.DrawUtil;
 
@@ -56,10 +58,13 @@ public final class Csgui1Screen extends Screen {
 
     private final List<Category> categories = List.of(Category.COMBAT, Category.MOVEMENT, Category.PLAYER, Category.RENDER, Category.COSMETICS, Category.MISC);
     private final EnumMap<Category, Float> scroll = new EnumMap<>(Category.class);
+    private final Map<Category, Float> displayScroll = new HashMap<>();
+    private final Map<Category, Float> displayVelocity = new HashMap<>();
     private final Map<Module, Boolean> expanded = new HashMap<>();
     private final Map<Module, Float> hover = new HashMap<>();
     private final Map<Module, Float> expandProgress = new HashMap<>();
     private final Map<Setting, Float> toggleProgress = new HashMap<>();
+    private final Map<Setting, Float> sliderProgress = new HashMap<>();
     private final Map<ColorSetting, float[]> hsb = new HashMap<>();
 
     private Category selected = Category.COMBAT;
@@ -73,6 +78,7 @@ public final class Csgui1Screen extends Screen {
     private String search = "";
     private boolean searchFocused;
     private float scale = 1.0F;
+    private final ThemePicker themePicker = new ThemePicker();
 
     public Csgui1Screen() {
         super(Text.literal("ClickGUI"));
@@ -99,6 +105,7 @@ public final class Csgui1Screen extends Screen {
         this.editingString = null;
         this.search = "";
         this.searchFocused = false;
+        this.themePicker.reset();
         super.init();
     }
 
@@ -164,6 +171,29 @@ public final class Csgui1Screen extends Screen {
 
     private float panelX() {
         return this.startX() + RAIL_W + GAP;
+    }
+
+    private float themeX() {
+        return ((float) screenWidth - this.themePicker.width()) / 2.0F;
+    }
+
+    private float themeY() {
+        return this.startY() - 8.0F - ThemePicker.BOX_HEIGHT;
+    }
+
+    private void renderTheme(CustomDrawContext draw, float mouseX, float mouseY) {
+        Theme theme = HuihuiClient.getInstance().getThemeManager().getCurrentTheme();
+        this.themePicker.render(draw, theme, this.panelBg(), this.accent(), TEXT_MAIN, 1.0F, this.themeX(), this.themeY(), mouseX, mouseY, new ThemePicker.Scissor() {
+            @Override
+            public void enable(float x, float y, float width, float height) {
+                Csgui1Screen.this.scissor(draw, x, y, width, height);
+            }
+
+            @Override
+            public void disable() {
+                draw.disableScissor();
+            }
+        });
     }
 
     private void updateLayout() {
@@ -247,6 +277,7 @@ public final class Csgui1Screen extends Screen {
         float ly = this.inverseY(mouseY);
         this.renderRail(draw, lx, ly);
         this.renderPanel(draw, lx, ly);
+        this.renderTheme(draw, lx, ly);
         context.getMatrices().pop();
     }
 
@@ -318,8 +349,16 @@ public final class Csgui1Screen extends Screen {
     private void renderModuleList(CustomDrawContext draw, float x, float y, float w, float h, float mouseX, float mouseY) {
         List<Module> mods = this.modulesOf(this.selected);
         float maxScroll = this.calculateMaxScroll(mods);
-        float offset = MathHelper.clamp(this.scroll.getOrDefault(this.selected, 0.0F), 0.0F, maxScroll);
-        this.scroll.put(this.selected, offset);
+        float targetScroll = MathHelper.clamp(this.scroll.getOrDefault(this.selected, 0.0F), 0.0F, maxScroll);
+        this.scroll.put(this.selected, targetScroll);
+        float display = this.displayScroll.getOrDefault(this.selected, targetScroll);
+        if (EditClickGUI.INSTANCE.isSmoothScroll()) {
+            display = this.updateScroll(display, targetScroll, this.selected);
+        } else {
+            display = targetScroll;
+        }
+        this.displayScroll.put(this.selected, display);
+        float offset = display;
 
         this.scissor(draw, x + 1.0F, y + HEADER_H, w - 2.0F, h - HEADER_H - 2.0F);
         float currentY = y + HEADER_H + 4.0F - offset;
@@ -362,6 +401,34 @@ public final class Csgui1Screen extends Screen {
             }
         }
         return Math.max(0.0F, total - (this.panelH() - HEADER_H - 8.0F));
+    }
+
+    private float scrollSmoothing() {
+        float speed = EditClickGUI.INSTANCE.getScrollSpeed();
+        float dt = Math.max(1.0F, MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(false));
+        float k = 1.0F - (float) Math.pow(1.0D - Math.min(1.0D, (double) speed / 60.0D), (double) dt);
+        return Math.max(0.001F, Math.min(1.0F, k));
+    }
+
+    private float updateScroll(float display, float target, Category cat) {
+        float elasticity = EditClickGUI.INSTANCE.getScrollElasticity();
+        if (elasticity <= 0.001F) {
+            float k = this.scrollSmoothing();
+            float next = display + (target - display) * k;
+            if (Math.abs(target - next) < 0.05F) {
+                next = target;
+            }
+            return next;
+        }
+        float dt = Math.max(1.0F, MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(false));
+        float vel = this.displayVelocity.getOrDefault(cat, 0.0F);
+        float stiffness = 0.05F + elasticity / 100.0F * 0.35F;
+        float damping = Math.max(0.55F, 0.92F - elasticity / 100.0F * 0.30F);
+        vel += (target - display) * stiffness * dt;
+        vel *= (float) Math.pow((double) damping, (double) dt);
+        float next = display + vel * dt;
+        this.displayVelocity.put(cat, vel);
+        return next;
     }
 
     private void renderModule(CustomDrawContext draw, Module module, float x, float y, float width, float totalHeight, float mouseX, float mouseY) {
@@ -488,8 +555,9 @@ public final class Csgui1Screen extends Screen {
                     toggle = bool.isEnabled() ? 1.0F : 0.0F;
                 }
                 this.toggleProgress.put(setting, toggle);
-                DrawUtil.drawRoundedRect(draw.getMatrices(), x + width - 26.0F, currentY + 1.0F, 24.0F, 13.0F, BorderRadius.all(7.0F), toggle > 0.01F ? this.accent().withAlpha(220) : new ColorRGBA(255, 255, 255, 22));
-                DrawUtil.drawRoundedRect(draw.getMatrices(), x + width - 21.0F + toggle * 12.0F - 4.5F, currentY + 2.0F, 9.0F, 11.0F, BorderRadius.all(999.0F), ColorRGBA.WHITE);
+                float sw = 26.0F;
+                float sh = 13.0F;
+                ToggleSwitch.render(draw, x + width - sw - 6.0F, currentY + 1.0F, sw, sh, toggle, this.accent(), new ColorRGBA(255, 255, 255, 22));
                 currentY += 17.0F + SET_GAP;
             } else if (setting instanceof KeySetting key) {
                 draw.drawText(this.font(7.5F), key.getName(), x, currentY + 3.0F, TEXT_MAIN);
@@ -507,9 +575,17 @@ public final class Csgui1Screen extends Screen {
                 draw.drawText(this.font(7.5F), value, x + width - this.textWidth(value, 7.5F), currentY, this.accent().withAlpha(220));
                 float trackY = currentY + 14.0F;
                 float pct = (slider.getMax() - slider.getMin()) <= 0.0F ? 0.0F : (slider.getCurrent() - slider.getMin()) / (slider.getMax() - slider.getMin());
+                float smooth = this.sliderProgress.getOrDefault(slider, pct);
+                float k = EditClickGUI.INSTANCE.getSliderSmoothness();
+                float kk = this.draggingSlider == slider ? Math.max(k, 0.45F) : k;
+                smooth += (pct - smooth) * kk;
+                if (Math.abs(pct - smooth) < 0.001F) {
+                    smooth = pct;
+                }
+                this.sliderProgress.put(slider, smooth);
                 DrawUtil.drawRoundedRect(draw.getMatrices(), x, trackY, width, 3.0F, BorderRadius.all(2.0F), new ColorRGBA(255, 255, 255, 16));
-                DrawUtil.drawRoundedRect(draw.getMatrices(), x, trackY, Math.max(3.0F, width * pct), 3.0F, BorderRadius.all(2.0F), this.accent().withAlpha(255));
-                DrawUtil.drawRoundedRect(draw.getMatrices(), x + width * pct - 4.5F, trackY - 3.0F, 9.0F, 9.0F, BorderRadius.all(999.0F), ColorRGBA.WHITE);
+                DrawUtil.drawRoundedRect(draw.getMatrices(), x, trackY, Math.max(3.0F, width * smooth), 3.0F, BorderRadius.all(2.0F), this.accent().withAlpha(255));
+                DrawUtil.drawRoundedRect(draw.getMatrices(), x + width * smooth - 4.5F, trackY - 3.0F, 9.0F, 9.0F, BorderRadius.all(999.0F), ColorRGBA.WHITE);
                 currentY += 24.0F + SET_GAP;
             } else if (setting instanceof ModeSetting mode) {
                 draw.drawText(this.font(7.5F), mode.getName() + ": " + mode.get(), x, currentY, TEXT_MAIN);
@@ -586,10 +662,7 @@ public final class Csgui1Screen extends Screen {
         DrawUtil.drawRoundedRect(draw.getMatrices(), knobX - 3.0F, knobY - 3.0F, 6.0F, 6.0F, BorderRadius.all(999.0F), ColorRGBA.WHITE);
 
         float sliderX = x + pickerW + 5.0F;
-        for (int i = 0; i < (int) PICKER_H; i++) {
-            float rowHue = (float) i / PICKER_H;
-            DrawUtil.drawRect(draw.getMatrices(), sliderX, y + (float) i, 4.0F, 1.0F, ColorRGBA.fromHSB(rowHue, 1.0F, 1.0F));
-        }
+        DrawUtil.drawHueBar(draw.getMatrices(), sliderX, y, 4.0F, PICKER_H, 255.0F);
         float hueKnobY = y + hsb[0] * PICKER_H;
         DrawUtil.drawRoundedRect(draw.getMatrices(), sliderX - 2.5F, hueKnobY - 4.0F, 9.0F, 8.0F, BorderRadius.all(4.0F), ColorRGBA.BLACK);
         DrawUtil.drawRoundedRect(draw.getMatrices(), sliderX - 1.5F, hueKnobY - 3.0F, 7.0F, 6.0F, BorderRadius.all(3.0F), ColorRGBA.WHITE);
@@ -623,6 +696,13 @@ public final class Csgui1Screen extends Screen {
         float mx = this.inverseX(mouseX);
         float my = this.inverseY(mouseY);
         float startY = this.startY();
+
+        if (this.themePicker.mouseClicked(mx, my, this.themeX(), this.themeY())) {
+            this.searchFocused = false;
+            this.editingString = null;
+            this.bindCapturing = false;
+            return true;
+        }
 
         if (mx >= this.railX() && mx <= this.railX() + RAIL_W && my >= startY && my <= startY + this.panelH()) {
             float iconY = startY + 32.0F;
@@ -679,7 +759,7 @@ public final class Csgui1Screen extends Screen {
     }
 
     private Module getModuleAt(float mouseX, float mouseY, float x, float y) {
-        float currentY = y + HEADER_H + 4.0F - this.scroll.getOrDefault(this.selected, 0.0F);
+        float currentY = y + HEADER_H + 4.0F - this.displayScroll.getOrDefault(this.selected, this.scroll.getOrDefault(this.selected, 0.0F));
         for (Module module : this.modulesOf(this.selected)) {
             boolean open = this.isOpen(module) && this.hasVisibleSettings(module);
             float progress = this.expandProgress.getOrDefault(module, open ? 1.0F : 0.0F);
@@ -693,7 +773,7 @@ public final class Csgui1Screen extends Screen {
     }
 
     private boolean handleSettingClick(float mouseX, float mouseY, float panelX, float panelY) {
-        float currentY = panelY + HEADER_H + 4.0F - this.scroll.getOrDefault(this.selected, 0.0F);
+        float currentY = panelY + HEADER_H + 4.0F - this.displayScroll.getOrDefault(this.selected, this.scroll.getOrDefault(this.selected, 0.0F));
         for (Module module : this.modulesOf(this.selected)) {
             boolean open = this.isOpen(module) && this.hasVisibleSettings(module);
             float progress = this.expandProgress.getOrDefault(module, open ? 1.0F : 0.0F);
@@ -708,9 +788,9 @@ public final class Csgui1Screen extends Screen {
                     }
                     float height = this.settingHeight(setting);
                     if (setting instanceof BooleanSetting bool) {
-                        float switchX = contentX + contentW - 26.0F;
+                        float switchX = contentX + contentW - 27.0F;
                         float switchY = settingY + 1.0F;
-                        if (mouseX >= switchX && mouseX <= switchX + 24.0F && mouseY >= switchY && mouseY <= switchY + 13.0F) {
+                        if (mouseX >= switchX && mouseX <= switchX + 26.0F && mouseY >= switchY && mouseY <= switchY + 13.0F) {
                             bool.setEnabled(!bool.isEnabled());
                             return true;
                         }

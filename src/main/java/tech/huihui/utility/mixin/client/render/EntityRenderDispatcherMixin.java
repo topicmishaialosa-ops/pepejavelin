@@ -43,7 +43,8 @@ public abstract class EntityRenderDispatcherMixin implements IMinecraft {
       at = @At(
    value = "INVOKE",
    target = "Lnet/minecraft/client/render/entity/EntityRenderDispatcher;renderShadow(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;Lnet/minecraft/client/render/entity/state/EntityRenderState;FFLnet/minecraft/world/WorldView;F)V"
-)
+),
+      require = 0
    )
    private void renderShadowHook(MatrixStack matrices, VertexConsumerProvider vertexConsumers, EntityRenderState state, float opacity, float tickDelta, WorldView world, float y, Entity entity, double x, double y2, double z, float yaw, MatrixStack matrices2, VertexConsumerProvider vertexConsumers2, int light, EntityRenderer entityRenderer) {
       if (!Optimization.INSTANCE.isShadowsEnabled()) {

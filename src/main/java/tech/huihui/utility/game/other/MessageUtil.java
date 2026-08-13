@@ -7,6 +7,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.HuihuiClient;
+import tech.huihui.client.modules.impl.misc.RenamePasterClient;
 import tech.huihui.utility.interfaces.IMinecraft;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
 import tech.huihui.utility.render.display.base.color.ColorUtil;
@@ -14,7 +15,7 @@ import tech.huihui.utility.render.display.base.color.ColorUtil;
 public final class MessageUtil implements IMinecraft {
    @Native
    public static void displayMessage(MessageUtil.LogLevel level, Object message) {
-      Text icon = createGradientText("Huihui Client", HuihuiClient.getInstance().getThemeManager().getCurrentTheme().getColor(), HuihuiClient.getInstance().getThemeManager().getCurrentTheme().getSecondColor());
+      Text icon = createGradientText(RenamePasterClient.getClientName(), HuihuiClient.getInstance().getThemeManager().getCurrentTheme().getColor(), HuihuiClient.getInstance().getThemeManager().getCurrentTheme().getSecondColor());
       Text styledMessage = Text.of(String.valueOf(message)).copy().getWithStyle(Style.EMPTY).isEmpty() ? Text.of("?") : (Text)Text.of(String.valueOf(message)).copy().getWithStyle(Style.EMPTY).getFirst();
       mc.player.sendMessage(icon.copy().append(styledMessage), false);
    }

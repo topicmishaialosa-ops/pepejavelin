@@ -51,14 +51,24 @@ public final class MsdfGlyph {
    }
 
    public float apply(Matrix4f matrix, VertexConsumer consumer, float size, float x, float y, float z, Gradient color) {
+      return apply(matrix, consumer, size, x, y, z, color, 1.0F);
+   }
+
+   public float apply(Matrix4f matrix, VertexConsumer consumer, float size, float x, float y, float z, Gradient color, float alphaMultiplier) {
       y -= this.topPosition * size;
       float width = this.width * size;
       float height = this.height * size;
-      consumer.vertex(matrix, x, y, z).texture(this.minU, this.minV).color(color.getTopLeftColor().getRGB());
-      consumer.vertex(matrix, x, y + height, z).texture(this.minU, this.maxV).color(color.getBottomLeftColor().getRGB());
-      consumer.vertex(matrix, x + width, y + height, z).texture(this.maxU, this.maxV).color(color.getBottomRightColor().getRGB());
-      consumer.vertex(matrix, x + width, y, z).texture(this.maxU, this.minV).color(color.getTopRightColor().getRGB());
+      consumer.vertex(matrix, x, y, z).texture(this.minU, this.minV).color(scaleAlpha(color.getTopLeftColor().getRGB(), alphaMultiplier));
+      consumer.vertex(matrix, x, y + height, z).texture(this.minU, this.maxV).color(scaleAlpha(color.getBottomLeftColor().getRGB(), alphaMultiplier));
+      consumer.vertex(matrix, x + width, y + height, z).texture(this.maxU, this.maxV).color(scaleAlpha(color.getBottomRightColor().getRGB(), alphaMultiplier));
+      consumer.vertex(matrix, x + width, y, z).texture(this.maxU, this.minV).color(scaleAlpha(color.getTopRightColor().getRGB(), alphaMultiplier));
       return this.advance * size;
+   }
+
+   private static int scaleAlpha(int color, float alphaMultiplier) {
+      int alpha = (int)((float)(color >>> 24 & 255) * alphaMultiplier);
+      alpha = Math.max(0, Math.min(255, alpha));
+      return color & 0xFFFFFF | (alpha & 255) << 24;
    }
 
    public float getWidth(float size) {

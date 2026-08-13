@@ -71,6 +71,20 @@ public final class CompanionModels {
       };
    }
 
+   public static CompanionAnimator patrickWobble() {
+      return (model, instance, time, limb, walk) -> {
+         pitch(model, "legL", MathHelper.cos(limb + MathHelper.PI) * 0.6F * walk);
+         pitch(model, "legR", MathHelper.cos(limb) * 0.6F * walk);
+         pitch(model, "body", MathHelper.sin(time * 1.3F) * 0.05F);
+         roll(model, "body", MathHelper.sin(limb * 2.0F) * 0.08F * walk + MathHelper.sin(time * 1.8F) * 0.05F);
+         yaw(model, "body", MathHelper.sin(time * 0.8F) * 0.18F);
+         roll(model, "armL", MathHelper.sin(time * 1.6F) * 0.2F);
+         roll(model, "armR", -MathHelper.sin(time * 1.6F) * 0.2F);
+         roll(model, "eyebrowL", -MathHelper.abs(MathHelper.sin(time * 1.8F)) * 0.12F);
+         roll(model, "eyebrowR", MathHelper.abs(MathHelper.sin(time * 1.8F)) * 0.12F);
+      };
+   }
+
    public static CompanionAnimator chickenAnim() {
       return (model, instance, time, limb, walk) -> {
          float flap = MathHelper.sin(time * 4.0F) * 0.45F;
@@ -539,6 +553,39 @@ public final class CompanionModels {
    private static void eyeShine(ProceduralModel.Builder b, float ex, float ey, float ez) {
       b.part("shineL", -ex, ey, ez, -0.26F, 0.26F, -0.12F, 0.42F, 0.42F, 0.2F, 0xFFFFFFFF)
        .part("shineR", ex, ey, ez, -0.26F, 0.26F, -0.12F, 0.42F, 0.42F, 0.2F, 0xFFFFFFFF);
+   }
+
+   public static ProceduralModel patrickStar() {
+      int pink = 0xFFF492C0;
+      int pinkDark = 0xFFDB74A8;
+      int light = 0xFFFFD1E4;
+      int white = 0xFFFFFFFF;
+      int dark = 0xFF262626;
+      int brown = 0xFF8A5A33;
+      ProceduralModel.Builder b = ProceduralModel.builder()
+         .part("body", 0F, 5.6F, 0F, -2.9F, -3.0F, -1.9F, 5.8F, 5.8F, 3.8F, pink)
+         .part("belly", 0F, 5.2F, -1.9F, -1.9F, -1.6F, -0.2F, 3.8F, 3.4F, 0.4F, light)
+         .part("shorts", 0F, 3.4F, 0F, -2.9F, -1.7F, -1.9F, 5.8F, 1.7F, 3.8F, 0xFF5FA84F)
+         .part("legL", -1.1F, 1.9F, 0F, -0.9F, -1.9F, -0.9F, 1.8F, 1.9F, 1.8F, pink)
+         .part("legR", 1.1F, 1.9F, 0F, -0.9F, -1.9F, -0.9F, 1.8F, 1.9F, 1.8F, pink)
+         .part("shoeL", -1.1F, 0.5F, 0F, -1.0F, -0.5F, -1.2F, 2.0F, 0.8F, 2.4F, brown)
+         .part("shoeR", 1.1F, 0.5F, 0F, -1.0F, -0.5F, -1.2F, 2.0F, 0.8F, 2.4F, brown)
+         .part("armL", -3.0F, 5.4F, 0F, -1.0F, -1.4F, -1.0F, 2.0F, 2.8F, 2.0F, pink)
+         .part("armR", 3.0F, 5.4F, 0F, -1.0F, -1.4F, -1.0F, 2.0F, 2.8F, 2.0F, pink)
+         .part("eyeL", -1.3F, 7.6F, -1.9F, -0.9F, -0.9F, -0.3F, 1.8F, 1.8F, 0.6F, white)
+         .part("eyeR", 1.3F, 7.6F, -1.9F, -0.9F, -0.9F, -0.3F, 1.8F, 1.8F, 0.6F, white)
+         .part("pupilL", -1.3F, 7.4F, -1.95F, -0.35F, -0.35F, -0.55F, 0.7F, 0.7F, 0.5F, dark)
+         .part("pupilR", 1.3F, 7.4F, -1.95F, -0.35F, -0.35F, -0.55F, 0.7F, 0.7F, 0.5F, dark)
+         .part("eyebrowL", -1.3F, 8.8F, -1.9F, -0.9F, -0.22F, -0.2F, 1.8F, 0.44F, 0.4F, pinkDark)
+         .part("eyebrowR", 1.3F, 8.8F, -1.9F, -0.9F, -0.22F, -0.2F, 1.8F, 0.44F, 0.4F, pinkDark)
+         .part("mouth", 0F, 6.0F, -1.95F, -1.0F, -0.16F, -0.15F, 2.0F, 0.32F, 0.3F, dark)
+         .part("cheekL", -2.2F, 6.6F, -1.95F, -0.45F, -0.35F, -0.12F, 0.9F, 0.7F, 0.3F, 0xFFF26A8F)
+         .part("cheekR", 2.2F, 6.6F, -1.95F, -0.45F, -0.35F, -0.12F, 0.9F, 0.7F, 0.3F, 0xFFF26A8F)
+         .part("flowerA", -1.6F, 4.0F, -1.9F, -0.45F, -0.45F, -0.05F, 0.9F, 0.9F, 0.2F, 0xFFF2C94C)
+         .part("flowerB", 0F, 4.0F, -1.9F, -1.1F, -0.45F, -0.05F, 2.2F, 0.9F, 0.2F, 0xFFF2F0EA)
+         .part("flowerC", 1.6F, 4.0F, -1.9F, -0.45F, -0.45F, -0.05F, 0.9F, 0.9F, 0.2F, 0xFFF2C94C)
+         .part("pointTop", 0F, 8.9F, 0F, -1.0F, -1.6F, -1.0F, 2.0F, 3.2F, 3.6F, pink);
+      return b.build();
    }
 
    private static void toes(ProceduralModel.Builder b, int leg, float x, float z, int color) {

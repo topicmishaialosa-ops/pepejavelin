@@ -13,7 +13,6 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4d;
 import org.joml.Vector4f;
-import org.lwjgl.opengl.GL11;
 import tech.huihui.utility.game.player.rotation.Rotation;
 import tech.huihui.utility.game.player.rotation.RotationUtil;
 import tech.huihui.utility.interfaces.IMinecraft;
@@ -33,7 +32,10 @@ public final class ProjectionUtil implements IMinecraft {
       if (viewportWidth != mc.getWindow().getFramebufferWidth() || viewportHeight != mc.getWindow().getFramebufferHeight()) {
          viewportWidth = mc.getWindow().getFramebufferWidth();
          viewportHeight = mc.getWindow().getFramebufferHeight();
-         GL11.glGetIntegerv(2978, VIEWPORT);
+         VIEWPORT[0] = 0;
+         VIEWPORT[1] = 0;
+         VIEWPORT[2] = viewportWidth;
+         VIEWPORT[3] = viewportHeight;
       }
       Vec3d cameraPos = mc.getEntityRenderDispatcher().camera.getPos();
       TRANSFORMED.set((float)(pos.x - cameraPos.x), (float)(pos.y - cameraPos.y), (float)(pos.z - cameraPos.z), 1.0F).mul(Render3DUtil.getLastWorldSpaceMatrix());

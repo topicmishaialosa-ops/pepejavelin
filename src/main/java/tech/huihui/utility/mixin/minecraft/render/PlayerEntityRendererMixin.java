@@ -37,7 +37,8 @@ public abstract class PlayerEntityRendererMixin {
       at = @At(
    value = "INVOKE",
    target = "Lnet/minecraft/client/model/ModelPart;render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumer;II)V"
-)
+),
+      require = 0
    )
    private void glowHandRender(ModelPart part, MatrixStack matrices, VertexConsumer vertexConsumer, int light, int overlay, MatrixStack matrices2, VertexConsumerProvider vertexConsumers, int light2, Identifier skin, ModelPart part2, boolean sleeveVisible) {
       GlowHands glowHands = GlowHands.INSTANCE;

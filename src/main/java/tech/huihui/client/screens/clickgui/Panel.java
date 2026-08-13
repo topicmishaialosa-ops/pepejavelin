@@ -27,6 +27,7 @@ public class Panel {
    private float y;
    private float scroll;
    private float animatedScroll;
+   private float animatedVelocity;
    private boolean draggingScrollbar;
    private float lastMouseY;
    private float max;
@@ -40,6 +41,28 @@ public class Panel {
             this.modules.add(new ModuleComponent(screen, module));
          }
       }
+   }
+
+   private float updateScroll(float animated, float target) {
+      if (!EditClickGUI.INSTANCE.isSmoothScroll()) {
+         this.animatedVelocity = 0.0F;
+         return target;
+      }
+      float elasticity = EditClickGUI.INSTANCE.getScrollElasticity();
+      float dt = Math.max(1.0F, this.screen.getTickDelta());
+      if (elasticity <= 0.001F) {
+         this.animatedVelocity = 0.0F;
+         float speed = EditClickGUI.INSTANCE.getScrollSpeed();
+         float k = 1.0F - (float) Math.pow(1.0D - Math.min(1.0D, (double) speed / 60.0D), (double) dt);
+         k = Math.max(0.001F, Math.min(1.0F, k));
+         float next = animated + (target - animated) * k;
+         return Math.abs(target - next) < 0.05F ? target : next;
+      }
+      float stiffness = 0.05F + elasticity / 100.0F * 0.35F;
+      float damping = Math.max(0.55F, 0.92F - elasticity / 100.0F * 0.30F);
+      this.animatedVelocity += (target - animated) * stiffness * dt;
+      this.animatedVelocity *= (float) Math.pow((double) damping, (double) dt);
+      return animated + this.animatedVelocity * dt;
    }
 
    private float getScrollRange() {
@@ -66,7 +89,7 @@ public class Panel {
       float height = this.screen.panelHeight();
       float header = ClickGuiScreen.HEADER_HEIGHT;
       float radius = this.screen.panelRadius();
-      this.animatedScroll += (this.scroll - this.animatedScroll) * 0.2F;
+      this.animatedScroll = this.updateScroll(this.animatedScroll, this.scroll);
 
       float maxHeight = 0.0F;
       for (ModuleComponent module : this.modules) {
@@ -79,7 +102,6 @@ public class Panel {
       float scrollRange = this.getScrollRange();
       if (scrollRange > 0.0F) {
          this.scroll = MathHelper.clamp(this.scroll, -scrollRange, 0.0F);
-         this.animatedScroll = MathHelper.clamp(this.animatedScroll, -scrollRange, 0.0F);
       } else {
          this.scroll = 0.0F;
          this.animatedScroll = 0.0F;
@@ -105,13 +127,18 @@ public class Panel {
 
       this.screen.scissor(draw, this.x + 1.0F, this.y + header, width - 2.0F, height - header - 2.0F);
       float moduleY = this.y + header + this.animatedScroll;
+      float contentTop = this.y + header;
+      float contentBottom = this.y + height - 2.0F;
       for (ModuleComponent module : this.modules) {
          if (this.screen.matchesSearch(module.getModule())) {
-            module.setX(this.x + 6.5F);
-            module.setY(moduleY);
-            module.setWidth(width - 13.0F);
-            module.render(draw, theme, mouseX, mouseY, alpha);
-            moduleY += module.getCurrentHeight() + 3.5F;
+            float moduleHeight = module.getCurrentHeight() + 3.5F;
+            if (moduleY + moduleHeight >= contentTop && moduleY <= contentBottom) {
+               module.setX(this.x + 6.5F);
+               module.setY(moduleY);
+               module.setWidth(width - 13.0F);
+               module.render(draw, theme, mouseX, mouseY, alpha);
+            }
+            moduleY += moduleHeight;
          }
       }
       draw.disableScissor();

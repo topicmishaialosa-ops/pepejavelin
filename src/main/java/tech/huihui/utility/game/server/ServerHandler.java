@@ -24,6 +24,7 @@ import net.minecraft.util.math.MathHelper;
 import org.apache.commons.lang3.StringUtils;
 import tech.huihui.base.events.impl.player.EventUpdate;
 import tech.huihui.base.events.impl.server.EventPacket;
+import tech.huihui.client.modules.impl.misc.RenamePasterClient;
 import tech.huihui.utility.game.player.PlayerIntersectionUtil;
 import tech.huihui.utility.interfaces.IMinecraft;
 import tech.huihui.utility.math.Timer;
@@ -90,7 +91,7 @@ public class ServerHandler implements IMinecraft {
       try {
          EventManager.register(this);
       } catch (Exception e) {
-         System.err.println("[HuihuiClient] Failed to register ServerHandler in EventManager: " + e.getMessage());
+         System.err.println("[" + RenamePasterClient.getClientName() + "] Failed to register ServerHandler in EventManager: " + e.getMessage());
       }
    }
 

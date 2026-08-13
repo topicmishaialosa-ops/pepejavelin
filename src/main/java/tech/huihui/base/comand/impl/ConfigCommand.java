@@ -7,7 +7,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import net.minecraft.command.CommandSource;
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.HoverEvent;
+import net.minecraft.text.Style;
+import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.HuihuiClient;
@@ -43,6 +48,38 @@ public class ConfigCommand extends CommandAbstract {
 
          return 1;
       })));
+      builder.then(literal("delete").then(arg("name", StringArgumentType.word()).executes((context) -> {
+         String name = (String)context.getArgument("name", String.class);
+         boolean success = HuihuiClient.getInstance().getConfigManager().deleteConfig(name);
+         if (success) {
+            MessageUtil.displayInfo(String.valueOf(Formatting.GRAY) + "Конфигурация удалена");
+         } else {
+            MessageUtil.displayInfo(String.valueOf(Formatting.GRAY) + "Ошибка при удалении конфигурации");
+         }
+
+         return 1;
+      })));
+      builder.then(literal("list").executes((context) -> {
+         List<String> configs = HuihuiClient.getInstance().getConfigManager().configNames();
+         if (configs.isEmpty()) {
+            MessageUtil.displayInfo(String.valueOf(Formatting.GRAY) + "Конфигураций пока нет");
+            return 1;
+         }
+
+         MessageUtil.displayInfo(String.valueOf(Formatting.GRAY) + "Список конфигураций:");
+         for(String name : configs) {
+            Text loadButton = Text.literal(" [Загрузить]").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withBold(true)
+               .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, ".cfg load " + name))
+               .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Нажми, чтобы загрузить " + name))));
+            Text deleteButton = Text.literal(" [Удалить]").setStyle(Style.EMPTY.withColor(Formatting.RED).withBold(true)
+               .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, ".cfg delete " + name))
+               .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Нажми, чтобы удалить " + name))));
+            Text line = Text.literal(name).setStyle(Style.EMPTY.withColor(Formatting.WHITE));
+            mc.player.sendMessage(line.copy().append(loadButton).append(deleteButton), false);
+         }
+
+         return 1;
+      }));
 builder.then(literal("dir").executes((context) -> {
           try {
              File dir = new File("huihui/configs/");

@@ -22,7 +22,6 @@ import net.minecraft.item.Items;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
 import net.minecraft.util.math.Vec3d;
-import org.lwjgl.opengl.GL11;
 import tech.huihui.base.events.impl.render.EventRender3D;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
@@ -273,7 +272,6 @@ public final class WingsModule extends Module {
       org.joml.Matrix4f transformMatrix = matrixStack.peek().getPositionMatrix();
 
       RenderSystem.lineWidth(1.35f);
-      GL11.glEnable(GL11.GL_LINE_SMOOTH);
 
       BufferBuilder outlineBuffer = Tessellator.getInstance().begin(VertexFormat.DrawMode.DEBUG_LINE_STRIP, VertexFormats.POSITION_COLOR);
 
@@ -284,7 +282,6 @@ public final class WingsModule extends Module {
       outlineBuffer.vertex(transformMatrix, direction * WING_SHAPE[0].x, WING_SHAPE[0].y, 0f).color(ColorUtil.red(outlineColor) / 255f, ColorUtil.green(outlineColor) / 255f, ColorUtil.blue(outlineColor) / 255f, ColorUtil.alpha(outlineColor) / 255f);
 
       BufferRenderer.drawWithGlobalProgram(outlineBuffer.end());
-      GL11.glDisable(GL11.GL_LINE_SMOOTH);
 
       RenderSystem.lineWidth(0.9f);
 

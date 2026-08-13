@@ -26,7 +26,8 @@ public final class CompanionRegistry {
       new Companion("rabbit", "Кролик", 0xFFE8E4DC, 0.36F, true, CompanionModels::minecraftRabbit, CompanionModels.hopAnim()),
       new Companion("panda", "Панда", 0xFFF5F2EC, 0.42F, false, CompanionModels::minecraftPanda, CompanionModels.quadPointyEars()),
       new Companion("sheep", "Овца", 0xFFE8E4D8, 0.42F, false, CompanionModels::minecraftSheep, CompanionModels.quadNoEars()),
-      new Companion("fox", "Лиса", 0xFFE07A2E, 0.38F, false, CompanionModels::minecraftFox, CompanionModels.quadPointyEars())
+      new Companion("fox", "Лиса", 0xFFE07A2E, 0.38F, false, CompanionModels::minecraftFox, CompanionModels.quadPointyEars()),
+      new Companion("patrick", "Патрик", 0xFFF492C0, 1.15F, false, CompanionModels::patrickStar, CompanionModels.patrickWobble())
    );
 
    static {

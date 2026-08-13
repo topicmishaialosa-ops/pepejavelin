@@ -110,6 +110,7 @@ public abstract class MixinGameRenderer {
    opcode = 180,
    ordinal = 2
 )},
+      require = 0,
       locals = LocalCapture.CAPTURE_FAILHARD
    )
    private void renderScreenHook(RenderTickCounter tickCounter, boolean tick, CallbackInfo ci, Profiler profiler, boolean bl, int i, int j, Window window, Matrix4f matrix4f, Matrix4fStack matrix4fStack, DrawContext drawContext) {

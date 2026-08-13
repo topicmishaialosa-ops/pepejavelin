@@ -21,10 +21,15 @@ import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
 import tech.huihui.client.modules.api.setting.impl.BooleanSetting;
+import tech.huihui.client.modules.api.setting.impl.ButtonSetting;
 import tech.huihui.client.modules.api.setting.impl.ColorSetting;
 import tech.huihui.client.modules.api.setting.impl.ModeSetting;
 import tech.huihui.client.modules.api.setting.impl.NumberSetting;
+import tech.huihui.client.modules.api.setting.impl.StringSetting;
 import tech.huihui.client.modules.impl.misc.NameProtect;
+import tech.huihui.client.modules.impl.misc.RenamePasterClient;
+import tech.huihui.client.screens.watermark.WatermarkLogo;
+import tech.huihui.client.screens.watermark.WatermarkLogoEditorScreen;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
 import tech.huihui.utility.render.display.base.GuiUtil;
@@ -61,6 +66,8 @@ public final class Watermark extends Module {
    public final BooleanSetting showTps = new BooleanSetting("ТПС", true);
    public final BooleanSetting showTime = new BooleanSetting("Время", true);
    public final BooleanSetting showServer = new BooleanSetting("Сервер", true);
+   public final ButtonSetting openLogoEditor = new ButtonSetting("Открыть редактор логотипа", WatermarkLogoEditorScreen::openEditor);
+   private final StringSetting logoData = new StringSetting("Данные логотипа", "");
 
    private boolean dragging;
    private float dragOffsetX;
@@ -68,6 +75,24 @@ public final class Watermark extends Module {
    private float[] lastSize = new float[]{110.0F, 16.0F};
 
    private Watermark() {
+      this.logoData.setVisible(() -> false);
+   }
+
+   public String getLogoData() {
+      return this.logoData.getValue();
+   }
+
+   public void setLogoData(String data) {
+      this.logoData.setValue(data);
+   }
+
+   private void renderLogo(CustomDrawContext ctx, float x, float y, ColorRGBA color) {
+      WatermarkLogo logo = WatermarkLogo.deserialize(this.logoData.getValue());
+      if (logo == null || logo.isEmpty()) {
+         ctx.drawText(Fonts.ICONS.getFont(6.5F), "B", x, y, color);
+         return;
+      }
+      logo.renderFit(ctx.getMatrices(), x - 0.5F, y - 2.5F, 11.0F, 11.0F, color);
    }
 
    public static final Watermark INSTANCE = new Watermark();
@@ -119,7 +144,7 @@ public final class Watermark extends Module {
       List<Cell> cells = new ArrayList<>();
       PlayerListEntry list = mc.getNetworkHandler() != null ? mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid()) : null;
       if (this.showName.isEnabled()) {
-         cells.add(new Cell("", "Huihui Client"));
+         cells.add(new Cell("", RenamePasterClient.getClientName()));
       }
       if (this.showNick.isEnabled()) {
          cells.add(new Cell(ICON_NICK, NameProtect.INSTANCE.isEnabled() ? NameProtect.getCustomName() : mc.player.getNameForScoreboard()));
@@ -140,7 +165,7 @@ public final class Watermark extends Module {
          cells.add(new Cell(ICON_TIME, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))));
       }
       if (cells.isEmpty()) {
-         cells.add(new Cell("", "Huihui Client"));
+         cells.add(new Cell("", RenamePasterClient.getClientName()));
       }
       return cells;
    }
@@ -178,12 +203,12 @@ public final class Watermark extends Module {
 
    private void renderClassic(CustomDrawContext ctx, float x, float y) {
       List<Cell> cells = this.cells();
-      float width = 12.0F + 11.0F + Math.max(this.cellsWidth(cells, 7.25F), 34.0F);
+      float width = 12.0F + 14.0F + Math.max(this.cellsWidth(cells, 7.25F), 34.0F);
       float height = 16.0F;
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(4.0F), BLACK);
       float cursor = x + 6.0F;
-      ctx.drawText(Fonts.ICONS.getFont(6.5F), "B", cursor + 0.5F, y + 4.75F, this.accent());
-      cursor += 11.0F;
+      this.renderLogo(ctx, cursor + 0.5F, y + 4.75F, this.accent());
+      cursor += 14.0F;
       this.renderCells(ctx, cells, cursor, y, this.accent());
       this.lastSize = new float[]{width, height};
    }
@@ -203,21 +228,21 @@ public final class Watermark extends Module {
 
    private void renderGradient(CustomDrawContext ctx, float x, float y) {
       List<Cell> cells = this.cells();
-      float width = 16.0F + 11.0F + Math.max(this.cellsWidth(cells, 7.25F), 40.0F);
+      float width = 16.0F + 14.0F + Math.max(this.cellsWidth(cells, 7.25F), 40.0F);
       float height = 20.0F;
       ColorRGBA a1 = this.accent().withAlpha(120);
       ColorRGBA a2 = this.accent().brighter(0.3F).withAlpha(100);
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(6.0F), a1, new ColorRGBA(22, 22, 30, 215), new ColorRGBA(22, 22, 30, 215), a2);
       float cursor = x + 8.0F;
-      ctx.drawText(Fonts.ICONS.getFont(6.5F), "B", cursor + 0.5F, y + 6.0F, this.accent().withAlpha(255));
-      cursor += 11.0F;
+      this.renderLogo(ctx, cursor + 0.5F, y + 6.0F, this.accent().withAlpha(255));
+      cursor += 14.0F;
       this.renderCells(ctx, cells, cursor, y + 1.0F, this.accent().withAlpha(255));
       this.lastSize = new float[]{width, height};
    }
 
    private void renderNeon(CustomDrawContext ctx, float x, float y) {
       List<Cell> cells = this.cells();
-      float width = 14.0F + 11.0F + Math.max(this.cellsWidth(cells, 7.25F), 36.0F);
+      float width = 14.0F + 14.0F + Math.max(this.cellsWidth(cells, 7.25F), 36.0F);
       float height = 20.0F;
       ColorRGBA accent = this.accent();
       DrawUtil.drawShadow(ctx.getMatrices(), x - 4.0F, y - 4.0F, width + 8.0F, height + 8.0F, 9.0F, BorderRadius.all(10.0F), accent.withAlpha(75));
@@ -225,8 +250,8 @@ public final class Watermark extends Module {
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(8.0F), new ColorRGBA(6, 6, 12, 160));
       DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, width, height, 1.0F, BorderRadius.all(8.0F), accent.withAlpha(200));
       float cursor = x + 7.0F;
-      ctx.drawText(Fonts.ICONS.getFont(6.5F), "B", cursor + 0.5F, y + 6.0F, accent);
-      cursor += 11.0F;
+      this.renderLogo(ctx, cursor + 0.5F, y + 6.0F, accent);
+      cursor += 14.0F;
       for (Cell cell : cells) {
          if (!cell.icon().isEmpty()) {
             ctx.drawText(Fonts.ICONS2.getFont(6.0F), cell.icon(), cursor + 1.5F, y + 6.5F, accent.withAlpha(230));
@@ -240,13 +265,13 @@ public final class Watermark extends Module {
 
    private void renderAccentBar(CustomDrawContext ctx, float x, float y) {
       List<Cell> cells = this.cells();
-      float width = 12.0F + 11.0F + Math.max(this.cellsWidth(cells, 7.25F), 34.0F);
+      float width = 12.0F + 14.0F + Math.max(this.cellsWidth(cells, 7.25F), 34.0F);
       float height = 19.0F;
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(4.0F), new ColorRGBA(10, 10, 14, 180));
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 1.0F, y + 1.0F, width - 2.0F, 2.5F, BorderRadius.all(1.25F), this.accent());
       float cursor = x + 6.0F;
-      ctx.drawText(Fonts.ICONS.getFont(6.5F), "B", cursor + 0.5F, y + 6.0F, this.accent());
-      cursor += 11.0F;
+      this.renderLogo(ctx, cursor + 0.5F, y + 6.0F, this.accent());
+      cursor += 14.0F;
       this.renderCells(ctx, cells, cursor, y + 1.0F, this.accent());
       this.lastSize = new float[]{width, height};
    }
@@ -325,7 +350,7 @@ public final class Watermark extends Module {
       List<Cell> cells = this.cells();
       List<String> lines = new ArrayList<>();
       for (int i = 0; i < cells.size(); i++) {
-         String prompt = i == 0 ? "huihui:~$ " : "$ ";
+         String prompt = i == 0 ? RenamePasterClient.getClientNameLower() + ":~$ " : "$ ";
          lines.add(prompt + cells.get(i).label());
       }
       float maxW = 0.0F;
@@ -341,7 +366,7 @@ public final class Watermark extends Module {
       float lineY = y + 5.0F;
       for (int i = 0; i < lines.size(); i++) {
          String line = lines.get(i);
-         int promptEnd = i == 0 ? "huihui:~$ ".length() : "$ ".length();
+         int promptEnd = i == 0 ? (RenamePasterClient.getClientNameLower() + ":~$ ").length() : "$ ".length();
          ctx.drawText(Fonts.REGULAR.getFont(7.0F), line.substring(0, Math.min(promptEnd, line.length())), x + 7.0F, lineY, green);
          ctx.drawText(Fonts.REGULAR.getFont(7.0F), line.substring(Math.min(promptEnd, line.length())), x + 7.0F + Fonts.REGULAR.getWidth(line.substring(0, Math.min(promptEnd, line.length())), 7.0F), lineY, new ColorRGBA(190, 255, 205, 255));
          lineY += 12.0F;
@@ -364,14 +389,14 @@ public final class Watermark extends Module {
       }
       float textW = Fonts.SEMIBOLD.getWidth(name, 7.25F);
       float valuesW = Fonts.REGULAR.getWidth(values, 6.5F);
-      float width = 12.0F + 11.0F + textW + (values.isEmpty() ? 0.0F : 14.0F + valuesW);
+      float width = 12.0F + 14.0F + textW + (values.isEmpty() ? 0.0F : 14.0F + valuesW);
       float height = 18.0F;
       ColorRGBA accent = this.accent();
       DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(height / 2.0F), accent.withAlpha(28));
       DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, width, height, 1.0F, BorderRadius.all(height / 2.0F), accent.withAlpha(190));
       float cursor = x + 6.0F;
-      ctx.drawText(Fonts.ICONS.getFont(6.5F), "B", cursor + 0.5F, y + 5.0F, accent);
-      cursor += 11.0F;
+      this.renderLogo(ctx, cursor + 0.5F, y + 5.0F, accent);
+      cursor += 14.0F;
       ctx.drawText(Fonts.SEMIBOLD.getFont(7.25F), name, cursor, y + 4.5F, TEXT);
       cursor += textW;
       if (!values.isEmpty()) {

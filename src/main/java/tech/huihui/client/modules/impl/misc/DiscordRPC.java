@@ -22,7 +22,6 @@ import tech.huihui.utility.game.other.MessageUtil;
 )
 public final class DiscordRPC extends Module {
    public static final DiscordRPC INSTANCE = new DiscordRPC();
-   private static final String CLIENT_NAME = "HuihuiClient";
    private static final String CLIENT_VERSION = "v0.3.5";
 
    private final StringSetting appId = new StringSetting("Application ID", "1536070842310594580");
@@ -142,9 +141,9 @@ public final class DiscordRPC extends Module {
          }
 
          details = "В главном меню";
-         state = CLIENT_NAME + " " + CLIENT_VERSION + " · Minecraft 1.21.4";
+         state = RenamePasterClient.getClientName() + " " + CLIENT_VERSION + " · Minecraft 1.21.4";
          largeKey = "huihui";
-         largeText = CLIENT_NAME + " " + CLIENT_VERSION;
+         largeText = RenamePasterClient.getClientName() + " " + CLIENT_VERSION;
          smallKey = "";
          smallText = "";
          timestamp = 0L;
@@ -173,7 +172,7 @@ public final class DiscordRPC extends Module {
 
          state = stateBuilder.toString();
          largeKey = "huihui";
-         largeText = CLIENT_NAME + " " + CLIENT_VERSION;
+         largeText = RenamePasterClient.getClientName() + " " + CLIENT_VERSION;
          smallKey = this.getDimensionKey();
          smallText = dimensionName;
          timestamp = this.startTimestamp;

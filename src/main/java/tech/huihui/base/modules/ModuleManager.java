@@ -53,6 +53,7 @@ import tech.huihui.client.modules.impl.misc.ItemScroller;
 import tech.huihui.client.modules.impl.misc.KeyFinder;
 import tech.huihui.client.modules.impl.misc.MineHelper;
 import tech.huihui.client.modules.impl.misc.NameProtect;
+import tech.huihui.client.modules.impl.misc.RenamePasterClient;
 import tech.huihui.client.modules.impl.misc.NoInteract;
 import tech.huihui.client.modules.impl.misc.PilotSettings;
 import tech.huihui.client.modules.impl.misc.ScoreboardHealth;
@@ -227,6 +228,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(AutoKit.INSTANCE);
       registerModule(CreeperFarm.INSTANCE);
       registerModule(NameProtect.INSTANCE);
+      registerModule(RenamePasterClient.INSTANCE);
       registerModule(ScoreboardHealth.INSTANCE);
       registerModule(ElytraAccelerate.INSTANCE);
       registerModule(ZarabotokReallyWorld.INSTANCE);

@@ -15,6 +15,7 @@ import tech.huihui.base.animations.base.Easing;
 import tech.huihui.base.font.Fonts;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.accounts.AccountManager;
+import tech.huihui.client.modules.impl.misc.RenamePasterClient;
 import tech.huihui.utility.interfaces.IClient;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
@@ -31,7 +32,7 @@ public class MainMenuScreen extends Screen implements IClient {
    private final List<MenuButton> buttons = new ArrayList();
 
    public MainMenuScreen() {
-      super(Text.of("HuihuiClient Menu"));
+      super(Text.of(RenamePasterClient.getClientName() + " Menu"));
       this.buttons.add(new MenuButton("Одиночная игра", () -> mc.setScreen(new SelectWorldScreen(this))));
       this.buttons.add(new MenuButton("Мультиплеер", () -> mc.setScreen(new MultiplayerScreen(this))));
       this.buttons.add(new MenuButton("Аккаунты", () -> mc.setScreen(new AccountManagerScreen())));
@@ -108,7 +109,7 @@ public class MainMenuScreen extends Screen implements IClient {
       float titleY = panelY - 82.0F;
       DrawUtil.drawGlow(draw.getMatrices(), titleX - 34.0F, titleY - 16.0F, width + 68.0F, 48.0F, 16);
       draw.drawText(Fonts.ROUND_BOLD.getFont(size), title, titleX, titleY, (new ColorRGBA(240, 240, 246)).withAlpha(255.0F * alpha));
-      String subtitle = "Huihui Client";
+      String subtitle = RenamePasterClient.getClientName();
       draw.drawText(Fonts.COMFORTA_REGULAR.getFont(5.0F), subtitle, (screenW - Fonts.COMFORTA_REGULAR.getFont(5.0F).width(subtitle)) / 2.0F, panelY - 50.0F, themeColor.withAlpha(255.0F * alpha));
    }
 

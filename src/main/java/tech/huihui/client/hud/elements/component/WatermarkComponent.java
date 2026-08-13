@@ -10,6 +10,7 @@ import tech.huihui.base.font.MsdfFont;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
 import tech.huihui.client.modules.impl.misc.NameProtect;
+import tech.huihui.client.modules.impl.misc.RenamePasterClient;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
@@ -27,7 +28,7 @@ public class WatermarkComponent extends DraggableHudElement {
       float x = this.getX();
       float y = this.getY();
       Theme theme = HuihuiClient.getInstance().getThemeManager().getCurrentTheme();
-      String name = "Huihui Client";
+      String name = RenamePasterClient.getClientName();
       String fps = mc.getCurrentFps() + "fps";
       PlayerListEntry list = mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid());
       String playerName = NameProtect.INSTANCE.isEnabled() ? NameProtect.getCustomName() : mc.player.getNameForScoreboard();

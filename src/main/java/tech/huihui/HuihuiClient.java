@@ -3,11 +3,7 @@ package tech.huihui;
 import java.io.File;
 import lombok.Generated;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
-import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.resource.ResourceType;
 import net.minecraft.util.Identifier;
 import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.base.autobuy.AutoBuyManager;
@@ -27,7 +23,6 @@ import tech.huihui.client.screens.menu.MenuScreen;
 import tech.huihui.client.screens.targethud.TargetHudPresetManager;
 import tech.huihui.utility.game.server.ServerHandler;
 import tech.huihui.utility.render.display.shader.DrawUtil;
-import tech.huihui.utility.render.display.shader.GlProgram;
 
 public enum HuihuiClient implements ClientModInitializer {
    INSTANCE;
@@ -98,17 +93,6 @@ public enum HuihuiClient implements ClientModInitializer {
          this.waypointManager = new WaypointManager();
          this.menuScreen = new MenuScreen();
          this.clickGuiScreen = new ClickGuiScreen();
-         ResourceManagerHelper.get(ResourceType.CLIENT_RESOURCES).registerReloadListener(new SimpleSynchronousResourceReloadListener() {
-            @Override
-            public Identifier getFabricId() {
-               return HuihuiClient.id("after_shader_load");
-            }
-
-            @Override
-            public void reload(ResourceManager manager) {
-               GlProgram.loadAndSetupPrograms();
-            }
-         });
          DrawUtil.initializeShaders();
       } catch (Exception e) {
          e.printStackTrace();

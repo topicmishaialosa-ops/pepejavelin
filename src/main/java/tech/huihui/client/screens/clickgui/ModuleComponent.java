@@ -81,7 +81,12 @@ public class ModuleComponent extends Component {
    }
 
    private boolean hasVisibleSettings() {
-      return this.components.stream().anyMatch(Component::isVisible);
+      for (Component component : this.components) {
+         if (component.isVisible()) {
+            return true;
+         }
+      }
+      return false;
    }
 
    @Override

@@ -6,6 +6,7 @@ import net.minecraft.util.math.MathHelper;
 import tech.huihui.base.font.Fonts;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.modules.api.setting.impl.NumberSetting;
+import tech.huihui.client.modules.impl.render.EditClickGUI;
 import tech.huihui.client.screens.clickgui.Component;
 import tech.huihui.utility.math.MathUtil;
 import tech.huihui.utility.render.display.base.BorderRadius;
@@ -18,6 +19,8 @@ public class SliderComponent extends Component {
    private final NumberSetting setting;
    private float anim;
    private boolean dragging;
+   private String cachedFormat;
+   private float lastFormattedValue = Float.NaN;
 
    public SliderComponent(NumberSetting setting) {
       this.setting = setting;
@@ -37,7 +40,11 @@ public class SliderComponent extends Component {
 
       float trackWidth = this.width - 10.0F;
       float target = trackWidth * (this.setting.getCurrent() - this.setting.getMin()) / (this.setting.getMax() - this.setting.getMin());
-      this.anim += (target - this.anim) * 0.2F;
+      float k = EditClickGUI.INSTANCE.getSliderSmoothness();
+      this.anim += (target - this.anim) * (this.dragging ? Math.max(k, 0.45F) : k);
+      if (Math.abs(target - this.anim) < 0.001F) {
+         this.anim = target;
+      }
       if (this.dragging) {
          float percent = MathHelper.clamp((mouseX - this.x - 5.0F) / trackWidth, 0.0F, 1.0F);
          float valueNew = this.setting.getMin() + percent * (this.setting.getMax() - this.setting.getMin());
@@ -53,10 +60,17 @@ public class SliderComponent extends Component {
    }
 
    private String formatValue() {
+      float current = this.setting.getCurrent();
+      if (this.cachedFormat != null && this.lastFormattedValue == current) {
+         return this.cachedFormat;
+      }
       float increment = this.setting.getIncrement();
       int decimals = Math.max(0, String.valueOf(increment).contains(".") ? String.valueOf(increment).split("\\.")[1].length() : 0);
       String format = "%." + decimals + "f";
-      return String.format(Locale.US, format, this.setting.getCurrent()).replaceAll("\\.?0+$", "");
+      String result = String.format(Locale.US, format, current).replaceAll("\\.?0+$", "");
+      this.lastFormattedValue = current;
+      this.cachedFormat = result;
+      return result;
    }
 
    @Override

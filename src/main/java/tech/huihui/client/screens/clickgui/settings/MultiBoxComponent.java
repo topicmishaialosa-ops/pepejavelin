@@ -15,6 +15,8 @@ import tech.huihui.utility.render.display.shader.DrawUtil;
 public class MultiBoxComponent extends Component {
    private final MultiBooleanSetting setting;
    private static final float SPACING = 2.0F;
+   private float[] chipWidths;
+   private float layoutWidth = -1.0F;
 
    public MultiBoxComponent(MultiBooleanSetting setting) {
       this.setting = setting;
@@ -26,20 +28,34 @@ public class MultiBoxComponent extends Component {
       return this.setting.isVisible();
    }
 
+   private void ensureLayout() {
+      if (this.layoutWidth == this.width && this.chipWidths != null) {
+         return;
+      }
+      var values = this.setting.getBooleanSettings();
+      this.chipWidths = new float[values.size()];
+      for (int i = 0; i < values.size(); ++i) {
+         this.chipWidths[i] = Fonts.REGULAR.getWidth(values.get(i).getName(), 5.5F) + 2.0F;
+      }
+      this.layoutWidth = this.width;
+   }
+
    @Override
    public void render(CustomDrawContext draw, Theme theme, float mouseX, float mouseY, float alpha) {
       draw.drawText(Fonts.REGULAR.getFont(5.5F), this.setting.getName(), this.x + 7.0F, this.y + 2.0F, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
+      this.ensureLayout();
       float offset = 0.0F;
       float row = 0.0F;
-      for (MultiBooleanSetting.Value value : this.setting.getBooleanSettings()) {
-         float chipWidth = Fonts.REGULAR.getWidth(value.getName(), 5.5F) + 2.0F;
+      var values = this.setting.getBooleanSettings();
+      for (int i = 0; i < values.size(); ++i) {
+         float chipWidth = this.chipWidths[i];
          if (offset + chipWidth + SPACING >= this.width - 10.0F) {
             offset = 0.0F;
             row += 10.0F;
          }
-         boolean enabled = value.isEnabled();
+         boolean enabled = values.get(i).isEnabled();
          DrawUtil.drawRoundedRect(draw.getMatrices(), this.x + 6.5F + offset, this.y + 9.5F + row, chipWidth + 2.0F, 9.0F, BorderRadius.all(1.0F), enabled ? theme.getColor().withAlpha(100.0F * alpha) : (new ColorRGBA(21, 21, 21)).withAlpha(100.0F * alpha));
-         draw.drawText(Fonts.REGULAR.getFont(5.5F), value.getName(), this.x + 8.0F + offset, this.y + 11.5F + row, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
+         draw.drawText(Fonts.REGULAR.getFont(5.5F), values.get(i).getName(), this.x + 8.0F + offset, this.y + 11.5F + row, (new ColorRGBA(153, 153, 153)).withAlpha(255.0F * alpha));
          offset += chipWidth + SPACING;
       }
       this.setHeight(22.0F + row);
@@ -50,16 +66,18 @@ public class MultiBoxComponent extends Component {
       if (button != 0) {
          return false;
       }
+      this.ensureLayout();
       float offset = 0.0F;
       float row = 0.0F;
-      for (MultiBooleanSetting.Value value : this.setting.getBooleanSettings()) {
-         float chipWidth = Fonts.REGULAR.getWidth(value.getName(), 5.5F) + 2.0F;
+      var values = this.setting.getBooleanSettings();
+      for (int i = 0; i < values.size(); ++i) {
+         float chipWidth = this.chipWidths[i];
          if (offset + chipWidth + SPACING >= this.width - 10.0F) {
             offset = 0.0F;
             row += 10.0F;
          }
          if (MathUtil.isHovered(mouseX, mouseY, this.x + 6.5F + offset, this.y + 9.5F + row, chipWidth + 2.0F, 9.0F)) {
-            value.toggle();
+            values.get(i).toggle();
             return true;
          }
          offset += chipWidth + SPACING;

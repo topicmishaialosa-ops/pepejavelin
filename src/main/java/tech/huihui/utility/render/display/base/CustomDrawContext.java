@@ -26,21 +26,21 @@ public class CustomDrawContext extends DrawContext implements IMinecraft {
       return new CustomDrawContext(originalContext);
    }
 
-   public void drawText(Font font, String text, float x, float y, ColorRGBA color) {
-      MsdfRenderer.renderText(font.getFont(), text, font.getSize(), color.getRGB(), this.getMatrices().peek().getPositionMatrix(), x, y, 0.0F);
-   }
+public void drawText(Font font, String text, float x, float y, ColorRGBA color) {
+       MsdfRenderer.renderText(font.getFont(), text, font.getSize(), color.getRGB(), this.getMatrices().peek().getPositionMatrix(), x, y, 0.0F);
+    }
 
-   public void drawText(Font font, String text, float x, float y, Gradient color) {
-      MsdfRenderer.renderText(font.getFont(), text, font.getSize(), color, this.getMatrices().peek().getPositionMatrix(), x, y, 0.0F);
-   }
+    public void drawText(Font font, String text, float x, float y, Gradient color) {
+       MsdfRenderer.renderText(font.getFont(), text, font.getSize(), color, this.getMatrices().peek().getPositionMatrix(), x, y, 0.0F);
+    }
 
-   public void drawText(Font font, Text text, float x, float y) {
-      MsdfRenderer.renderText(font.getFont(), text, font.getSize(), this.getMatrices().peek().getPositionMatrix(), x, y, 0.0F);
-   }
+    public void drawText(Font font, Text text, float x, float y) {
+       MsdfRenderer.renderText(font.getFont(), text, font.getSize(), this.getMatrices().peek().getPositionMatrix(), x, y, 0.0F);
+    }
 
-   public void drawText(Font font, Text text, float x, float y, float alpha) {
-      MsdfRenderer.renderText(font.getFont(), text, font.getSize(), this.getMatrices().peek().getPositionMatrix(), x, y, 0.0F, (int)alpha);
-   }
+    public void drawText(Font font, Text text, float x, float y, float alpha) {
+       MsdfRenderer.renderText(font.getFont(), text, font.getSize(), this.getMatrices().peek().getPositionMatrix(), x, y, 0.0F, (int)alpha);
+    }
 
    public void drawSquircle(float x, float y, float width, float height, float squirt, BorderRadius borderRadius, ColorRGBA color) {
       DrawUtil.drawSquircle(this.getMatrices(), x, y, width, height, squirt, borderRadius, color);

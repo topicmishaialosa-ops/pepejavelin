@@ -32,6 +32,12 @@ public final class EditClickGUI extends Module {
       return this.gradientEnabled.isEnabled();
    });
    private final ColorSetting borderColor = new ColorSetting("Цвет рамки", new ColorRGBA(21, 21, 21));
+   private final BooleanSetting smoothScroll = new BooleanSetting("Плавный скролл", true);
+   private final NumberSetting sliderSmoothness = new NumberSetting("Плавность ползунков", 0.18F, 0.02F, 1.0F, 0.01F, () -> {
+      return true;
+   });
+   private final NumberSetting scrollSpeed = new NumberSetting("Скорость скролла", 12.0F, 1.0F, 60.0F, 1.0F);
+   private final NumberSetting scrollElasticity = new NumberSetting("Упругость скролла", 0.0F, 0.0F, 100.0F, 1.0F);
 
    private EditClickGUI() {
    }
@@ -108,5 +114,41 @@ public final class EditClickGUI extends Module {
    @Generated
    public ColorSetting getBorderColor() {
       return this.borderColor;
+   }
+
+   public boolean isSmoothScroll() {
+      return this.smoothScroll.isEnabled();
+   }
+
+   public float getScrollSpeed() {
+      return this.scrollSpeed.getCurrent();
+   }
+
+   public float getSliderSmoothness() {
+      return this.sliderSmoothness.getCurrent();
+   }
+
+   @Generated
+   public NumberSetting getSliderSmoothnessSetting() {
+      return this.sliderSmoothness;
+   }
+
+   @Generated
+   public BooleanSetting getSmoothScroll() {
+      return this.smoothScroll;
+   }
+
+   @Generated
+   public NumberSetting getScrollSpeedSetting() {
+      return this.scrollSpeed;
+   }
+
+   public float getScrollElasticity() {
+      return this.scrollElasticity.getCurrent();
+   }
+
+   @Generated
+   public NumberSetting getScrollElasticitySetting() {
+      return this.scrollElasticity;
    }
 }

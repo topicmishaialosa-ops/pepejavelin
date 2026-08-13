@@ -37,7 +37,11 @@ public class Config {
 
          while(var3.hasNext()) {
             Module module = (Module)var3.next();
-            modulesObject.add(module.getName(), module.save());
+            try {
+               modulesObject.add(module.getName(), module.save());
+            } catch (Exception var6) {
+               System.err.println("[Config] Failed to save module '" + module.getName() + "': " + var6.getMessage());
+            }
          }
 
          root.add("Modules", modulesObject);
@@ -121,10 +125,18 @@ public class Config {
 
             while(var6.hasNext()) {
                Module module = (Module)var6.next();
-               module.load(modulesObject.getAsJsonObject(module.getName()));
+               try {
+                  JsonObject moduleObject = modulesObject.getAsJsonObject(module.getName());
+                  if (moduleObject == null) {
+                     continue;
+                  }
+                  module.load(moduleObject);
+               } catch (Exception var5) {
+                  System.err.println("[Config] Failed to load module '" + module.getName() + "': " + var5.getMessage());
+               }
             }
-         } catch (Exception var5) {
-            var5.printStackTrace();
+         } catch (Exception var8) {
+            var8.printStackTrace();
          }
       }
 

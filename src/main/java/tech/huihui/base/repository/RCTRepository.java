@@ -14,6 +14,7 @@ import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.events.impl.player.EventUpdate;
 import tech.huihui.base.events.impl.server.EventPacket;
+import tech.huihui.client.modules.impl.misc.RenamePasterClient;
 import tech.huihui.base.notify.NotifyManager;
 import tech.huihui.utility.game.player.PlayerInventoryUtil;
 import tech.huihui.utility.game.server.ServerHandler;
@@ -29,7 +30,7 @@ public class RCTRepository implements IClient {
       try {
          EventManager.register(this);
       } catch (Exception e) {
-         System.err.println("[HuihuiClient] Failed to register RCTRepository in EventManager: " + e.getMessage());
+         System.err.println("[" + RenamePasterClient.getClientName() + "] Failed to register RCTRepository in EventManager: " + e.getMessage());
       }
    }
 

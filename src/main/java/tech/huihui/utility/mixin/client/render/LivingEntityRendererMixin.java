@@ -44,7 +44,8 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
       at = @At(
    value = "INVOKE",
    target = "Lnet/minecraft/client/render/entity/LivingEntityRenderer;getRenderLayer(Lnet/minecraft/client/render/entity/state/LivingEntityRenderState;ZZZ)Lnet/minecraft/client/render/RenderLayer;"
-)
+),
+      require = 0
    )
    private RenderLayer renderHook(LivingEntityRenderer instance, LivingEntityRenderState state, boolean showBody, boolean translucent, boolean showOutline) {
       if (!translucent && state.width == 0.6F) {
@@ -63,7 +64,8 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
       at = @At(
    value = "INVOKE",
    target = "Lnet/minecraft/client/render/entity/model/EntityModel;render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumer;III)V"
-)
+),
+      require = 0
    )
    private void renderModelHook(EntityModel<?> instance, MatrixStack matrixStack, VertexConsumer vertexConsumer, int i, int j, int l) {
       VertexConsumerProvider vertexConsumers = RENDER_VERTEX_CONSUMERS.get();
