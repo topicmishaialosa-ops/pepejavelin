@@ -24,17 +24,21 @@ public final class ChestStealer extends Module {
    private final NumberSetting delay = new NumberSetting("Задержка", 2.0F, 1.0F, 10.0F, 1.0F);
    private final BooleanSetting onlyChest = new BooleanSetting("Только сундуки", true);
    private final BooleanSetting closeWhenDone = new BooleanSetting("Закрывать когда пусто", true);
+   private static final int CLOSE_GRACE_TICKS = 40;
    private int tickDelay;
    private int nextSlot;
+   private int emptyTicks;
 
    @EventTarget
    private void onUpdate(EventUpdate event) {
       if (mc.player == null || mc.currentScreen == null) {
          this.nextSlot = 0;
          this.tickDelay = 0;
+         this.emptyTicks = 0;
          return;
       }
       if (!(mc.currentScreen instanceof HandledScreen<?> screen)) {
+         this.emptyTicks = 0;
          return;
       }
       ScreenHandler handler = screen.getScreenHandler();
@@ -46,6 +50,7 @@ public final class ChestStealer extends Module {
       }
 
       if (this.tickDelay-- > 0) {
+         this.emptyTicks = 0;
          return;
       }
       this.tickDelay = (int) this.delay.getCurrent();
@@ -60,16 +65,40 @@ public final class ChestStealer extends Module {
          empty = false;
          mc.interactionManager.clickSlot(handler.syncId, i, 0, SlotActionType.QUICK_MOVE, mc.player);
          this.nextSlot = i + 1;
+         this.emptyTicks = 0;
          return;
       }
 
       if (this.nextSlot >= containerSlots) {
          this.nextSlot = 0;
       }
-      if (empty && this.closeWhenDone.isEnabled() && containerSlots > 0) {
-         mc.execute(() -> mc.setScreen(null));
-         this.nextSlot = 0;
+      if (!empty) {
+         this.emptyTicks = 0;
+         return;
       }
+      if (this.containerHasItems(containerSlots, handler)) {
+         this.emptyTicks = 0;
+         this.nextSlot = 0;
+         return;
+      }
+      if (!this.closeWhenDone.isEnabled() || containerSlots <= 0) {
+         return;
+      }
+      if (++this.emptyTicks < CLOSE_GRACE_TICKS) {
+         return;
+      }
+      mc.execute(() -> mc.setScreen(null));
+      this.nextSlot = 0;
+      this.emptyTicks = 0;
+   }
+
+   private boolean containerHasItems(int containerSlots, ScreenHandler handler) {
+      for (int i = 0; i < containerSlots; ++i) {
+         if (!handler.getSlot(i).getStack().isEmpty()) {
+            return true;
+         }
+      }
+      return false;
    }
 
    private int getContainerSlots(ScreenHandler handler) {

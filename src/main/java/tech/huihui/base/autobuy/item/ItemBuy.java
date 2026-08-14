@@ -9,6 +9,8 @@ public class ItemBuy implements IClient {
    protected final String displayName;
    protected final String searchName;
    protected final ItemBuy.Category category;
+   protected int price;
+   protected boolean enabled;
 
    public ItemBuy(ItemStack itemStack, String searchName, ItemBuy.Category category) {
       this.itemStack = itemStack;
@@ -46,6 +48,26 @@ public class ItemBuy implements IClient {
    @Generated
    public ItemBuy.Category getCategory() {
       return this.category;
+   }
+
+   @Generated
+   public int getPrice() {
+      return this.price;
+   }
+
+   @Generated
+   public void setPrice(int price) {
+      this.price = price;
+   }
+
+   @Generated
+   public boolean isEnabled() {
+      return this.enabled;
+   }
+
+   @Generated
+   public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
    }
 
    public static enum Category {

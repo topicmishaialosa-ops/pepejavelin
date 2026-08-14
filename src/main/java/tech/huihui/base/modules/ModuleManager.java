@@ -36,6 +36,8 @@ import tech.huihui.client.modules.impl.combat.ClickPearl;
 import tech.huihui.client.modules.impl.combat.Surround;
 import tech.huihui.client.modules.impl.combat.TargetPearl;
 import tech.huihui.client.modules.impl.cosmetics.AnimalsModule;
+import tech.huihui.client.modules.impl.misc.AutoBuy;
+import tech.huihui.client.modules.impl.misc.Collector;
 import tech.huihui.client.modules.impl.misc.AHHelper;
 import tech.huihui.client.modules.impl.misc.AutoAccept;
 import tech.huihui.client.modules.impl.misc.AutoDuel;
@@ -45,6 +47,7 @@ import tech.huihui.client.modules.impl.misc.BaseFinder;
 import tech.huihui.client.modules.impl.misc.AutoJoiner;import tech.huihui.client.modules.impl.misc.AutoKit;
 import tech.huihui.client.modules.impl.misc.AutoRespawn;
 import tech.huihui.client.modules.impl.misc.Autofarm;
+import tech.huihui.client.modules.impl.misc.AncientFarmer;
 import tech.huihui.client.modules.impl.misc.ClickAction;
 import tech.huihui.client.modules.impl.misc.ChestStealer;
 import tech.huihui.client.modules.impl.misc.CreeperFarm;
@@ -67,7 +70,6 @@ import tech.huihui.client.modules.impl.movement.AutoSprint;
 import tech.huihui.client.modules.impl.movement.ElytraAccelerate;
 import tech.huihui.client.modules.impl.movement.ElytraBooster;
 import tech.huihui.client.modules.impl.movement.ElytraMotion;
-import tech.huihui.client.modules.impl.movement.ElytraPredict;
 import tech.huihui.client.modules.impl.movement.ElytraRecast;
 import tech.huihui.client.modules.impl.movement.Fly;
 import tech.huihui.client.modules.impl.movement.GuiWalk;
@@ -168,7 +170,6 @@ public final class ModuleManager implements IMinecraft {
       registerModule(AirStuck.INSTANCE);
       registerModule(AntiElytraTarget.INSTANCE);
       registerModule(ElytraMotion.INSTANCE);
-      registerModule(ElytraPredict.INSTANCE);
        registerModule(NoWeb.INSTANCE);
         registerModule(SpiderMatrix.INSTANCE);
         registerModule(Scaffold.INSTANCE);
@@ -220,6 +221,8 @@ public final class ModuleManager implements IMinecraft {
 
    private void registerMisc() {
       registerModule(ServerHelper.INSTANCE);
+      registerModule(AutoBuy.INSTANCE);
+      registerModule(Collector.INSTANCE);
        registerModule(ElytraHelper.INSTANCE);
        registerModule(PilotSettings.INSTANCE);
        registerModule(ItemScroller.INSTANCE);
@@ -232,6 +235,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(AutoDuel.INSTANCE);
       registerModule(AutoRespawn.INSTANCE);
       registerModule(Autofarm.INSTANCE);
+      registerModule(AncientFarmer.INSTANCE);
       registerModule(AutoKit.INSTANCE);
       registerModule(CreeperFarm.INSTANCE);
       registerModule(NameProtect.INSTANCE);

@@ -54,6 +54,10 @@ public final class XRay extends Module {
       }
    }
 
+   public java.util.List<BlockPos> getOres() {
+      return this.ores;
+   }
+
    private void found(BlockPos pos) {
       if (!this.ores.contains(pos)) {
          this.ores.add(pos);

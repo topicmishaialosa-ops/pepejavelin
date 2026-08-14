@@ -16,6 +16,7 @@ import tech.huihui.base.events.impl.player.EventUpdate;
 import tech.huihui.base.events.impl.render.EventHudRender;
 import tech.huihui.client.hud.elements.component.InformationComponent;
 import tech.huihui.client.hud.elements.component.KeybindsComponent;
+import tech.huihui.client.hud.elements.component.HelperBindsComponent;
 import tech.huihui.client.hud.elements.component.MusicInfoComponent;
 import tech.huihui.client.hud.elements.component.NotifyComponent;
 import tech.huihui.client.hud.elements.component.PotionsComponent;
@@ -51,7 +52,7 @@ public final class Interface extends Module {
    private static final float[] DEFAULT_OFFSET_Y = new float[]{10.0F, 73.0F, 73.0F, -72.5F, 41.5F, 73.0F};
    public final ModeSetting lang = new ModeSetting("Язык", "Русский", "English", "中文");
    public final NumberSetting hudSpacing = new NumberSetting("Отступ элементов", 11.0F, 6.0F, 20.0F, 1.0F);
-   private final MultiBooleanSetting elementsSetting = MultiBooleanSetting.create("Элементы", List.of("Ватермарка", "Эффекты", "Модераторы", "Уведомления", "Информация", "Бинды", "Музыка"));
+   private final MultiBooleanSetting elementsSetting = MultiBooleanSetting.create("Элементы", List.of("Ватермарка", "Эффекты", "Модераторы", "Уведомления", "Информация", "Бинды", "Музыка", "Бинды хелперов"));
    private final List<DraggableHudElement> elements = new ArrayList();
    private DraggableHudElement draggingElement = null;
    private float dragOffsetX;
@@ -69,6 +70,7 @@ public final class Interface extends Module {
       this.addElement(new InformationComponent("Information", 0.0F, 0.0F, 960.0F, 495.5F, 10.0F, 41.5F, DraggableHudElement.Align.TOP_LEFT));
       this.addElement(new KeybindsComponent("Keybinds", 349.0F, 0.0F, 960.0F, 495.5F, -122.0F, 73.0F, DraggableHudElement.Align.TOP_RIGHT));
       this.addElement(new MusicInfoComponent("Music", 0.0F, 0.0F, 960.0F, 495.5F, 10.0F, -150.0F, DraggableHudElement.Align.CENTER_LEFT));
+      this.addElement(new HelperBindsComponent("HelperBinds", 0.0F, 0.0F, 960.0F, 495.5F, -122.0F, 91.5F, DraggableHudElement.Align.TOP_RIGHT));
    }
 
    public void onEnable() {

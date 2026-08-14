@@ -18,7 +18,7 @@ import tech.huihui.utility.render.display.base.color.ColorRGBA;
 public final class EditClickGUI extends Module {
    public static final EditClickGUI INSTANCE = new EditClickGUI();
 
-   private final ModeSetting mode = new ModeSetting("Режим", "Dropdown1", "csgui1", "Dropdown3");
+   private final ModeSetting mode = new ModeSetting("Режим", "Dropdown1", "csgui1", "Dropdown3", "Dropdown4", "Dropdown5", "Dropdown6", "Dropdown7", "Dropdown8", "Dropdown9", "Dropdown10", "Dropdown11", "Dropdown12", "Dropdown13");
    private final NumberSetting width = new NumberSetting("Ширина", 120.0F, 80.0F, 220.0F, 1.0F);
    private final NumberSetting height = new NumberSetting("Высота", 300.0F, 100.0F, 500.0F, 1.0F);
    private final NumberSetting opacity = new NumberSetting("Прозрачность", 210.0F, 40.0F, 255.0F, 1.0F);

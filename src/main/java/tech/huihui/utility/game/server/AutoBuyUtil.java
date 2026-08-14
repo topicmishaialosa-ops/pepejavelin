@@ -133,6 +133,66 @@ public final class AutoBuyUtil {
       return handledScreen.slots.size() == 90 && handledScreen.getSlot(49).getStack().getItem() == Items.NETHER_STAR;
    }
 
+   public static String getServer() {
+      return MinecraftClient.getInstance().getCurrentServerEntry() == null
+         ? ""
+         : MinecraftClient.getInstance().getCurrentServerEntry().address;
+   }
+
+   public static boolean isFuntimeServer() {
+      return getServer().toLowerCase().contains("funtime");
+   }
+
+   public static boolean isHollyworldServer() {
+      String server = getServer().toLowerCase();
+      return server.contains("hollyworld") || server.contains("holyworld");
+   }
+
+   public static int getServerPrice(ItemStack itemStack) {
+      return getPrice(itemStack) / Math.max(1, itemStack.getCount());
+   }
+
+   public static long getBalance() {
+      if (MinecraftClient.getInstance().player == null
+         || MinecraftClient.getInstance().player.getScoreboardTeam() == null
+         || MinecraftClient.getInstance().player.getScoreboardTeam().getPrefix() == null) {
+         return -1L;
+      }
+
+      String prefix = stripFormatting(MinecraftClient.getInstance().player.getScoreboardTeam().getPrefix().getString());
+      if (!prefix.contains("монет")) {
+         return -1L;
+      }
+
+      Matcher matcher = Pattern.compile("[\\d ]+").matcher(prefix);
+      if (matcher.find()) {
+         String amount = matcher.group().replaceAll(" ", "").trim();
+         if (!amount.isEmpty()) {
+            try {
+               return Long.parseLong(amount);
+            } catch (NumberFormatException var5) {
+               return -1L;
+            }
+         }
+      }
+
+      return -1L;
+   }
+
+   public static String stripFormatting(String text) {
+      StringBuilder builder = new StringBuilder();
+      for (int i = 0; i < text.length(); ++i) {
+         char c = text.charAt(i);
+         if (c == 167) {
+            ++i;
+         } else {
+            builder.append(c);
+         }
+      }
+
+      return builder.toString();
+   }
+
    public static boolean isWaitBuy(ScreenHandler handledScreen) {
       return handledScreen.slots.size() == 63 && handledScreen.getSlot(0).getStack().getItem() == Items.LIME_STAINED_GLASS_PANE;
    }
