@@ -1,8 +1,10 @@
 package tech.huihui.client.screens.clickgui.settings;
 
 import lombok.Getter;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
+import org.lwjgl.glfw.GLFW;
 import tech.huihui.base.font.Fonts;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.modules.api.setting.impl.StringSetting;
@@ -26,12 +28,24 @@ public class StringComponent extends Component implements IMinecraft {
 
    private TextFieldWidget field() {
       if (!this.initialized && mc.textRenderer != null) {
-         this.field = new TextFieldWidget(mc.textRenderer, 0, 0, 90, 16, Text.empty());
-         this.field.setMaxLength(40);
+         this.field = new TextFieldWidget(mc.textRenderer, 0, 0, 150, 16, Text.empty());
+         this.field.setMaxLength(512);
          this.field.setText(this.setting.getValue());
          this.initialized = true;
       }
       return this.field;
+   }
+
+   private boolean pasteFromClipboard(TextFieldWidget field) {
+      if (!Screen.hasControlDown() || mc.getWindow() == null) {
+         return false;
+      }
+      String clipboard = GLFW.glfwGetClipboardString(mc.getWindow().getHandle());
+      if (clipboard == null || clipboard.isEmpty()) {
+         return false;
+      }
+      field.write(clipboard.replaceAll("[\\r\\n\\t]+", " ").trim());
+      return true;
    }
 
    @Override
@@ -46,7 +60,7 @@ public class StringComponent extends Component implements IMinecraft {
       if (field == null) {
          return;
       }
-      float fieldX = this.x + this.width / 2.0F - 45.0F;
+      float fieldX = this.x + this.width / 2.0F - 75.0F;
       float fieldY = this.y + 2.0F;
       DrawUtil.drawRoundedRect(draw.getMatrices(), fieldX - 1.0F, fieldY - 1.0F, field.getWidth() + 2.0F, field.getHeight() + 2.0F, BorderRadius.all(3.0F), (new ColorRGBA(30, 30, 34)).withAlpha(200.0F * alpha));
       DrawUtil.drawRoundedBorder(draw.getMatrices(), fieldX - 1.0F, fieldY - 1.0F, field.getWidth() + 2.0F, field.getHeight() + 2.0F, 1.0F, BorderRadius.all(3.0F), field.isFocused() ? theme.getColor().withAlpha(255.0F * alpha) : (new ColorRGBA(120, 120, 126)).withAlpha(90.0F * alpha));
@@ -61,7 +75,7 @@ public class StringComponent extends Component implements IMinecraft {
       if (field == null) {
          return false;
       }
-      float fieldX = this.x + this.width / 2.0F - 45.0F;
+      float fieldX = this.x + this.width / 2.0F - 75.0F;
       float fieldY = this.y + 2.0F;
       boolean inside = mouseX >= fieldX && mouseX <= fieldX + field.getWidth() && mouseY >= fieldY && mouseY <= fieldY + field.getHeight();
       field.setFocused(inside);
@@ -77,6 +91,10 @@ public class StringComponent extends Component implements IMinecraft {
       TextFieldWidget field = this.field();
       if (field == null || !field.isFocused()) {
          return false;
+      }
+      if (this.pasteFromClipboard(field)) {
+         this.setting.setValue(field.getText());
+         return true;
       }
       field.keyPressed(key, scanCode, modifiers);
       this.setting.setValue(field.getText());

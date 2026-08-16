@@ -91,9 +91,9 @@ public enum HuihuiClient implements ClientModInitializer {
          this.serverHandler = new ServerHandler();
          this.rctRepository = new RCTRepository();
          this.themeManager = new ThemeManager();
+         this.autoBuyManager = new AutoBuyManager();
          this.moduleManager = new ModuleManager();
          this.configManager = new ConfigManager();
-         this.autoBuyManager = new AutoBuyManager();
          this.commandManager = new CommandManager();
          this.scriptManager = new ScriptManager();
          this.waypointManager = new WaypointManager();

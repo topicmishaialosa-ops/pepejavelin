@@ -10,6 +10,8 @@ import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.command.CommandSource;
 import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.base.comand.api.CommandAbstract;
+import tech.huihui.base.comand.impl.AhChenaCommand;
+import tech.huihui.base.comand.impl.AhSearchCommand;
 import tech.huihui.base.comand.impl.BlockESPCommand;
 import tech.huihui.base.comand.impl.ClipCommand;
 import tech.huihui.base.comand.impl.ConfigCommand;
@@ -20,6 +22,7 @@ import tech.huihui.base.comand.impl.HelpCommand;
 import tech.huihui.base.comand.impl.MacroCommand;
 import tech.huihui.base.comand.impl.PilotCommand;
 import tech.huihui.base.comand.impl.RCTCommand;
+import tech.huihui.base.comand.impl.RtpFunTimeCommand;
 import tech.huihui.base.comand.impl.StopCommand;
 import tech.huihui.base.comand.impl.TPCommand;
 
@@ -45,8 +48,11 @@ public class CommandManager {
        this.registerCommand(new FarmCommand());
        this.registerCommand(new StopCommand());
        this.registerCommand(new HelpCommand());
-       this.registerCommand(new PilotCommand());
-       this.registerCommand(new TPCommand());
+        this.registerCommand(new PilotCommand());
+this.registerCommand(new RtpFunTimeCommand());
+         this.registerCommand(new AhSearchCommand());
+         this.registerCommand(new AhChenaCommand());
+         this.registerCommand(new TPCommand());
     }
 
    @Native

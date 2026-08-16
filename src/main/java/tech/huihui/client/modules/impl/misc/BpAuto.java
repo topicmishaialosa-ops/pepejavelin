@@ -1,25 +1,38 @@
 package tech.huihui.client.modules.impl.misc;
 
 import com.darkmagician6.eventapi.EventTarget;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.LoreComponent;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.screen.ScreenHandler;
+import net.minecraft.screen.slot.Slot;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.text.Text;
 import tech.huihui.base.events.impl.player.EventUpdate;
+import tech.huihui.base.events.impl.server.EventChatReceive;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
 import tech.huihui.client.modules.api.setting.impl.BooleanSetting;
 import tech.huihui.client.modules.api.setting.impl.NumberSetting;
+import tech.huihui.client.modules.api.setting.impl.StringSetting;
+import tech.huihui.utility.ai.ZaiAi;
 import tech.huihui.utility.game.other.MessageUtil;
+import tech.huihui.utility.game.player.PlayerInventoryUtil;
+import tech.huihui.utility.game.server.AutoBuyUtil;
 
 @ModuleAnnotation(
    name = "BpAuto",
@@ -38,6 +51,10 @@ public final class BpAuto extends Module {
    private final NumberSetting timeout = new NumberSetting("Таймаут", 200.0F, 40.0F, 400.0F, 10.0F);
    private final BooleanSetting closeGui = new BooleanSetting("Закрывать GUI", true);
    private final BooleanSetting chatOutput = new BooleanSetting("Вывод в чат", true);
+private final BooleanSetting aiAssist = new BooleanSetting("ИИ-помощник", "Отдаёт план действий через GLM-4.7-Flash (z.ai)", false);
+    private final StringSetting aiApiKey = new StringSetting("API-ключ Z.AI", "");
+    private final BooleanSetting ahTrade = new BooleanSetting("Торговля на /ah", "Разрешает ИИ покупать и продавать через аукцион /ah", true, () -> this.aiAssist.isEnabled());
+    private final NumberSetting buyThreshold = new NumberSetting("Порог баланса (покупка)", 500000.0F, 100000.0F, 10000000.0F, 10000.0F);
    public final List<BpTask> tasks = new ArrayList<>();
 
    private enum State {
@@ -47,6 +64,14 @@ public final class BpAuto extends Module {
    private State state = State.IDLE;
    private int tickDelay;
    private int stateTicks;
+   private long balance = -1L;
+   private boolean balanceRequested;
+   private boolean balanceChecked;
+   private final ExecutorService aiExecutor = Executors.newSingleThreadExecutor(runnable -> {
+      Thread thread = new Thread(runnable, "BpAuto-AI");
+      thread.setDaemon(true);
+      return thread;
+   });
 
    @Override
    public void onEnable() {
@@ -55,8 +80,52 @@ public final class BpAuto extends Module {
       this.state = State.WAIT_BP_OPEN;
       this.tickDelay = 20;
       this.stateTicks = 0;
+      this.balance = -1L;
+      this.balanceRequested = false;
+      this.balanceChecked = false;
       if (mc.player != null) {
          mc.getNetworkHandler().sendChatMessage("/bp");
+         this.requestBalance();
+      }
+   }
+
+   private void requestBalance() {
+      if (mc.player == null || mc.getNetworkHandler() == null || this.balanceRequested) {
+         return;
+      }
+      this.balanceRequested = true;
+      mc.getNetworkHandler().sendChatCommand("bal");
+   }
+
+   @EventTarget
+   private void onChat(EventChatReceive event) {
+      if (!this.aiAssist.isEnabled() || !this.balanceRequested || this.balanceChecked || mc.player == null) {
+         return;
+      }
+      String text = event.getMessage().getString();
+      String lower = text.toLowerCase();
+      if (!lower.contains("баланс") && !lower.contains("balance") && !lower.contains("монет")
+         && !lower.contains("coins") && !lower.contains("$") && !lower.contains("кошельк")) {
+         return;
+      }
+      long value = this.parseBalance(text);
+      if (value < 0) {
+         return;
+      }
+      this.balance = value;
+      this.balanceChecked = true;
+   }
+
+   private long parseBalance(String text) {
+      String clean = text.replaceAll("[^\\d ]", " ").trim();
+      Matcher matcher = Pattern.compile("\\d{1,3}(?:[ ]\\d{3})+|\\d+").matcher(clean);
+      if (!matcher.find()) {
+         return -1L;
+      }
+      try {
+         return Long.parseLong(matcher.group().replaceAll(" ", ""));
+      } catch (NumberFormatException e) {
+         return -1L;
       }
    }
 
@@ -184,6 +253,333 @@ public final class BpAuto extends Module {
       if (this.chatOutput.isEnabled()) {
          this.printTasks();
       }
+
+      this.askAi();
+   }
+
+   private void askAi() {
+      if (!this.aiAssist.isEnabled() || this.tasks.isEmpty()) {
+         return;
+      }
+      String key = this.aiApiKey.getValue();
+      if (key == null || key.isBlank()) {
+         MessageUtil.displayError("BpAuto ИИ: вставьте API-ключ z.ai в настройках");
+         return;
+      }
+      if (!this.balanceChecked) {
+         if (this.balanceRequested) {
+            this.aiExecutor.execute(() -> {
+               try {
+                  Thread.sleep(1000L);
+               } catch (InterruptedException ignored) {
+               }
+               mc.execute(BpAuto.this::askAi);
+            });
+         } else {
+            this.requestBalance();
+            this.aiExecutor.execute(() -> {
+               try {
+                  Thread.sleep(1000L);
+               } catch (InterruptedException ignored) {
+               }
+               mc.execute(BpAuto.this::askAi);
+            });
+         }
+         return;
+      }
+      this.aiExecutor.execute(() -> ZaiAi.ask(key, this.buildSystemPrompt(), this.buildTasksPrompt(), new ZaiAi.Callback() {
+         @Override
+         public void onResult(String reply) {
+            mc.execute(() -> BpAuto.this.executePlan(reply));
+         }
+
+         @Override
+         public void onError(String message) {
+            MessageUtil.displayError("BpAuto ИИ: " + message);
+         }
+      }));
+   }
+
+   private String buildSystemPrompt() {
+      return "Ты — ИИ-планировщик заданий для Minecraft (анархия FunTime). "
+         + "СПРАВОЧНИК СЕРВЕРА FunTime анархия: "
+         + "/rtp — случайный телепорт в случайную точку мира; "
+         + "/bp — открывает GUI с еженедельными заданиями; "
+         + "/bal — баланс монет; "
+         + "/ah — открыть аукцион (GUI, там слот для продажи и покупки); "
+         + "/ah sell <цена> — ПРОДАЖА на аукционе: игрок держит в руке предмет (весь стак/количество в руке, цена указывается за всё что в руке), затем пишет /ah sell <цена> — так продаётся вся пачка; "
+         + "продажу добытых ресурсов игрок делает через аукцион /ah sell (не через /sellall и не через /pawn). "
+         + "ДОБЫЧА: Baritone-команды #mine <блок> (добыть блок), #goto x y z (идти к координатам), #stop (остановить). "
+         + "При добыче дерева и руд ресурсы получаются в инвентарь, потом их нужно продать через /ah sell. "
+         + "Задания из /bp могут требовать: добыть N штук блока (tree, ore), скрафтить предмет, убить моба или купить предмет. "
+         + "Верни ТОЛЬКО JSON без пояснений и markdown в формате: {\"plan\": [{\"action\": \"...\", \"поле\": \"...\"}]}. "
+         + "Доступные действия: "
+         + "\"rtp\" — случайный телепорт через /rtp; "
+         + "\"mine\" с полем \"block\" — добывать блок через Baritone (блок по-английски, например oak_log, iron_ore); "
+         + "\"baritone\" с полем \"command\" — выполнить команду Baritone (например \"#mine diamond_ore\" или \"#goto 100 64 100\"); "
+         + "\"goto\" с полями x, y, z — идти к координатам через Baritone; "
+         + "\"sell\" с полями \"item\" и \"price\" — продать добытый ресурс: клиент возьмёт предмет в руку и отправит /ah sell <price>. item — название предмета на русском или английском из добытого, price — цена монет за всё что в руке; "
+         + "\"autobuy\" с полем \"item\" — купить предмет через AutoBuy на аукционе; "
+         + "\"ahsearch\" с полем \"item\" — открыть поиск предмета на аукционе командой .ahsearch (покажет лоты с этим предметом и цены); "
+         + "\"message\" с полем \"text\" — сообщение игроку в чат. "
+         + "Правила: НИКОГДА не предлагай идти в Энд и не ищи порталы в Энд. "
+         + "НИКОГДА не строй порталы в Ад — только ищи уже существующие. "
+         + "Для добычи дерева и руд всегда сначала выполни rtp, потом mine. "
+         + "ВАЖНО ПРО БАЛАНС: тебе дают текущий баланс игрока и порог. "
+         + "Если баланс меньше порога — режим ДОБЫЧИ: запрещено использовать autobuy. "
+         + "Планируй добычу ресурсов (rtp + mine) и продажу добытого через /ah sell (шлейф: rtp → mine → sell). "
+         + "Когда баланс достигнет порога — можно переходить к покупкам через autobuy. "
+         + "AutoBuy работает только на FunTime; для задания с хорусом/хорусами обязательно оцени стоимость и выгоду покупки через autobuy: "
+         + "если покупка невыгодна — переходи к следующему заданию и выдай его план; если ВСЕ задания невыгодны или невыполнимы — верни одно действие message и объясни. "
+         + "Планируй только задания, которые реально выполнить. Текст message пиши на русском.";
+   }
+
+   private String buildTasksPrompt() {
+      StringBuilder builder = new StringBuilder("Задания /bp:\n");
+      for (BpTask task : this.tasks) {
+         builder.append("- ").append(task.name);
+         if (task.current >= 0 && task.target > 0) {
+            builder.append(" [").append(task.current).append("/").append(task.target).append("]");
+         }
+         if (task.reward != null) {
+            builder.append(" | награда: ").append(task.reward);
+         }
+         builder.append('\n');
+      }
+      builder.append("Баланс: ").append(this.balance >= 0 ? this.balance : AutoBuyUtil.getBalance()).append(" монет\n");
+      builder.append("Порог для покупок: ").append((long) this.buyThreshold.getCurrent()).append(" монет\n");
+      return builder.toString();
+   }
+
+   private void executePlan(String reply) {
+      try {
+         String json = this.extractJson(reply);
+         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+         JsonArray plan = root.getAsJsonArray("plan");
+         if (plan == null) {
+            this.aiOutput(reply);
+            return;
+         }
+         boolean anyExecuted = false;
+         for (JsonElement element : plan) {
+            if (this.executeAction(element.getAsJsonObject())) {
+               anyExecuted = true;
+            }
+         }
+         if (!anyExecuted) {
+            MessageUtil.displayInfo("BpAuto ИИ: все задания невыгодны или уже выполнены");
+         }
+      } catch (Exception e) {
+         MessageUtil.displayError("BpAuto ИИ: не удалось разобрать план: " + e.getMessage());
+         this.aiOutput(reply);
+      }
+   }
+
+   private String extractJson(String reply) {
+      String text = reply == null ? "" : reply.trim();
+      if (text.isEmpty()) {
+         return "";
+      }
+      text = text.replaceFirst("^```[a-zA-Z]*\\s*", "").replaceFirst("\\s*```$", "");
+      int start = -1;
+      char open = 0;
+      for (int i = 0; i < text.length(); i++) {
+         char c = text.charAt(i);
+         if (c == '{' || c == '[') {
+            start = i;
+            open = c;
+            break;
+         }
+      }
+      if (start == -1) {
+         return text;
+      }
+      char close = open == '{' ? '}' : ']';
+      int depth = 0;
+      boolean inString = false;
+      boolean escaped = false;
+      for (int i = start; i < text.length(); i++) {
+         char c = text.charAt(i);
+         if (inString) {
+            if (escaped) {
+               escaped = false;
+            } else if (c == '\\') {
+               escaped = true;
+            } else if (c == '"') {
+               inString = false;
+            }
+         } else if (c == '"') {
+            inString = true;
+         } else if (c == open) {
+            depth++;
+         } else if (c == close) {
+            depth--;
+            if (depth == 0) {
+               return text.substring(start, i + 1);
+            }
+         }
+      }
+      return text.substring(start);
+   }
+
+   private boolean executeAction(JsonObject action) {
+      if (action == null || !action.has("action")) {
+         return false;
+      }
+      String type = action.get("action").getAsString().toLowerCase();
+      switch (type) {
+         case "rtp":
+            this.runClientCommand(".rtpfuntime");
+            return true;
+         case "mine": {
+            String block = action.has("block") ? action.get("block").getAsString() : null;
+            this.runClientCommand(".rtpfuntime");
+            if (block != null && !block.isBlank()) {
+               this.sendBaritone("#mine " + block);
+            }
+            return true;
+         }
+         case "baritone": {
+            String command = action.has("command") ? action.get("command").getAsString() : null;
+            if (command != null && !command.isBlank()) {
+               this.sendBaritone(command);
+               return true;
+            }
+            return false;
+         }
+         case "goto": {
+            String command = "#goto";
+            if (action.has("x") && action.has("y") && action.has("z")) {
+               command = command + " " + action.get("x").getAsString() + " " + action.get("y").getAsString() + " " + action.get("z").getAsString();
+            } else if (action.has("command")) {
+               command = action.get("command").getAsString();
+            }
+            this.sendBaritone(command);
+            return true;
+         }
+         case "sell": {
+            if (!this.ahTrade.isEnabled()) {
+               MessageUtil.displayInfo("BpAuto ИИ: торговля на /ah выключена — продажа пропущена");
+               return true;
+            }
+            String item = action.has("item") ? action.get("item").getAsString() : null;
+            String price = action.has("price") ? action.get("price").getAsString() : null;
+            this.sellOnAh(item, price);
+            return true;
+         }
+         case "ahsearch": {
+            if (!this.ahTrade.isEnabled()) {
+               MessageUtil.displayInfo("BpAuto ИИ: торговля на /ah выключена — поиск на аукционе пропущен");
+               return true;
+            }
+            String item = action.has("item") ? action.get("item").getAsString() : null;
+            if (item == null || item.isBlank()) {
+               this.runClientCommand(".ahsearch");
+               return true;
+            }
+            this.runClientCommand(".ahsearch " + item);
+            MessageUtil.displayInfo("BpAuto ИИ: ищу \"" + item + "\" на аукционе");
+            return true;
+         }
+         case "autobuy": {
+            if (!this.ahTrade.isEnabled()) {
+               MessageUtil.displayInfo("BpAuto ИИ: торговля на /ah выключена — покупка пропущена");
+               return true;
+            }
+            String item = action.has("item") ? action.get("item").getAsString() : null;
+            if (!AutoBuyUtil.isFuntimeServer()) {
+               MessageUtil.displayInfo("BpAuto ИИ: AutoBuy работает только на FunTime");
+               return true;
+            }
+            long threshold = (long) this.buyThreshold.getCurrent();
+            if (this.balance >= 0 && this.balance < threshold) {
+               MessageUtil.displayInfo("BpAuto ИИ: баланс " + this.balance
+                  + " меньше порога " + threshold + " — сначала добываем/продаём, покупаем позже");
+               return true;
+            }
+            AutoBuy.INSTANCE.setToggled(true);
+            MessageUtil.displayInfo("BpAuto ИИ: включаю AutoBuy" + (item != null && !item.isBlank() ? " для " + item : ""));
+            return true;
+         }
+         case "message": {
+            String text = action.has("text") ? action.get("text").getAsString() : "";
+            this.aiOutput(text);
+            return true;
+         }
+         default:
+            return false;
+      }
+   }
+
+   private void runClientCommand(String command) {
+      if (mc.getNetworkHandler() != null) {
+         mc.getNetworkHandler().sendChatMessage(command);
+      }
+   }
+
+   private void sendBaritone(String command) {
+      if (mc.getNetworkHandler() == null) {
+         return;
+      }
+      String cmd = command.startsWith("#") ? command : "#" + command;
+      mc.getNetworkHandler().sendChatMessage(cmd);
+   }
+
+   private void sellOnAh(String item, String price) {
+      if (mc.player == null) {
+         return;
+      }
+      this.holdItemInHand(item);
+      if (price != null && !price.isBlank()) {
+         this.runClientCommand("/ah sell " + price);
+         MessageUtil.displayInfo("BpAuto ИИ: продаю на /ah за " + price);
+      } else {
+         this.aiOutput("Возьми предмет в руку и напиши /ah sell <цена>, чтобы продать его на аукционе");
+      }
+   }
+
+   private void holdItemInHand(String item) {
+      if (mc.player == null || mc.player.currentScreenHandler == null) {
+         return;
+      }
+      String lower = item == null ? "" : item.toLowerCase();
+      Slot hotbar = null;
+      Slot inventory = null;
+      for (Slot slot : PlayerInventoryUtil.slots().toList()) {
+         if (!slot.hasStack()) {
+            continue;
+         }
+         String name = slot.getStack().getName().getString().toLowerCase();
+         boolean match = lower.isEmpty() || name.contains(lower);
+         if (!match) {
+            continue;
+         }
+         boolean isHotbar = slot.getIndex() < 9;
+         if (isHotbar && hotbar == null) {
+            hotbar = slot;
+         } else if (!isHotbar && inventory == null) {
+            inventory = slot;
+         }
+      }
+      if (hotbar != null) {
+         mc.player.getInventory().selectedSlot = hotbar.getIndex();
+         mc.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(hotbar.getIndex()));
+         return;
+      }
+      if (inventory != null) {
+         PlayerInventoryUtil.swapHand(inventory, mc.player.getInventory().selectedSlot, false);
+      }
+   }
+
+   private void aiOutput(String text) {
+      if (mc.player == null) {
+         return;
+      }
+      String clean = text == null ? "" : text.replaceAll("```", "").trim();
+      if (clean.isEmpty()) {
+         return;
+      }
+      mc.player.sendMessage(Text.literal("§d[ИИ]§r " + clean), false);
    }
 
    private boolean tryParseProgress(BpTask task, String text) {
