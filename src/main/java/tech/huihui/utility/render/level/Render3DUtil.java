@@ -62,7 +62,7 @@ public final class Render3DUtil implements IMinecraft {
          RenderSystem.enableBlend();
          RenderSystem.disableCull();
          RenderSystem.disableDepthTest();
-         RenderSystem.blendFunc(SrcFactor.SRC_ALPHA, DstFactor.ONE_MINUS_CONSTANT_ALPHA);
+         RenderSystem.blendFunc(SrcFactor.SRC_ALPHA, DstFactor.ONE_MINUS_SRC_ALPHA);
          RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
          final BufferBuilder finalBuffer = tessellator.begin(DrawMode.QUADS, VertexFormats.POSITION_COLOR);
          QUAD.forEach((quad) -> {
@@ -83,7 +83,7 @@ public final class Render3DUtil implements IMinecraft {
          RenderSystem.enableBlend();
          RenderSystem.disableCull();
          RenderSystem.disableDepthTest();
-         RenderSystem.blendFunc(SrcFactor.SRC_ALPHA, DstFactor.ONE_MINUS_CONSTANT_ALPHA);
+         RenderSystem.blendFunc(SrcFactor.SRC_ALPHA, DstFactor.ONE_MINUS_SRC_ALPHA);
          RenderSystem.setShader(ShaderProgramKeys.RENDERTYPE_LINES);
          widths.forEach((width) -> {
             RenderSystem.lineWidth(width);
@@ -109,7 +109,7 @@ public final class Render3DUtil implements IMinecraft {
          RenderSystem.disableCull();
          RenderSystem.enableDepthTest();
          RenderSystem.depthMask(false);
-         RenderSystem.blendFunc(SrcFactor.SRC_ALPHA, DstFactor.ONE_MINUS_CONSTANT_ALPHA);
+         RenderSystem.blendFunc(SrcFactor.SRC_ALPHA, DstFactor.ONE_MINUS_SRC_ALPHA);
          RenderSystem.setShader(ShaderProgramKeys.RENDERTYPE_LINES);
          widths.forEach((width) -> {
             RenderSystem.lineWidth(width);
@@ -131,7 +131,7 @@ public final class Render3DUtil implements IMinecraft {
          RenderSystem.enableBlend();
          RenderSystem.disableCull();
          RenderSystem.enableDepthTest();
-         RenderSystem.blendFunc(SrcFactor.SRC_ALPHA, DstFactor.ONE_MINUS_CONSTANT_ALPHA);
+         RenderSystem.blendFunc(SrcFactor.SRC_ALPHA, DstFactor.ONE_MINUS_SRC_ALPHA);
          RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
          final BufferBuilder finalBuffer2 = tessellator.begin(DrawMode.QUADS, VertexFormats.POSITION_COLOR);
          QUAD_DEPTH.forEach((quad) -> {

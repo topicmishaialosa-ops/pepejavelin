@@ -45,13 +45,49 @@ public final class AccountManager implements IMinecraft {
       if (name == null || name.trim().isEmpty() || this.findByName(name) != null) {
          return;
       }
-      this.accounts.add(new Account(name.trim()));
+      boolean first = this.accounts.isEmpty();
+      this.accounts.add(new Account(name.trim(), first, false));
       this.save();
    }
 
    public void remove(Account account) {
+      boolean wasSelected = account.isSelected();
       this.accounts.remove(account);
+      if (wasSelected && !this.accounts.isEmpty()) {
+         this.accounts.get(0).setSelected(true);
+      }
       this.save();
+   }
+
+   public void clear() {
+      this.accounts.clear();
+      this.save();
+   }
+
+   public void reorder(java.util.List<Account> ordered) {
+      this.accounts.clear();
+      this.accounts.addAll(ordered);
+      this.save();
+   }
+
+   public void select(Account account) {
+      if (account == null) {
+         return;
+      }
+      for (Account other : this.accounts) {
+         other.setSelected(other == account);
+      }
+      this.save();
+      this.switchTo(account);
+   }
+
+   public Account getSelected() {
+      for (Account account : this.accounts) {
+         if (account.isSelected()) {
+            return account;
+         }
+      }
+      return null;
    }
 
    public void switchTo(Account account) {
@@ -87,7 +123,9 @@ public final class AccountManager implements IMinecraft {
             for (JsonElement element : object.getAsJsonArray("accounts")) {
                JsonObject acc = element.getAsJsonObject();
                if (acc.has("name")) {
-                  this.accounts.add(new Account(acc.get("name").getAsString()));
+                  boolean selected = acc.has("selected") && acc.get("selected").getAsBoolean();
+                  boolean favorited = acc.has("favorited") && acc.get("favorited").getAsBoolean();
+                  this.accounts.add(new Account(acc.get("name").getAsString(), selected, favorited));
                }
             }
          }
@@ -106,6 +144,8 @@ public final class AccountManager implements IMinecraft {
          for (Account account : this.accounts) {
             JsonObject object = new JsonObject();
             object.addProperty("name", account.getName());
+            object.addProperty("selected", account.isSelected());
+            object.addProperty("favorited", account.isFavorited());
             array.add(object);
          }
          JsonObject root = new JsonObject();

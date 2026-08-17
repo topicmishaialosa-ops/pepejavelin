@@ -8,6 +8,7 @@ import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
 import tech.huihui.client.modules.api.setting.impl.ButtonSetting;
+import tech.huihui.client.modules.api.setting.impl.BooleanSetting;
 import tech.huihui.client.modules.api.setting.impl.ModeSetting;
 import tech.huihui.client.modules.api.setting.impl.NumberSetting;
 import tech.huihui.client.screens.swing.SwingEditorScreen;
@@ -42,8 +43,9 @@ public final class SwingAnimation extends Module {
    public NumberSetting customPosY = new NumberSetting("Позиция Y", 0.0F, -3.0F, 3.0F, 0.01F, this::isCustomMode);
    public NumberSetting customPosZ = new NumberSetting("Позиция Z", 0.0F, -3.0F, 3.0F, 0.01F, this::isCustomMode);
    public NumberSetting customScale = new NumberSetting("Масштаб", 1.0F, 0.1F, 3.0F, 0.01F, this::isCustomMode);
-   public ModeSetting customCurve = new ModeSetting("Кривая", this::isCustomMode, new String[]{"Линейная", "Плавная"});
-   public ButtonSetting openEditor = new ButtonSetting("Открыть редактор анимации", SwingEditorScreen::openEditor);
+public ModeSetting customCurve = new ModeSetting("Кривая", this::isCustomMode, new String[]{"Линейная", "Плавная"});
+    public ButtonSetting openEditor = new ButtonSetting("Открыть редактор анимации", SwingEditorScreen::openEditor);
+    public BooleanSetting showHands = new BooleanSetting("Показать руки", false);
 
    private SwingAnimation() {
    }
@@ -72,38 +74,38 @@ public final class SwingAnimation extends Module {
       return mc.currentScreen instanceof SwingEditorScreen;
    }
 
-   public void applyEditorPosition(MatrixStack matrices, Arm arm) {
-      if (mc.player == null || arm != mc.player.getMainArm()) {
-         return;
-      }
-      matrices.translate(-0.56F, 0.52F, 0.25F);
-   }
+public void applyEditorPosition(MatrixStack matrices, Arm arm) {
+       if (mc.player == null || arm != mc.player.getMainArm()) {
+          return;
+       }
+        matrices.translate(-0.56F, 0.52F, 0.25F);
+     }
 
    private float lerp(float a, float b, float t) {
       return a + (b - a) * t;
    }
 
-   public void renderSwordAnimation(MatrixStack matrices, float swingProgress, float equipProgress, Arm arm) {
+public void renderSwordAnimation(MatrixStack matrices, float swingProgress, float equipProgress, Arm arm) {
         if (this.isPreviewing()) {
-           swingProgress = this.getPreviewProgress();
+            swingProgress = this.getPreviewProgress();
         } else {
-           float speedFactor = Math.max(this.speed.getCurrent(), 0.1F) / 7.0F;
-           swingProgress = MathHelper.clamp(swingProgress * speedFactor, 0.0F, 1.0F);
+            float speedFactor = Math.max(this.speed.getCurrent(), 0.1F) / 7.0F;
+            swingProgress = MathHelper.clamp(swingProgress * speedFactor, 0.0F, 1.0F);
         }
-      if (arm == Arm.RIGHT) {
-         matrices.translate(this.rightX.getCurrent(), this.rightY.getCurrent(), this.rightZ.getCurrent());
-      } else {
-         matrices.translate(this.leftX.getCurrent(), this.leftY.getCurrent(), this.leftZ.getCurrent());
-      }
-      float anim = (float)Math.sin((double)swingProgress * 1.5707963267948966D * 2.0D);
-      float sin2 = MathHelper.sin(MathHelper.sqrt(swingProgress) * 3.1415927F);
-      float power = this.swingPower.getCurrent();
-      float ang = this.angle.getCurrent();
-      String mode = this.animationMode.get();
-      float f;
-      float g;
-      float sinExtra;
-      switch(mode) {
+        if (arm == Arm.RIGHT) {
+            matrices.translate(this.rightX.getCurrent(), this.rightY.getCurrent(), this.rightZ.getCurrent());
+        } else {
+            matrices.translate(this.leftX.getCurrent(), this.leftY.getCurrent(), this.leftZ.getCurrent());
+        }
+        float anim = (float)Math.sin((double)swingProgress * 1.5707963267948966D * 2.0D);
+        float sin2 = MathHelper.sin(MathHelper.sqrt(swingProgress) * 3.1415927F);
+        float power = this.swingPower.getCurrent();
+        float ang = this.angle.getCurrent();
+        String mode = this.animationMode.get();
+        float f;
+        float g;
+        float sinExtra;
+        switch(mode) {
       case "HMI Взмахи": {
          float swingRot = hmiSwingRot(swingProgress);
          float swing = hmiEase(MathHelper.sin(swingProgress * 3.1415927F));

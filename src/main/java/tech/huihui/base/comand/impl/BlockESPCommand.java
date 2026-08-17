@@ -14,6 +14,7 @@ import net.minecraft.util.Formatting;
 import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.comand.api.CommandAbstract;
+import tech.huihui.base.comand.impl.args.TokenArgumentType;
 import tech.huihui.client.modules.api.setting.impl.BlockMapSetting;
 import tech.huihui.client.modules.impl.render.BlockESP;
 import tech.huihui.utility.game.other.MessageUtil;
@@ -49,11 +50,11 @@ public class BlockESPCommand extends CommandAbstract {
 
    @Native
    public void execute(LiteralArgumentBuilder<CommandSource> builder) {
-      builder.then(literal("add").then(arg("блок", StringArgumentType.word()).suggests(this.blockSuggestions())
+      builder.then(literal("add").then(arg("блок", TokenArgumentType.create()).suggests(this.blockSuggestions())
          .executes((context) -> this.addBlock(context, (String)null))
          .then(arg("цвет", StringArgumentType.word()).suggests(this.colorSuggestions())
             .executes((context) -> this.addBlock(context, context.getArgument("цвет", String.class))))));
-      builder.then(literal("remove").then(arg("блок", StringArgumentType.word()).suggests(this.addedBlockSuggestions())
+      builder.then(literal("remove").then(arg("блок", TokenArgumentType.create()).suggests(this.addedBlockSuggestions())
          .executes(this::removeBlock)));
       builder.then(literal("clear").executes(this::clearBlocks));
       builder.then(literal("list").executes(this::listBlocks));
@@ -140,9 +141,13 @@ public class BlockESPCommand extends CommandAbstract {
 
    private Block findBlock(String input) {
       String normalized = input.toLowerCase(Locale.ROOT);
+      if (normalized.startsWith("minecraft:")) {
+         normalized = normalized.substring("minecraft:".length());
+      }
       for (Block block : Registries.BLOCK) {
          String id = BlockMapSetting.getId(block);
-         if (id.equals(normalized) || id.equals("minecraft:" + normalized)) {
+         String stripped = id.startsWith("minecraft:") ? id.substring("minecraft:".length()) : id;
+         if (stripped.equals(normalized) || id.equals(normalized)) {
             return block;
          }
       }

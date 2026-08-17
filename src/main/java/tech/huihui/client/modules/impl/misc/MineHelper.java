@@ -155,7 +155,7 @@ public final class MineHelper extends Module {
       float panelX = (float)centerX - panelWidth / 2.0F;
       float panelY = (float)topY - 18.0F;
 
-      ColorRGBA accent = JAVELIN.getThemeManager().getClientColor(90);
+      ColorRGBA accent = new ColorRGBA(96, 130, 255);
       DrawUtil.drawRoundedRect(
          event.getContext().getMatrices(),
          panelX,
@@ -272,6 +272,26 @@ public final class MineHelper extends Module {
             }
          }
          rendered++;
+      }
+   }
+
+   public String getTimerValue() {
+      if (mc.world == null || mc.player == null) {
+         return "";
+      }
+      return this.findTimerValue(this.getArmorStands());
+   }
+
+   public int getTimerSeconds() {
+      String value = this.getTimerValue();
+      if (value.isEmpty()) {
+         return -1;
+      }
+      String[] parts = value.split(":");
+      try {
+         return Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
+      } catch (NumberFormatException var6) {
+         return -1;
       }
    }
 

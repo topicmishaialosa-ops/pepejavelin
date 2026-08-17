@@ -23,6 +23,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.At.Shift;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import tech.huihui.client.modules.impl.render.HoldMyItemsRenderer;
 import tech.huihui.client.modules.impl.render.SwingAnimation;
 import tech.huihui.client.modules.impl.render.UseAnimation;
 import tech.huihui.client.modules.impl.render.ViewModel;
@@ -46,7 +47,7 @@ public abstract class HeldItemRendererMixin {
    protected abstract void method_3228(AbstractClientPlayerEntity var1, float var2, float var3, Hand var4, float var5, ItemStack var6, float var7, MatrixStack var8, VertexConsumerProvider var9, int var10);
 
    @Shadow
-   protected abstract void method_65816(float var1, float var2, MatrixStack var3, int var4, Arm var5);
+    protected abstract void method_65816(float var1, float var2, MatrixStack var3, int var4, Arm var5);
 
      @Inject(
        method = {"renderFirstPersonItem"},
@@ -136,6 +137,19 @@ public abstract class HeldItemRendererMixin {
         ci.cancel();
         useAnimation.apply(matrices, tickDelta, arm, stack, player);
      }
+
+   @Inject(
+      method = {"renderFirstPersonItem"},
+      at = {@At("HEAD")},
+      cancellable = true
+   )
+    public void injectHoldMyItemsHands(AbstractClientPlayerEntity player, float tickDelta, float pitch, Hand hand, float swingProgress, ItemStack item, float equipProgress, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, CallbackInfo ci) {
+       SwingAnimation swingAnimation = SwingAnimation.INSTANCE;
+       if (!swingAnimation.isEnabled() || !swingAnimation.showHands.isEnabled() || swingAnimation.isEditorOpen()) {
+          return;
+       }
+       HoldMyItemsRenderer.INSTANCE.renderItemInFirstPerson(player, tickDelta, pitch, hand, swingProgress, item, equipProgress, matrices, vertexConsumers, light, ci);
+    }
 
    @Inject(
       method = {"renderFirstPersonItem"},

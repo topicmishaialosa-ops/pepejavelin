@@ -13,6 +13,7 @@ import net.minecraft.client.texture.AbstractTexture;
 import net.minecraft.client.texture.ResourceTexture;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
@@ -38,7 +39,17 @@ import tech.huihui.utility.render.display.shader.DrawUtil;
 )
 public class TargetESP extends Module {
    public static final TargetESP INSTANCE = new TargetESP();
-   private final ModeSetting mode = new ModeSetting("Мод", new String[]{"Маркер", "Призраки"});
+   private final ModeSetting mode = new ModeSetting("Мод", new String[]{"Маркер", "Призраки", "Спираль"});
+   private static final float HELIX_SPEED = 4.0F;
+   private static final float HELIX_BASE_SIZE = 0.45F;
+   private static final int HELIX_TRAIL_LENGTH = 30;
+   private static final float HELIX_RADIUS = 0.6F;
+   private static final float HELIX_UPPER_POS = 1.65F;
+   private static final float HELIX_LOWER_POS = 0.45F;
+   private static final float HELIX_BREATH_RANGE = 0.4F;
+   private static final float HELIX_DRIFT_AMP = 0.06F;
+   private static final float HELIX_MID_POS = (HELIX_UPPER_POS + HELIX_LOWER_POS) / 2.0F;
+   private static final float[] HELIX_FIXED_Y = {HELIX_UPPER_POS, HELIX_MID_POS, HELIX_LOWER_POS};
    private final Animation animation;
    private final Animation animation2;
    private Entity lastTarget;
@@ -70,7 +81,11 @@ public class TargetESP extends Module {
          this.drawSpiritsTrack(e);
       }
 
-      if (!this.mode.is("Призраки")) {
+      if (this.mode.is("Спираль")) {
+         this.drawHelix(e);
+      }
+
+      if (!this.mode.is("Призраки") && !this.mode.is("Спираль")) {
          if (!this.textureLoaded) {
             MinecraftClient.getInstance().getTextureManager().registerTexture(Identifier.of("huihui", "hud/marker.png"), new ResourceTexture(Identifier.of("huihui", "hud/marker.png")));
             this.textureLoaded = true;
@@ -207,5 +222,73 @@ public class TargetESP extends Module {
          }
 
       }
+   }
+
+   private void drawHelix(EventRender3D event3D) {
+      Aura aura = Aura.INSTANCE;
+      this.animation2.update(aura.getTarget() != null && aura.isEnabled());
+      if (this.animation2.getValue() == 0.0F) {
+         return;
+      }
+
+      if (aura.getTarget() != null) {
+         this.lastTarget = aura.getTarget();
+      }
+
+      if (this.lastTarget == null) {
+         return;
+      }
+
+      float show = this.animation2.getValue();
+      double x = interpolate(this.lastTarget.getX(), this.lastTarget.lastRenderX, (double)event3D.getPartialTicks()) - mc.gameRenderer.getCamera().getPos().getX();
+      double y = interpolate(this.lastTarget.getY(), this.lastTarget.lastRenderY, (double)event3D.getPartialTicks()) - mc.gameRenderer.getCamera().getPos().getY();
+      double z = interpolate(this.lastTarget.getZ(), this.lastTarget.lastRenderZ, (double)event3D.getPartialTicks()) - mc.gameRenderer.getCamera().getPos().getZ();
+      RenderSystem.setShader(ShaderProgramKeys.POSITION_TEX_COLOR);
+      RenderSystem.setShaderTexture(0, HuihuiClient.id("icons/glow.png"));
+      RenderSystem.enableBlend();
+      RenderSystem.blendFuncSeparate(770, 1, 0, 1);
+      RenderSystem.disableCull();
+      RenderSystem.disableDepthTest();
+      RenderSystem.depthMask(false);
+      float t = (float)((double)System.currentTimeMillis() / 1000.0D * (double)HELIX_SPEED);
+      MatrixStack matrices = event3D.getMatrix();
+      matrices.push();
+      BufferBuilder buffer = Tessellator.getInstance().begin(DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
+
+      for(int layer = 0; layer < HELIX_FIXED_Y.length; ++layer) {
+         float baseY = HELIX_FIXED_Y[layer];
+         float radius = HELIX_RADIUS + HELIX_BREATH_RANGE * MathHelper.sin(t * 0.5F + (float)layer * 2.0F);
+
+         for(int i = 0; i < HELIX_TRAIL_LENGTH; ++i) {
+            float angle = (float)((double)i * 6.283185307179586D / (double)HELIX_TRAIL_LENGTH) + t;
+            float px = MathHelper.cos(angle) * radius;
+            float pz = MathHelper.sin(angle) * radius;
+            float py = baseY + MathHelper.sin(t + (float)i * 0.2F) * HELIX_DRIFT_AMP;
+            float progress = (float)i / (float)HELIX_TRAIL_LENGTH;
+            float size = HELIX_BASE_SIZE * show * (1.0F - progress * 0.6F);
+            ColorRGBA color = ColorRGBA.fromHSB((t * 0.1F + progress + (float)layer / (float)HELIX_FIXED_Y.length) % 1.0F, 1.0F, 1.0F).withAlpha((int)(show * 255.0F));
+            if (this.lastTarget instanceof LivingEntity && ((LivingEntity)this.lastTarget).hurtTime > 0) {
+               color = new ColorRGBA(255, 50, 50, color.getAlpha());
+            }
+
+            matrices.push();
+            matrices.translate(x + (double)px, y + (double)py, z + (double)pz);
+            matrices.scale(size, size, size);
+            matrices.multiply(mc.gameRenderer.getCamera().getRotation());
+            buffer.vertex(matrices.peek().getPositionMatrix(), -25.0F, -25.0F, 0.0F).texture(0.0F, 1.0F).color(color.getRGB());
+            buffer.vertex(matrices.peek().getPositionMatrix(), 25.0F, -25.0F, 0.0F).texture(1.0F, 1.0F).color(color.getRGB());
+            buffer.vertex(matrices.peek().getPositionMatrix(), 25.0F, 25.0F, 0.0F).texture(1.0F, 0.0F).color(color.getRGB());
+            buffer.vertex(matrices.peek().getPositionMatrix(), -25.0F, 25.0F, 0.0F).texture(0.0F, 0.0F).color(color.getRGB());
+            matrices.pop();
+         }
+      }
+
+      BufferRenderer.drawWithGlobalProgram(buffer.end());
+      matrices.pop();
+      RenderSystem.enableDepthTest();
+      RenderSystem.depthMask(true);
+      RenderSystem.disableBlend();
+      RenderSystem.blendFunc(770, 771);
+      RenderSystem.enableCull();
    }
 }

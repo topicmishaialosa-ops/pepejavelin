@@ -7,43 +7,56 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
 import net.minecraft.client.gui.screen.option.OptionsScreen;
 import net.minecraft.client.gui.screen.world.SelectWorldScreen;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
+import org.joml.Quaternionf;
+import org.lwjgl.glfw.GLFW;
 import tech.huihui.HuihuiClient;
-import tech.huihui.base.animations.base.Animation;
-import tech.huihui.base.animations.base.Easing;
 import tech.huihui.base.font.Fonts;
 import tech.huihui.base.theme.Theme;
-import tech.huihui.client.accounts.AccountManager;
 import tech.huihui.client.modules.impl.misc.RenamePasterClient;
+import tech.huihui.client.modules.impl.render.Menu;
 import tech.huihui.utility.interfaces.IClient;
+import tech.huihui.utility.math.MathUtil;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
+import tech.huihui.utility.render.display.base.Gradient;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
 import tech.huihui.utility.render.display.shader.DrawUtil;
 
 public class MainMenuScreen extends Screen implements IClient {
-   private static final float PANEL_WIDTH = 240.0F;
-   private static final float PANEL_HEIGHT = 224.0F;
-   private static final float BUTTON_HEIGHT = 32.0F;
-   private static final float BUTTON_GAP = 8.0F;
+   private static final float[] PARALLAX = new float[2];
 
-   private final Animation openAnimation = new Animation(500L, Easing.EXPO_OUT);
-   private final List<MenuButton> buttons = new ArrayList();
+   private final AnimationUtilState openState = new AnimationUtilState();
+   private final MenuButton singleplayer;
+   private final MenuButton multiplayer;
+   private final MenuButton accounts;
+   private final MenuButton settings;
+   private final List<MenuButton> buttons = new ArrayList<>();
+   private final List<EffectMarker.Marker> effects = new ArrayList<>();
+   private float switchKnob;
+   private float dragKnob = -1.0F;
+   private float switchTrackX;
+   private float switchTrackY;
+   private int shuffleLayout = -1;
 
    public MainMenuScreen() {
-      super(Text.of(RenamePasterClient.getClientName() + " Menu"));
-      this.buttons.add(new MenuButton("Одиночная игра", () -> mc.setScreen(new SelectWorldScreen(this))));
-      this.buttons.add(new MenuButton("Мультиплеер", () -> mc.setScreen(new MultiplayerScreen(this))));
-      this.buttons.add(new MenuButton("Аккаунты", () -> mc.setScreen(new AccountManagerScreen())));
-      this.buttons.add(new MenuButton("Настройки", () -> mc.setScreen(new OptionsScreen(this, mc.options))));
-      this.buttons.add(new MenuButton("Выход", () -> mc.scheduleStop()));
-   }
-
-   @Override
-   protected void init() {
-      this.openAnimation.animateTo(1.0F);
-      super.init();
+      super(Text.empty());
+      if (mc.currentScreen instanceof MainMenuScreen) {
+         this.openState.set(1.0F);
+      }
+      if (Menu.INSTANCE.getLayoutIndex() == Menu.LAYOUT_RANDOM) {
+         this.shuffleLayout = (int) (Math.random() * Menu.LAYOUT_RANDOM);
+      }
+      this.singleplayer = new MenuButton(88.0F, 38.0F, "Одиночный Режим", () -> mc.setScreen(new SelectWorldScreen(null)));
+      this.multiplayer = new MenuButton(88.0F, 38.0F, "Сетевая Игра", () -> mc.setScreen(new MultiplayerScreen(null)));
+      this.accounts = new MenuButton(181.0F, 30.0F, "Выбор аккаунта", () -> mc.setScreen(new AccountManagerScreen()));
+      this.settings = new MenuButton(79.0F, 19.5F, "Настройки", () -> mc.setScreen(new OptionsScreen(null, mc.options)));
+      this.buttons.add(this.singleplayer);
+      this.buttons.add(this.multiplayer);
+      this.buttons.add(this.accounts);
+      this.buttons.add(this.settings);
    }
 
    @Override
@@ -52,75 +65,350 @@ public class MainMenuScreen extends Screen implements IClient {
    }
 
    @Override
+   public void close() {
+   }
+
+   @Override
+   public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+   }
+
+   @Override
    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-      this.openAnimation.update();
+      super.render(context, mouseX, mouseY, delta);
+      this.openState.expand(mc.currentScreen instanceof MainMenuScreen);
+      this.openState.update(0.0F, 1.0F, 0.15F, delta);
+      float fMin = Math.min(1.0F, this.openState.getValue() / 0.9F);
       float screenW = mw.getScaledWidth();
       float screenH = mw.getScaledHeight();
-      float anim = this.openAnimation.getValue();
-      float time = (float) (System.currentTimeMillis() % 36000L) / 36000.0F * 2.0F * (float) Math.PI;
+
+      renderParallaxBackground(context, screenW, screenH, mouseX, mouseY, 1.25F - (easeBack(fMin) * 0.2F));
+      CustomDrawContext draw = CustomDrawContext.of(context);
+
+      this.applyLayout(screenW, screenH, this.shuffleLayout >= 0 ? this.shuffleLayout : Menu.INSTANCE.getLayoutIndex());
+
+      for (MenuButton button : this.buttons) {
+         button.render(context, mouseX, mouseY, delta, fMin);
+      }
+      this.renderSwitch(draw, fMin, (float) mouseX);
+      this.renderTitle(draw, screenW * 0.5F, ((screenH - this.singleplayer.getHeight()) * 0.5F) - 58.0F, fMin);
+      this.renderLayoutPanel(draw, screenW, screenH, fMin, mouseX, mouseY);
+      EffectMarker.renderAll(context.getMatrices(), delta, this.effects);
+   }
+
+   private boolean layoutPanelContains(float screenW, float screenH, double x, double y) {
+      return MathUtil.isHovered(x, y, screenW - 178.0F, screenH - 70.0F, 168.0F, 60.0F);
+   }
+
+   private void renderLayoutPanel(CustomDrawContext draw, float screenW, float screenH, float open, int mx, int my) {
+      MatrixStack matrices = draw.getMatrices();
+      float px = screenW - 178.0F;
+      float py = screenH - 70.0F;
+      DrawUtil.drawRoundedRect(matrices, px, py, 168.0F, 60.0F, BorderRadius.all(8.0F), new ColorRGBA(11, 11, 13).withAlpha(165.0F * open));
+      DrawUtil.drawRoundedBorder(matrices, px, py, 168.0F, 60.0F, 0.5F, BorderRadius.all(8.0F), new ColorRGBA(255, 255, 255).withAlpha(14.0F * open));
+      Theme theme = HuihuiClient.getInstance().getThemeManager().getCurrentTheme();
+      ColorRGBA accent = theme.getColor().withAlpha(255.0F * open);
+
+      int layout = this.shuffleLayout >= 0 ? this.shuffleLayout : Menu.INSTANCE.getLayoutIndex();
+      this.drawSwitcherRow(draw, px, py + 7.0F, open, layout, Menu.LAYOUTS.length, Menu.LAYOUTS[layout],
+         this.shuffleLayout >= 0 ? "Случайно" : Menu.LAYOUTS[layout], mx, my);
+      this.drawSwitcherRow(draw, px, py + 32.0F, open, Menu.INSTANCE.getStyleIndex(), Menu.STYLES.length, Menu.STYLES[Menu.INSTANCE.getStyleIndex()], null, mx, my);
+
+      this.drawDots(matrices, px, py, 13.0F, layout, Menu.LAYOUTS.length, 7.0F, accent.withAlpha(open));
+      this.drawDots(matrices, px, py, 38.0F, Menu.INSTANCE.getStyleIndex(), Menu.STYLES.length, 10.0F, accent.withAlpha(open));
+   }
+
+   private void drawSwitcherRow(CustomDrawContext draw, float px, float rowY, float open, int index, int count, String label, String subtitle, int mx, int my) {
+      boolean hovL = MathUtil.isHovered(mx, my, px + 4.0F, rowY - 6.0F, 18.0F, 16.0F);
+      boolean hovR = MathUtil.isHovered(mx, my, px + 146.0F, rowY - 6.0F, 18.0F, 16.0F);
+      ColorRGBA arrowColor = new ColorRGBA(255, 255, 255, (int) (170.0F * open));
+      this.drawArrow(draw.getMatrices(), px + 13.0F, rowY, arrowColor, hovL);
+      this.drawArrow(draw.getMatrices(), px + 155.0F, rowY, arrowColor, hovR);
+      String shown = subtitle != null ? subtitle + "  (" + (index + 1) + "/" + count + ")" : label + "  (" + (index + 1) + "/" + count + ")";
+      float w = Fonts.REGULAR.getFont(4.0F).width(shown);
+      draw.drawText(Fonts.REGULAR.getFont(4.0F), shown, px + ((168.0F - w) / 2.0F), rowY - 3.0F, new ColorRGBA(255, 255, 255, (int) (200.0F * open)));
+   }
+
+   private void drawArrow(MatrixStack matrices, float cx, float cy, ColorRGBA color, boolean reversed) {
+      ColorRGBA c = reversed ? new ColorRGBA(255, 255, 255, 255) : color;
+      float r = 4.0F;
+      int dir = reversed ? -1 : 1;
+      net.minecraft.util.math.Vec2f top = new net.minecraft.util.math.Vec2f(cx - (r * dir), cy - 4.5F);
+      net.minecraft.util.math.Vec2f mid = new net.minecraft.util.math.Vec2f(cx + (r * dir), cy);
+      net.minecraft.util.math.Vec2f bot = new net.minecraft.util.math.Vec2f(cx - (r * dir), cy + 4.5F);
+      DrawUtil.drawLine(matrices, top, mid, c);
+      DrawUtil.drawLine(matrices, bot, mid, c);
+   }
+
+   private void drawDots(MatrixStack matrices, float px, float py, float y, int active, int count, float spacing, ColorRGBA accent) {
+      float size = 3.0F;
+      float total = (count * spacing) - (spacing - size);
+      float startX = px + ((168.0F - total) / 2.0F);
+      for (int i = 0; i < count; i++) {
+         ColorRGBA color = i == active ? accent : new ColorRGBA(255, 255, 255).withAlpha(35.0F * (accent.getAlpha() / 255.0F));
+         DrawUtil.drawRoundedRect(matrices, startX + (i * spacing), py + y, size, size, BorderRadius.all(1.5F), color);
+      }
+   }
+
+   private void applyLayout(float screenW, float screenH, int layout) {
+      float gap = 6.0F;
+      switch (layout) {
+         case Menu.LAYOUT_LEFT: {
+            float x = screenW * 0.08F;
+            float y = screenH * 0.30F;
+            this.singleplayer.setPosition(x, y);
+            this.multiplayer.setPosition(x, y + 43.0F);
+            this.accounts.setPosition(x, y + 83.0F);
+            this.settings.setPosition(x, y + 113.5F);
+            this.switchTrackX = x;
+            this.switchTrackY = screenH * 0.85F;
+            break;
+         }
+         case Menu.LAYOUT_RIGHT: {
+            float x = screenW * 0.08F;
+            float y = screenH * 0.30F;
+            this.singleplayer.setPosition(screenW - x - 88.0F, y);
+            this.multiplayer.setPosition(screenW - x - 88.0F, y + 43.0F);
+            this.accounts.setPosition(screenW - x - 181.0F, y + 83.0F);
+            this.settings.setPosition(screenW - x - 79.0F, y + 113.5F);
+            this.switchTrackX = screenW - x - 79.0F;
+            this.switchTrackY = screenH * 0.85F;
+            break;
+         }
+         case Menu.LAYOUT_BOTTOM: {
+            float rowY = screenH * 0.82F;
+            float startX = (screenW - 539.0F) / 2.0F;
+            this.singleplayer.setPosition(startX, rowY);
+            this.multiplayer.setPosition(startX + 94.0F, rowY);
+            this.accounts.setPosition(startX + 188.0F, rowY + 4.0F);
+            this.settings.setPosition(startX + 375.0F, rowY + 9.25F);
+            this.switchTrackX = startX + 460.0F;
+            this.switchTrackY = rowY + 9.25F;
+            break;
+         }
+         case Menu.LAYOUT_TOP: {
+            float rowY = screenH * 0.08F;
+            float startX = (screenW - 539.0F) / 2.0F;
+            this.singleplayer.setPosition(startX, rowY);
+            this.multiplayer.setPosition(startX + 94.0F, rowY);
+            this.accounts.setPosition(startX + 188.0F, rowY + 4.0F);
+            this.settings.setPosition(startX + 375.0F, rowY + 9.25F);
+            this.switchTrackX = startX + 460.0F;
+            this.switchTrackY = rowY + 9.25F;
+            break;
+         }
+         case Menu.LAYOUT_CORNERS: {
+            float x = screenW * 0.07F;
+            this.singleplayer.setPosition(x, screenH * 0.18F);
+            this.multiplayer.setPosition(screenW - x - 88.0F, screenH * 0.18F);
+            this.accounts.setPosition(x, screenH * 0.74F);
+            this.settings.setPosition(screenW - x - 79.0F, screenH * 0.74F);
+            this.switchTrackX = (screenW - 79.0F) / 2.0F;
+            this.switchTrackY = screenH * 0.90F;
+            break;
+         }
+         case Menu.LAYOUT_DIAGONAL: {
+            this.singleplayer.setPosition(screenW * 0.14F, screenH * 0.12F);
+            this.multiplayer.setPosition(screenW * 0.38F, screenH * 0.34F);
+            this.accounts.setPosition(screenW * 0.58F, screenH * 0.56F);
+            this.settings.setPosition(screenW * 0.74F, screenH * 0.78F);
+            this.switchTrackX = (screenW - 79.0F) / 2.0F;
+            this.switchTrackY = screenH * 0.92F;
+            break;
+         }
+         case Menu.LAYOUT_SCATTER: {
+            this.singleplayer.setPosition(screenW * 0.07F, screenH * 0.30F);
+            this.multiplayer.setPosition(screenW * 0.90F - 88.0F, screenH * 0.22F);
+            this.accounts.setPosition(screenW * 0.26F, screenH * 0.66F);
+            this.settings.setPosition(screenW * 0.68F, screenH * 0.72F);
+            this.switchTrackX = screenW * 0.68F;
+            this.switchTrackY = screenH * 0.88F;
+            break;
+         }
+         default: {
+            float mainY = (screenH - 38.0F) / 2.0F;
+            this.singleplayer.setPosition((screenW - 181.0F) / 2.0F, mainY);
+            this.multiplayer.setPosition((screenW - 181.0F) / 2.0F + 88.0F + 5.0F, mainY);
+            this.accounts.setPosition((screenW - 181.0F) / 2.0F, mainY + 43.0F);
+            this.switchTrackX = (screenW - 79.0F) / 2.0F;
+            this.switchTrackY = screenH * 0.85F;
+            this.settings.setPosition((screenW - 79.0F) / 2.0F, this.switchTrackY - 24.5F);
+            break;
+         }
+      }
+   }
+
+   private void renderTitle(CustomDrawContext draw, float centerX, float titleY, float open) {
+      String clientName = RenamePasterClient.getClientName();
+      float titleWidth = Fonts.ROUND_BOLD.getFont(12.0F).width(clientName);
+      Theme theme = HuihuiClient.getInstance().getThemeManager().getCurrentTheme();
+      ColorRGBA primary = theme.getColor().withAlpha(255.0F * open);
+      ColorRGBA white = new ColorRGBA(255, 255, 255).withAlpha(255.0F * open);
+      MatrixStack matrices = draw.getMatrices();
+      float scale = 0.85F + (0.15F * easeBack(open));
+      matrices.push();
+      matrices.translate(centerX, titleY + 8.0F, 0.0F);
+      matrices.scale(scale, scale, 1.0F);
+      matrices.translate(-centerX, -titleY - 8.0F, 0.0F);
+      draw.drawText(Fonts.ROUND_BOLD.getFont(12.0F), clientName, centerX - (titleWidth / 2.0F), titleY + 1.5F, Gradient.of(primary, white, white, primary));
+      draw.drawText(Fonts.ROUND_BOLD.getFont(7.0F), "1.21.4", centerX - (Fonts.ROUND_BOLD.getFont(7.0F).width("1.21.4") / 2.0F), titleY + 21.5F, new ColorRGBA(255, 255, 255, (int) (160.0F * open)));
+      matrices.pop();
+   }
+
+   static void renderParallaxBackground(DrawContext context, float width, float height, int mouseX, int mouseY, float scale) {
+      float marginX = width * 0.025F;
+      float marginY = height * 0.025F;
+      PARALLAX[0] += ((MathHelper.clamp((((mouseX / width) - 0.5F) * 2.0F) * marginX, -marginX * 0.9F, marginX * 0.9F) - PARALLAX[0]) * 0.03F);
+      PARALLAX[1] += ((MathHelper.clamp((((mouseY / height) - 0.5F) * 2.0F) * marginY, -marginY * 0.9F, marginY * 0.9F) - PARALLAX[1]) * 0.03F);
+      MatrixStack matrices = context.getMatrices();
+      matrices.push();
+      matrices.translate(width / 2.0F, height / 2.0F, 0.0F);
+      matrices.scale(scale, scale, 1.0F);
+      matrices.translate(-width / 2.0F, -height / 2.0F, 0.0F);
       Theme theme = HuihuiClient.getInstance().getThemeManager().getCurrentTheme();
       ColorRGBA themeColor = theme.getColor();
-
-      float panelX = (screenW - PANEL_WIDTH) / 2.0F;
-      float panelY = (screenH - PANEL_HEIGHT) / 2.0F + 8.0F;
-
-      CustomDrawContext draw = CustomDrawContext.of(context);
-      this.renderBackground(draw, themeColor, screenW, screenH, panelX, panelY, time);
-      this.renderTitle(draw, themeColor, screenW, panelY, anim);
-
-      DrawUtil.drawShadow(draw.getMatrices(), panelX, panelY, PANEL_WIDTH, PANEL_HEIGHT, 6.0F, BorderRadius.all(12.0F), new ColorRGBA(0, 0, 0).withAlpha(160.0F * anim));
-      DrawUtil.drawRoundedRect(draw.getMatrices(), panelX, panelY, PANEL_WIDTH, PANEL_HEIGHT, BorderRadius.all(12.0F),
-         new ColorRGBA(21, 21, 27).withAlpha(240.0F * anim), new ColorRGBA(18, 18, 24).withAlpha(240.0F * anim),
-         new ColorRGBA(14, 14, 19).withAlpha(240.0F * anim), new ColorRGBA(23, 23, 31).withAlpha(240.0F * anim));
-      DrawUtil.drawRoundedBorder(draw.getMatrices(), panelX, panelY, PANEL_WIDTH, PANEL_HEIGHT, 1.0F, BorderRadius.all(12.0F), themeColor.withAlpha(70.0F * anim));
-
-      float buttonsStart = panelY + 14.0F;
-      for (int i = 0; i < this.buttons.size(); i++) {
-         MenuButton button = this.buttons.get(i);
-         float start = 0.07F * (float) i;
-         float progress = MathHelper.clamp((anim - start) / (1.0F - start), 0.0F, 1.0F);
-         float buttonY = buttonsStart + (float) i * (BUTTON_HEIGHT + BUTTON_GAP) + (1.0F - progress) * 16.0F;
-         button.set(panelX + 14.0F, buttonY, PANEL_WIDTH - 28.0F, BUTTON_HEIGHT);
-         button.update((float) mouseX, (float) mouseY);
-         button.render(draw, themeColor, progress);
-      }
-
-      String current = "Аккаунт: " + AccountManager.INSTANCE.currentName();
-      draw.drawText(Fonts.REGULAR.getFont(3.5F), current, panelX + (PANEL_WIDTH - Fonts.REGULAR.getFont(3.5F).width(current)) / 2.0F, panelY + PANEL_HEIGHT - 12.0F, themeColor.withAlpha(255.0F * anim));
-
-      String version = "v0.1  ·  1.21.4";
-      draw.drawText(Fonts.REGULAR.getFont(3.0F), version, screenW - Fonts.REGULAR.getFont(3.0F).width(version) - 8.0F, screenH - 12.0F, (new ColorRGBA(110, 110, 120)).withAlpha(255.0F * anim));
-   }
-
-   private void renderBackground(CustomDrawContext draw, ColorRGBA themeColor, float screenW, float screenH, float panelX, float panelY, float time) {
-      DrawUtil.drawRoundedRect(draw.getMatrices(), 0.0F, 0.0F, screenW, screenH, BorderRadius.all(0.0F),
+      ColorRGBA second = theme.getSecondColor();
+      DrawUtil.drawRoundedRect(matrices, -marginX * 4.0F, -marginY * 4.0F, width + (marginX * 8.0F), height + (marginY * 8.0F), BorderRadius.ZERO,
          new ColorRGBA(11, 11, 15), new ColorRGBA(9, 9, 13), new ColorRGBA(6, 6, 10), new ColorRGBA(14, 14, 20));
-      float driftX = MathHelper.sin(time) * 26.0F;
-      float driftY = MathHelper.cos(time * 1.4F) * 18.0F;
-      DrawUtil.drawGlow(draw.getMatrices(), panelX - 150.0F + driftX, panelY - 120.0F + driftY, 440.0F, 280.0F, 90);
-      DrawUtil.drawGlow(draw.getMatrices(), panelX + PANEL_WIDTH - 130.0F - driftX, panelY + PANEL_HEIGHT - 40.0F - driftY, 380.0F, 220.0F, 70);
+      float driftX = MathHelper.sin(System.currentTimeMillis() / 2400.0F) * 26.0F + PARALLAX[0];
+      float driftY = MathHelper.cos(System.currentTimeMillis() / 3200.0F) * 20.0F + PARALLAX[1];
+      DrawUtil.drawGlow(matrices, width * 0.10F - 150.0F + driftX, height * 0.18F - 120.0F + driftY, 440.0F, 280.0F, 90);
+      DrawUtil.drawGlow(matrices, width * 0.90F - 130.0F - driftX, height * 0.82F - 40.0F - driftY, 380.0F, 220.0F, 70);
+      if (themeColor.getRed() + themeColor.getGreen() + themeColor.getBlue() > 180) {
+         DrawUtil.drawGlow(matrices, width * 0.5F - 90.0F + driftX, height * 0.5F - 60.0F + driftY, 280.0F, 160.0F, 40);
+      }
+      matrices.pop();
    }
 
-   private void renderTitle(CustomDrawContext draw, ColorRGBA themeColor, float screenW, float panelY, float alpha) {
-      String title = "JAVELIN";
-      float size = 22.0F;
-      float width = Fonts.ROUND_BOLD.getFont(size).width(title);
-      float titleX = (screenW - width) / 2.0F;
-      float titleY = panelY - 82.0F;
-      DrawUtil.drawGlow(draw.getMatrices(), titleX - 34.0F, titleY - 16.0F, width + 68.0F, 48.0F, 16);
-      draw.drawText(Fonts.ROUND_BOLD.getFont(size), title, titleX, titleY, (new ColorRGBA(240, 240, 246)).withAlpha(255.0F * alpha));
-      String subtitle = RenamePasterClient.getClientName();
-      draw.drawText(Fonts.COMFORTA_REGULAR.getFont(5.0F), subtitle, (screenW - Fonts.COMFORTA_REGULAR.getFont(5.0F).width(subtitle)) / 2.0F, panelY - 50.0F, themeColor.withAlpha(255.0F * alpha));
+   private void renderSwitch(CustomDrawContext draw, float open, float mouseX) {
+      float target = this.dragKnob >= 0.0F ? MathHelper.clamp((((mouseX - this.dragKnob) - this.switchTrackX) - 1.75F) / 59.5F, 0.0F, 1.0F) : 0.0F;
+      this.switchKnob += (target - this.switchKnob) * 0.25F;
+      float scale = 0.85F + (0.15F * easeBack(open));
+      MatrixStack matrices = draw.getMatrices();
+      matrices.push();
+      matrices.translate(this.switchTrackX + 39.5F, this.switchTrackY + 9.75F, 0.0F);
+      matrices.scale(scale, scale, 1.0F);
+      matrices.translate(-this.switchTrackX - 39.5F, -this.switchTrackY - 9.75F, 0.0F);
+      float knobX = this.switchTrackX + 1.75F + (this.switchKnob * 59.5F);
+      float knobY = this.switchTrackY + 1.75F;
+      float centerX = knobX + 8.0F;
+      float centerY = knobY + 8.0F;
+      DrawUtil.drawRoundedRect(matrices, this.switchTrackX, this.switchTrackY, 79.0F, 19.5F, BorderRadius.all(8.0F), new ColorRGBA(11, 11, 13).withAlpha(195.0F * open));
+      DrawUtil.drawRoundedBorder(matrices, this.switchTrackX, this.switchTrackY, 79.0F, 19.5F, 0.5F, BorderRadius.all(8.0F), new ColorRGBA(255, 255, 255).withAlpha(15.0F * open));
+      float labelX = this.switchTrackX + 9.0F;
+      float labelWidth = Fonts.REGULAR.getFont(6.0F).width("Выйти из игры");
+      String clipped = labelWidth > ((knobX - 3.0F) - this.switchTrackX) - 9.0F ? clipText("Выйти из игры", ((knobX - 3.0F) - this.switchTrackX) - 9.0F) : "Выйти из игры";
+      draw.drawText(Fonts.REGULAR.getFont(6.0F), clipped, labelX, this.switchTrackY + ((19.5F - Fonts.REGULAR.getFont(6.0F).height()) / 2.0F), new ColorRGBA(220, 80, 80, (int) (this.switchKnob * 255.0F * open)));
+      ColorRGBA knob = ColorRGBA.lerp(new ColorRGBA(255, 255, 255, 13), new ColorRGBA(220, 80, 80, 40), this.switchKnob);
+      DrawUtil.drawRoundedRect(matrices, knobX, knobY, 16.0F, 16.0F, BorderRadius.all(7.0F), knob.withAlpha(255.0F * open));
+      matrices.push();
+      matrices.translate(centerX, centerY, 0.0F);
+      matrices.multiply(new Quaternionf().rotateZ((float) Math.toRadians(-90.0F + (180.0F * this.switchKnob))));
+      matrices.translate(-centerX, -centerY, 0.0F);
+      ColorRGBA iconColor = ColorRGBA.lerp(new ColorRGBA(255, 255, 255), new ColorRGBA(220, 80, 80), this.switchKnob);
+      float iconW = Fonts.ICONS.getFont(10.5F).width("4");
+      draw.drawText(Fonts.ICONS.getFont(10.5F), "4", (centerX - iconW / 2.0F) + 1.0F, centerY - (Fonts.ICONS.getFont(10.5F).height() / 2.0F), iconColor.withAlpha(255.0F * open));
+      matrices.pop();
+      matrices.pop();
+   }
+
+   private String clipText(String text, float maxWidth) {
+      StringBuilder builder = new StringBuilder();
+      for (char c : text.toCharArray()) {
+         if (Fonts.REGULAR.getFont(6.0F).width(builder.toString() + c) > maxWidth) {
+            break;
+         }
+         builder.append(c);
+      }
+      return builder.toString();
+   }
+
+   @Override
+   public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+      if (keyCode == GLFW.GLFW_KEY_F1) {
+         this.shuffleLayout = -1;
+         Menu.INSTANCE.cycleLayout(-1);
+         return true;
+      }
+      if (keyCode == GLFW.GLFW_KEY_F2) {
+         this.shuffleLayout = -1;
+         Menu.INSTANCE.cycleLayout(1);
+         return true;
+      }
+      if (keyCode >= GLFW.GLFW_KEY_1 && keyCode <= GLFW.GLFW_KEY_9) {
+         this.shuffleLayout = -1;
+         Menu.INSTANCE.setLayoutIndex(keyCode - GLFW.GLFW_KEY_1);
+         return true;
+      }
+      return super.keyPressed(keyCode, scanCode, modifiers);
    }
 
    @Override
    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+      float screenW = mw.getScaledWidth();
+      float screenH = mw.getScaledHeight();
+      if (this.layoutPanelContains(screenW, screenH, mouseX, mouseY)) {
+         float px = screenW - 178.0F;
+         float py = screenH - 70.0F;
+         if (MathUtil.isHovered(mouseX, mouseY, px + 4.0F, py + 1.0F, 18.0F, 16.0F)) {
+            this.shuffleLayout = -1;
+            Menu.INSTANCE.cycleLayout(-1);
+            return true;
+         }
+         if (MathUtil.isHovered(mouseX, mouseY, px + 146.0F, py + 1.0F, 18.0F, 16.0F)) {
+            this.shuffleLayout = -1;
+            Menu.INSTANCE.cycleLayout(1);
+            return true;
+         }
+         if (MathUtil.isHovered(mouseX, mouseY, px + 4.0F, py + 26.0F, 18.0F, 16.0F)) {
+            Menu.INSTANCE.cycleStyle(-1);
+            return true;
+         }
+         if (MathUtil.isHovered(mouseX, mouseY, px + 146.0F, py + 26.0F, 18.0F, 16.0F)) {
+            Menu.INSTANCE.cycleStyle(1);
+            return true;
+         }
+      }
+      EffectMarker.spawn(this.effects, (float) mouseX, (float) mouseY);
+      float dragX = (float) mouseX;
+      float dragY = (float) mouseY;
+      if (MathUtil.isHovered(dragX, dragY, this.switchTrackX + 1.75F, this.switchTrackY + 1.75F, 16.0F, 16.0F)) {
+         this.dragKnob = dragX - this.switchTrackX;
+         return true;
+      }
       for (MenuButton menuButton : this.buttons) {
-         if (menuButton.isHovered((float) mouseX, (float) mouseY)) {
+         if (menuButton.isHovered(dragX, dragY)) {
             menuButton.click();
             return true;
          }
       }
       return super.mouseClicked(mouseX, mouseY, button);
+   }
+
+   @Override
+   public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+      if (this.dragKnob >= 0.0F) {
+         return true;
+      }
+      return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+   }
+
+   @Override
+   public boolean mouseReleased(double mouseX, double mouseY, int button) {
+      if (this.dragKnob < 0.0F) {
+         return super.mouseReleased(mouseX, mouseY, button);
+      }
+      float progress = MathHelper.clamp(((((float) mouseX - this.dragKnob) - this.switchTrackX) - 1.75F) / 59.5F, 0.0F, 1.0F);
+      this.dragKnob = -1.0F;
+      if (progress < 0.95F) {
+         return true;
+      }
+      mc.scheduleStop();
+      return true;
+   }
+
+   private static float easeBack(float value) {
+      float c1 = 1.70158F;
+      float c3 = c1 + 1.0F;
+      return 1.0F + (c3 * (value - 1.0F) * (value - 1.0F) * (value - 1.0F)) + (c1 * (value - 1.0F) * (value - 1.0F));
    }
 }

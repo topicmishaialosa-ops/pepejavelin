@@ -45,6 +45,7 @@ import tech.huihui.client.modules.impl.misc.AutoWarden;
 import tech.huihui.client.modules.impl.misc.BpAuto;
 import tech.huihui.client.modules.impl.misc.BaseFinder;
 import tech.huihui.client.modules.impl.misc.AutoJoiner;import tech.huihui.client.modules.impl.misc.AutoKit;
+import tech.huihui.client.modules.impl.misc.AutoMineFunTime;
 import tech.huihui.client.modules.impl.misc.AutoRespawn;
 import tech.huihui.client.modules.impl.misc.Autofarm;
 import tech.huihui.client.modules.impl.misc.AncientFarmer;
@@ -245,7 +246,8 @@ public final class ModuleManager implements IMinecraft {
       registerModule(ZarabotokReallyWorld.INSTANCE);
        registerModule(AutoJoiner.INSTANCE);
        registerModule(BaseFinder.INSTANCE);
-        registerModule(MineHelper.INSTANCE);
+         registerModule(MineHelper.INSTANCE);
+         registerModule(AutoMineFunTime.INSTANCE);
         registerModule(KeyFinder.INSTANCE);
         registerModule(AutoWarden.INSTANCE);
         registerModule(BpAuto.INSTANCE);

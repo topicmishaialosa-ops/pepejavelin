@@ -48,6 +48,8 @@
     "client.render.gui.hud.InGameHudMixin",
     "client.render.gui.screen.ChatScreenMixin",
     "client.render.gui.screen.HandledScreenMixin",
+    "client.render.gui.screen.TitleScreenMixin",
+    "client.SessionMixin",
     "minecraft.network.ClientPlayNetworkHandlerMixin",
     "minecraft.render.ClientWorldPropertiesMixin",
     "minecraft.render.FeatureRendererMixin",

@@ -12,6 +12,7 @@ import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.base.comand.api.CommandAbstract;
 import tech.huihui.base.comand.impl.AhChenaCommand;
 import tech.huihui.base.comand.impl.AhSearchCommand;
+import tech.huihui.base.comand.impl.BindCommand;
 import tech.huihui.base.comand.impl.BlockESPCommand;
 import tech.huihui.base.comand.impl.ClipCommand;
 import tech.huihui.base.comand.impl.ConfigCommand;
@@ -36,8 +37,9 @@ public class CommandManager {
       this.register();
    }
 
-    @Native
+@Native
     private void register() {
+       this.registerCommand(new BindCommand());
        this.registerCommand(new BlockESPCommand());
        this.registerCommand(new FriendCommand());
        this.registerCommand(new MacroCommand());
@@ -50,10 +52,10 @@ public class CommandManager {
        this.registerCommand(new HelpCommand());
         this.registerCommand(new PilotCommand());
 this.registerCommand(new RtpFunTimeCommand());
-         this.registerCommand(new AhSearchCommand());
-         this.registerCommand(new AhChenaCommand());
-         this.registerCommand(new TPCommand());
-    }
+          this.registerCommand(new AhSearchCommand());
+          this.registerCommand(new AhChenaCommand());
+          this.registerCommand(new TPCommand());
+     }
 
    @Native
    public void registerCommand(CommandAbstract command) {

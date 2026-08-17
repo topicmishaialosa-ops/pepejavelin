@@ -1,17 +1,23 @@
 package tech.huihui.client.modules.impl.render;
 
 import com.darkmagician6.eventapi.EventTarget;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.vehicle.ChestMinecartEntity;
 import net.minecraft.entity.vehicle.MinecartEntity;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
-import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.ChunkStatus;
@@ -47,8 +53,10 @@ public final class BlockESP extends Module {
    private final BooleanSetting minecarts = new BooleanSetting("Вагонетки", false);
    private final BooleanSetting chestMinecarts = new BooleanSetting("Вагонетки с сундуком", false);
 
-   private final Map<BlockPos, Integer> found = new HashMap();
+   private final Long2ObjectOpenHashMap<FoundBlock> found = new Long2ObjectOpenHashMap();
    private final ArrayDeque<ChunkSectionPos> scanQueue = new ArrayDeque();
+   private final Map<Block, Integer> colorCache = new HashMap();
+   private final BlockPos.Mutable scanPos = new BlockPos.Mutable();
    private boolean scanDone = true;
    private boolean dirty = true;
    private long nextScanAt;
@@ -76,6 +84,7 @@ public final class BlockESP extends Module {
       if (this.blocks.isEmpty()) {
          this.found.clear();
          this.scanQueue.clear();
+         this.colorCache.clear();
          this.scanDone = true;
          return;
       }
@@ -85,15 +94,9 @@ public final class BlockESP extends Module {
       }
       float width = this.lineWidth.getCurrent();
       boolean doFill = this.fill.isEnabled();
-      for (Map.Entry<BlockPos, Integer> entry : this.found.entrySet()) {
-         BlockPos pos = entry.getKey();
-         BlockState state = mc.world.getBlockState(pos);
-         VoxelShape shape = state.getCollisionShape(mc.world, pos);
-         if (shape.isEmpty()) {
-            shape = state.getOutlineShape(mc.world, pos);
-         }
-         Box box = shape.isEmpty() ? new Box(pos) : shape.getBoundingBox().offset(pos);
-         Render3DUtil.drawBox(box, entry.getValue(), width, true, doFill, false);
+      for (Long2ObjectMap.Entry<FoundBlock> entry : this.found.long2ObjectEntrySet()) {
+         FoundBlock foundBlock = entry.getValue();
+         Render3DUtil.drawBox(foundBlock.box, foundBlock.color, width, true, doFill, false);
       }
    }
 
@@ -158,8 +161,23 @@ public final class BlockESP extends Module {
    private void rebuildScan() {
       this.found.clear();
       this.scanQueue.clear();
+      this.colorCache.clear();
       this.dirty = false;
       if (mc.world == null || mc.player == null) {
+         this.scanDone = true;
+         return;
+      }
+      for (Map.Entry<String, Integer> entry : this.blocks.getBlocks().entrySet()) {
+         Identifier id = Identifier.tryParse(entry.getKey());
+         if (id == null) {
+            continue;
+         }
+         Block block = Registries.BLOCK.get(id);
+         if (block != null && block != Blocks.AIR) {
+            this.colorCache.put(block, entry.getValue());
+         }
+      }
+      if (this.colorCache.isEmpty()) {
          this.scanDone = true;
          return;
       }
@@ -204,12 +222,22 @@ public final class BlockESP extends Module {
                if (state.isAir()) {
                   continue;
                }
-               Integer color = this.blocks.getColor(BlockMapSetting.getId(state.getBlock()));
-               if (color != null) {
-                  this.found.put(new BlockPos(baseX + x, baseY + y, baseZ + z), color);
+               Integer color = this.colorCache.get(state.getBlock());
+               if (color == null) {
+                  continue;
                }
+               this.scanPos.set(baseX + x, baseY + y, baseZ + z);
+               VoxelShape shape = state.getCollisionShape(mc.world, this.scanPos);
+               if (shape.isEmpty()) {
+                  shape = state.getOutlineShape(mc.world, this.scanPos);
+               }
+               Box box = shape.isEmpty() ? new Box(this.scanPos) : shape.getBoundingBox().offset(this.scanPos);
+               this.found.put(this.scanPos.asLong(), new FoundBlock(box, color));
             }
          }
       }
+   }
+
+   private record FoundBlock(Box box, int color) {
    }
 }
