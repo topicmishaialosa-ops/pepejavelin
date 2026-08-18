@@ -15,6 +15,7 @@ import net.minecraft.util.Formatting;
 import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.comand.api.CommandAbstract;
+import tech.huihui.base.config.ConfigManager;
 import tech.huihui.client.screens.config.ConfigManagerScreen;
 import tech.huihui.utility.game.other.MessageUtil;
 
@@ -85,7 +86,7 @@ public class ConfigCommand extends CommandAbstract {
       }));
 builder.then(literal("dir").executes((context) -> {
           try {
-             File dir = new File("huihui/configs/");
+             File dir = ConfigManager.configDirectory;
              if (!dir.exists()) {
                 MessageUtil.displayInfo(String.valueOf(Formatting.GRAY) + "Ты нахуя папку удалил фрик");
                 dir.mkdirs();
