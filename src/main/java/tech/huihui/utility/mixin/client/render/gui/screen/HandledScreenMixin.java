@@ -17,7 +17,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import tech.huihui.client.modules.impl.misc.AHHelper;
 import tech.huihui.client.modules.impl.misc.ItemScroller;
+import tech.huihui.client.modules.impl.render.Animations;
 import tech.huihui.utility.game.server.AutoBuyUtil;
+import tech.huihui.utility.mixin.accessors.HandledScreenAccessor;
 
 @Mixin({HandledScreen.class})
 public abstract class HandledScreenMixin {
@@ -80,6 +82,28 @@ public abstract class HandledScreenMixin {
          } else if (slot == this.lowAllSumSlotId) {
             AHHelper.INSTANCE.renderGood(context, slot);
          }
+      }
+
+      Animations animations = Animations.INSTANCE;
+      if (animations.isEnabled() && animations.getAnimate().isEnable("Предметы")) {
+         boolean focused = slot == ((HandledScreenAccessor)(Object)this).getFocusedSlot() && slot.hasStack();
+         float scale = animations.getSlotAnimation(slot).moveTo(focused ? 1.25F : 0.75F, focused ? 1.25F : 1.0F);
+         context.getMatrices().push();
+         context.getMatrices().translate((float)slot.x + 8.0F, (float)slot.y + 8.0F, 0.0F);
+         context.getMatrices().scale(scale, scale, 1.0F);
+         context.getMatrices().translate(-((float)slot.x + 8.0F), -((float)slot.y + 8.0F), 0.0F);
+      }
+
+   }
+
+   @Inject(
+      method = {"drawSlot(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/screen/slot/Slot;)V"},
+      at = {@At("RETURN")}
+   )
+   private void onDrawSlotTail(DrawContext context, Slot slot, CallbackInfo ci) {
+      Animations animations = Animations.INSTANCE;
+      if (animations.isEnabled() && animations.getAnimate().isEnable("Предметы")) {
+         context.getMatrices().pop();
       }
 
    }

@@ -21,7 +21,7 @@ import tech.huihui.client.screens.swing.SwingEditorScreen;
 public final class SwingAnimation extends Module {
    public static final SwingAnimation INSTANCE = new SwingAnimation();
    public static float previewProgress = -1.0F;
-   public ModeSetting animationMode = new ModeSetting("Режим", new String[]{"HMI Взмахи", "HMI Вперед", "HMI Обычная", "Smooth", "Self", "Self2", "Down", "Forward", "Touch", "Pander", "Curt", "BlockHit", "Spin", "Backhand", "Overhead", "Stab", "Slash", "Reverse", "Flick", "Whip", "Rush", "Upswing", "Hammer", "Tornado", "Rotor", "Bounce", "Jab", "Cross", "Power", "Ghost", "Shake", "Blink", "ReverseSpin", "Swing360", "Flip", "Boomerang", "Cannon", "Pierce", "Wave", "Claw", "Wide", "Aim", "Precise", "Drop", "Vertical", "Custom"});
+   public ModeSetting animationMode = new ModeSetting("Режим", new String[]{"HMI Взмахи", "HMI Вперед", "HMI Обычная", "HMI Копье", "HMI Инструмент", "HMI Блок", "HMI Лопата", "Smooth", "Self", "Self2", "Down", "Forward", "Touch", "Pander", "Curt", "BlockHit", "Spin", "Backhand", "Overhead", "Stab", "Slash", "Reverse", "Flick", "Whip", "Rush", "Upswing", "Hammer", "Tornado", "Rotor", "Bounce", "Jab", "Cross", "Power", "Ghost", "Shake", "Blink", "ReverseSpin", "Swing360", "Flip", "Boomerang", "Cannon", "Pierce", "Wave", "Claw", "Wide", "Aim", "Precise", "Drop", "Vertical", "Custom"});
    public NumberSetting swingPower = new NumberSetting("Сила", 5.0F, 1.0F, 10.0F, 1.0F);
    public NumberSetting speed = new NumberSetting("Скорость", 7.0F, 0.0F, 20.0F, 1.0F);
    public NumberSetting angle = new NumberSetting("Угол", 0.0F, 0.0F, 360.0F, 1.0F, () -> {
@@ -138,6 +138,48 @@ public void renderSwordAnimation(MatrixStack matrices, float swingProgress, floa
          matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-10.0F * swingRot));
          matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(40.0F * swing));
          matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(10.0F * swing));
+         break;
+      }
+      case "HMI Копье": {
+         float swingRot = hmiSwingRot(swingProgress);
+         float swing = hmiEase(MathHelper.sin(swingProgress * 3.1415927F));
+         matrices.translate(0.56F, -0.52F, -0.72F);
+         matrices.translate(0.0F, 0.0F, 0.45F * swingRot);
+         matrices.translate(-0.25F * swing, -0.35F * swingRot, -0.6F * swing);
+         matrices.translate(0.0F, 0.1F * swing, 0.0F);
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(15.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(30.0F * swingRot));
+         break;
+      }
+      case "HMI Инструмент": {
+         float swingRot = hmiSwingRot(swingProgress);
+         float swing = hmiEase(MathHelper.sin(swingProgress * 3.1415927F));
+         matrices.translate(0.56F, -0.52F, -0.72F);
+         matrices.translate(0.1F * swingRot, 0.1F * swingRot, -0.5F * swing);
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-30.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-20.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(40.0F * swing));
+         break;
+      }
+      case "HMI Блок": {
+         float swingRot = hmiSwingRot(swingProgress);
+         float swing = hmiEase(MathHelper.sin(swingProgress * 3.1415927F));
+         matrices.translate(0.56F, -0.52F, -0.72F);
+         matrices.translate(0.1F * swingRot, 0.1F * swingRot, -0.2F * swing);
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-10.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-10.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(20.0F * swing));
+         break;
+      }
+      case "HMI Лопата": {
+         float swingRot = hmiSwingRot(swingProgress);
+         float swing = hmiEase(MathHelper.sin(swingProgress * 3.1415927F));
+         matrices.translate(0.56F, -0.52F, -0.72F);
+         matrices.translate(0.0F, 0.15F * swingRot, -0.25F * swingRot);
+         matrices.translate(0.0F, 0.0F, -0.2F * swing);
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(15.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-35.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(30.0F * swing));
          break;
       }
       case "Smooth":
@@ -438,6 +480,32 @@ public void renderSwordAnimation(MatrixStack matrices, float swingProgress, floa
          matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-10.0F * swingRot));
          matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(40.0F * swing));
          matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(10.0F * swing));
+         break;
+      case "HMI Копье":
+         matrices.translate(0.0F, 0.0F, 0.45F * swingRot);
+         matrices.translate(-0.25F * swing, -0.35F * swingRot, -0.6F * swing);
+         matrices.translate(0.0F, 0.1F * swing, 0.0F);
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(15.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(30.0F * swingRot));
+         break;
+      case "HMI Инструмент":
+         matrices.translate(0.1F * swingRot, 0.1F * swingRot, -0.5F * swing);
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-30.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-20.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(40.0F * swing));
+         break;
+      case "HMI Блок":
+         matrices.translate(0.1F * swingRot, 0.1F * swingRot, -0.2F * swing);
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-10.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-10.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(20.0F * swing));
+         break;
+      case "HMI Лопата":
+         matrices.translate(0.0F, 0.15F * swingRot, -0.25F * swingRot);
+         matrices.translate(0.0F, 0.0F, -0.2F * swing);
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(15.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-35.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(30.0F * swing));
          break;
       }
    }

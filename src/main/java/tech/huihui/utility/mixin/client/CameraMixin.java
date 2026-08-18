@@ -15,10 +15,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.At.Shift;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import tech.huihui.base.events.impl.player.EventRotation;
 import tech.huihui.base.events.impl.render.EventCamera;
 import tech.huihui.base.events.impl.render.EventCameraPosition;
 import tech.huihui.client.modules.impl.misc.FreeCam;
+import tech.huihui.client.modules.impl.render.Animations;
 import tech.huihui.utility.game.player.rotation.Rotation;
 import tech.huihui.utility.mixin.accessors.CameraAccessor;
 
@@ -114,5 +116,18 @@ public abstract class CameraMixin {
       }
 
       ((CameraAccessor)instance).setCustomRotation(newYaw, newPitch);
+   }
+
+   @Inject(
+      method = {"clipToSpace"},
+      at = {@At("HEAD")},
+      cancellable = true
+   )
+   private void animationsClipToSpace(float desiredCameraDistance, CallbackInfoReturnable<Float> info) {
+      Animations animations = Animations.INSTANCE;
+      if (animations.isEnabled() && animations.getAnimate().isEnable("Смена перспективы")) {
+         info.setReturnValue(desiredCameraDistance * animations.getPerspectiveAnimation().getAnimationValue());
+      }
+
    }
 }

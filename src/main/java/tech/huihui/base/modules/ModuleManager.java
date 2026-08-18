@@ -34,6 +34,7 @@ import tech.huihui.client.modules.impl.combat.AutoSwap;
 import tech.huihui.client.modules.impl.combat.AutoTotem;
 import tech.huihui.client.modules.impl.combat.ClickPearl;
 import tech.huihui.client.modules.impl.combat.Surround;
+import tech.huihui.client.modules.impl.combat.AutoMace;
 import tech.huihui.client.modules.impl.combat.TargetPearl;
 import tech.huihui.client.modules.impl.cosmetics.AnimalsModule;
 import tech.huihui.client.modules.impl.misc.AutoBuy;
@@ -107,6 +108,7 @@ import tech.huihui.client.modules.impl.render.Optimization;
 import tech.huihui.client.modules.impl.render.ShulkerPreview;
 import tech.huihui.client.modules.impl.render.Predictions;
 import tech.huihui.client.modules.impl.render.AresMinePvPWarpChest;
+import tech.huihui.client.modules.impl.render.Animations;
 import tech.huihui.client.modules.impl.render.SwingAnimation;
 import tech.huihui.client.modules.impl.render.UseAnimation;
 import tech.huihui.client.modules.impl.render.TargetESP;
@@ -157,6 +159,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(AutoGapple.INSTANCE);
       registerModule(ClickPearl.INSTANCE);
       registerModule(TargetPearl.INSTANCE);
+      registerModule(AutoMace.INSTANCE);
    }
 
    private void registerMovement() {
@@ -185,6 +188,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(NoRender.INSTANCE);
       registerModule(Predictions.INSTANCE);
       registerModule(SwingAnimation.INSTANCE);
+      registerModule(Animations.INSTANCE);
       registerModule(Crosshair.INSTANCE);
       registerModule(ViewModel.INSTANCE);
       registerModule(CustomFog.INSTANCE);

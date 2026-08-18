@@ -4,14 +4,17 @@ import com.darkmagician6.eventapi.EventManager;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.hud.InGameHud;
 import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.scoreboard.ScoreboardDisplaySlot;
 import net.minecraft.world.GameMode;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import tech.huihui.base.events.impl.render.EventRender2D;
 import tech.huihui.client.modules.api.Module;
+import tech.huihui.client.modules.impl.render.Animations;
 import tech.huihui.client.modules.impl.render.Crosshair;
 import tech.huihui.client.modules.impl.render.CustomHotbar;
 import tech.huihui.client.modules.impl.render.Interface;
@@ -28,6 +31,86 @@ public abstract class InGameHudMixin {
    public void onRender(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
       CustomDrawContext customDrawContext = new CustomDrawContext(IMinecraft.mc.getBufferBuilders().getEntityVertexConsumers());
       EventManager.call(new EventRender2D(customDrawContext, tickCounter.getTickDelta(false)));
+   }
+
+   @Inject(
+      method = {"render"},
+      at = {@At("TAIL")}
+   )
+   private void animationsTab(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
+      Animations animations = Animations.INSTANCE;
+      if (animations.isEnabled() && animations.getAnimate().isEnable("TAB") && animations.getTabAnimation().getAnimationValue() > 0.0F && !IMinecraft.mc.options.playerListKey.isPressed()) {
+         IMinecraft.mc.inGameHud.getPlayerListHud().render(context, IMinecraft.mc.getWindow().getScaledWidth(), IMinecraft.mc.world.getScoreboard(), IMinecraft.mc.world.getScoreboard().getObjectiveForSlot(ScoreboardDisplaySlot.LIST));
+      }
+
+   }
+
+   @Inject(
+      method = {"renderMainHud"},
+      at = {@At("HEAD")}
+   )
+   private void animationsHotbarHead(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
+      Animations animations = Animations.INSTANCE;
+      if (!(Interface.INSTANCE.isEnabled() && Interface.INSTANCE.isEnableHotBar()) && animations.isEnabled() && animations.getAnimate().isEnable("Поднятие хотбара")) {
+         context.getMatrices().push();
+         context.getMatrices().translate(0.0F, -16.0F * animations.getHotbarAnimation().getAnimationValue(), 0.0F);
+      }
+
+   }
+
+   @Inject(
+      method = {"renderMainHud"},
+      at = {@At("RETURN")}
+   )
+   private void animationsHotbarTail(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
+      Animations animations = Animations.INSTANCE;
+      if (!(Interface.INSTANCE.isEnabled() && Interface.INSTANCE.isEnableHotBar()) && animations.isEnabled() && animations.getAnimate().isEnable("Поднятие хотбара")) {
+         context.getMatrices().pop();
+      }
+
+   }
+
+   @Inject(
+      method = {"renderExperienceLevel"},
+      at = {@At("HEAD")}
+   )
+   private void animationsExpHead(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
+      Animations animations = Animations.INSTANCE;
+      if (!(Interface.INSTANCE.isEnabled() && Interface.INSTANCE.isEnableHotBar()) && animations.isEnabled() && animations.getAnimate().isEnable("Поднятие хотбара")) {
+         context.getMatrices().push();
+         context.getMatrices().translate(0.0F, -16.0F * animations.getHotbarAnimation().getAnimationValue(), 0.0F);
+      }
+
+   }
+
+   @Inject(
+      method = {"renderExperienceLevel"},
+      at = {@At("RETURN")}
+   )
+   private void animationsExpTail(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
+      Animations animations = Animations.INSTANCE;
+      if (!(Interface.INSTANCE.isEnabled() && Interface.INSTANCE.isEnableHotBar()) && animations.isEnabled() && animations.getAnimate().isEnable("Поднятие хотбара")) {
+         context.getMatrices().pop();
+      }
+
+   }
+
+   @ModifyArg(
+      method = {"renderHotbar"},
+      index = 2,
+      at = @At(
+   value = "INVOKE",
+   ordinal = 1,
+   target = "Lnet/minecraft/client/gui/DrawContext;drawGuiTexture(Ljava/util/function/Function;Lnet/minecraft/util/Identifier;IIII)V"
+)
+   )
+   private int animationsSlot(int x) {
+      Animations animations = Animations.INSTANCE;
+      if (animations.isEnabled() && animations.getAnimate().isEnable("Слот хотбара") && IMinecraft.mc.player != null) {
+         return Math.round((x - (IMinecraft.mc.player.getInventory().selectedSlot * 20)) + (animations.getSelectedSlot() * 20.0F));
+      }
+
+      return x;
    }
 
    @Inject(

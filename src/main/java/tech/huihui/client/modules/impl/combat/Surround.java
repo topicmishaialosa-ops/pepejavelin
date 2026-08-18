@@ -13,9 +13,11 @@ import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
 import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.RaycastContext.FluidHandling;
@@ -56,119 +58,133 @@ public class Surround extends Module {
 
    private final Timer timer = new Timer();
    private final Random random = new Random();
-   
-   // Для отложенного плейса после ротации
+
    private BlockPos pendingPlace = null;
    private int pendingSlot = -1;
    private Hand pendingHand = Hand.MAIN_HAND;
    private BlockHitResult pendingHitResult = null;
    private int rotationTicks = 0;
+   private BlockPos lastBase = null;
 
    private Surround() {
+   }
+
+   public void onDisable() {
+      super.onDisable();
+      this.clearPending();
    }
 
    @EventTarget
    @Native
    private void onUpdate(EventUpdate event) {
-      if (mc.player == null || mc.world == null || mc.interactionManager == null) {
+      if (mc.player == null || mc.world == null || mc.interactionManager == null || mc.currentScreen != null) {
          return;
       }
-      if (mc.currentScreen != null) {
-         return;
-      }
-      
-      // Проверка на землю (Grim флагает плейс в воздухе)
+
       if (this.groundCheck.isEnabled() && !mc.player.isOnGround() && !mc.player.getAbilities().flying) {
          return;
       }
-      
-      // Обработка отложенного плейса после ротации
+
       if (this.pendingPlace != null) {
-         if (this.rotationTicks > 0) {
-            this.rotationTicks--;
-            return;
-         }
-         
-         // Проверяем, что ротация достигла цели
-         if (this.strictRotation.isEnabled() && !this.isRotationDone()) {
-            return;
-         }
-         
-         this.executePlace(this.pendingSlot, this.pendingHand, this.pendingHitResult);
-         this.pendingPlace = null;
-         this.pendingSlot = -1;
-         this.pendingHitResult = null;
+         this.processPending();
          return;
       }
-      
-      // Рандомизированная задержка
-      long currentDelay = (long)(this.delay.getCurrent() + random.nextInt((int)this.randomDelay.getCurrent()));
+
+      long currentDelay = (long)this.delay.getCurrent() + (long)this.random.nextInt((int)this.randomDelay.getCurrent() + 1);
       if (!this.timer.finished(currentDelay)) {
          return;
       }
-      
-      List<BlockPos> positions = this.getSurroundPositions(mc.player.getBlockPos());
+
+      BlockPos base = BlockPos.ofFloored(mc.player.getX(), mc.player.getY(), mc.player.getZ());
+      List<BlockPos> positions = this.getSurroundPositions(base);
       for (BlockPos pos : positions) {
-         if (this.isSolid(pos)) {
+         if (this.isSolid(pos) || this.isBlocked(pos)) {
             continue;
          }
-         if (this.isBlocked(pos)) {
-            continue;
-         }
-         
-         // Проверка дистанции (Grim флагает > 4.5)
+
          double distance = mc.player.getEyePos().distanceTo(Vec3d.ofCenter(pos));
-         if (distance > 4.5) {
+         if (distance > 4.5D) {
             continue;
          }
-         
+
          BlockPos support = this.findSupport(pos);
          if (support == null) {
             continue;
          }
-         
-         // Определяем руку и слот
+
          Hand hand = this.getPlaceHand();
-         int slot = -1;
-         
+         int slot;
          if (hand == Hand.MAIN_HAND) {
             slot = this.findBlockSlot();
             if (slot == -1) {
                return;
             }
-         } else if (hand == Hand.OFF_HAND) {
-            // Offhand уже держит блок
+         } else {
             slot = mc.player.getInventory().selectedSlot;
          }
-         
+
          Direction side = Direction.fromVector(pos.subtract(support), Direction.UP);
          Vec3d hitVec = this.getHitVec(support, side);
-         
-         // Raytrace проверка
+
          if (this.raytraceCheck.isEnabled() && !this.canSeeBlock(support, hitVec)) {
             continue;
          }
-         
+
          BlockHitResult hitResult = new BlockHitResult(hitVec, side, support, false);
-         
-         // Ротация
+
          if (!this.rotate.is("OFF")) {
             this.rotateTo(hitVec);
-            // Откладываем плейс на 1-2 тика
             this.pendingPlace = pos;
             this.pendingSlot = slot;
             this.pendingHand = hand;
             this.pendingHitResult = hitResult;
             this.rotationTicks = this.rotate.is("Легит") ? 2 : 1;
-            return;
-         } else {
-            this.executePlace(slot, hand, hitResult);
-            this.timer.reset();
+            this.lastBase = base;
             return;
          }
+
+         this.executePlace(slot, hand, hitResult);
+         return;
       }
    }
-   
+
+   private void processPending() {
+      if (this.pendingPlace == null) {
+         return;
+      }
+
+      BlockPos base = BlockPos.ofFloored(mc.player.getX(), mc.player.getY(), mc.player.getZ());
+      if (this.lastBase != null && !base.equals(this.lastBase)) {
+         this.clearPending();
+         return;
+      }
+
+      if (this.rotationTicks > 0) {
+         --this.rotationTicks;
+         return;
+      }
+
+      if (this.strictRotation.isEnabled() && this.rotate.is("Легит") && !this.isRotationDone()) {
+         return;
+      }
+
+      if (this.isSolid(this.pendingPlace)) {
+         this.clearPending();
+         return;
+      }
+
+      this.executePlace(this.pendingSlot, this.pendingHand, this.pendingHitResult);
+      this.clearPending();
+   }
+
+   private void clearPending() {
+      this.pendingPlace = null;
+      this.pendingSlot = -1;
+      this.pendingHitResult = null;
+      this.rotationTicks = 0;
+      this.lastBase = null;
+   }
+
    private void executePlace(int slot, Hand hand, BlockHitResult hitResult) {
       if (this.swapMode.is("Silent") && hand == Hand.MAIN_HAND) {
          int current = mc.player.getInventory().selectedSlot;
@@ -176,11 +192,10 @@ public class Surround extends Module {
             mc.player.getInventory().selectedSlot = slot;
             mc.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(slot));
          }
-         
-         // Отправляем пакеты в правильном порядке для Grim
+
          mc.getNetworkHandler().sendPacket(new PlayerInteractBlockC2SPacket(hand, hitResult, 0));
          mc.getNetworkHandler().sendPacket(new HandSwingC2SPacket(hand));
-         
+
          if (current != slot) {
             mc.player.getInventory().selectedSlot = current;
             mc.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(current));
@@ -215,11 +230,11 @@ public class Surround extends Module {
       }
       return list;
    }
-   
+
    private Hand getPlaceHand() {
       ItemStack offhand = mc.player.getOffHandStack();
       boolean obsidianOnly = this.blockMode.is("Обсидиан");
-      
+
       if (!offhand.isEmpty() && offhand.getItem() instanceof BlockItem) {
          if (!obsidianOnly || offhand.getItem() == Blocks.OBSIDIAN.asItem()) {
             return Hand.OFF_HAND;
@@ -247,44 +262,44 @@ public class Surround extends Module {
       Vec3d eye = mc.player.getEyePos();
       Vec3d diff = point.subtract(eye);
       Rotation rotation = Rotation.fromRotationVec(diff);
-      
-      // Рандомизируем ротацию
-      float yawRandom = (random.nextFloat() - 0.5f) * 2.0f;
-      float pitchRandom = (random.nextFloat() - 0.5f) * 1.0f;
-      rotation = new Rotation(rotation.getYaw() + yawRandom, Math.max(-90, Math.min(90, rotation.getPitch() + pitchRandom)));
-      
+
+      float yawRandom = (this.random.nextFloat() - 0.5F) * 2.0F;
+      float pitchRandom = (this.random.nextFloat() - 0.5F) * 1.0F;
+      rotation = new Rotation(rotation.getYaw() + yawRandom, Math.max(-90.0F, Math.min(90.0F, rotation.getPitch() + pitchRandom)));
+
       if (this.rotate.is("Легит")) {
          RotationComponent.update(rotation, 25.0F, 25.0F, 15.0F, 15.0F, 8, 2, false);
       } else {
          RotationComponent.update(rotation, 180.0F, 180.0F, 180.0F, 180.0F, 4, 1, false);
       }
    }
-   
+
    private boolean isRotationDone() {
-      return true;
+      Rotation target = RotationComponent.instance.targetRotation();
+      if (target == null) {
+         return true;
+      }
+      float yawDelta = MathHelper.wrapDegrees(target.getYaw() - mc.player.getYaw());
+      float pitchDelta = MathHelper.wrapDegrees(target.getPitch() - mc.player.getPitch());
+      return Math.abs(yawDelta) < 2.0F && Math.abs(pitchDelta) < 2.0F;
    }
-   
+
    private Vec3d getHitVec(BlockPos support, Direction side) {
-      double x = support.getX() + 0.5 + side.getOffsetX() * 0.5;
-      double y = support.getY() + 0.5 + side.getOffsetY() * 0.5;
-      double z = support.getZ() + 0.5 + side.getOffsetZ() * 0.5;
-      
+      double x = support.getX() + 0.5 + (double)side.getOffsetX() * 0.5;
+      double y = support.getY() + 0.5 + (double)side.getOffsetY() * 0.5;
+      double z = support.getZ() + 0.5 + (double)side.getOffsetZ() * 0.5;
+
       double randomOffset = 0.1;
-      x += (random.nextDouble() - 0.5) * randomOffset;
-      y += (random.nextDouble() - 0.5) * randomOffset;
-      z += (random.nextDouble() - 0.5) * randomOffset;
-      
+      x += (this.random.nextDouble() - 0.5) * randomOffset;
+      y += (this.random.nextDouble() - 0.5) * randomOffset;
+      z += (this.random.nextDouble() - 0.5) * randomOffset;
+
       return new Vec3d(x, y, z);
    }
-   
+
    private boolean canSeeBlock(BlockPos pos, Vec3d hitVec) {
       Vec3d eye = mc.player.getEyePos();
-      return mc.world.raycast(new RaycastContext(
-         eye, hitVec, 
-         ShapeType.COLLIDER,
-         FluidHandling.NONE,
-         mc.player
-      )).getType() == net.minecraft.util.hit.HitResult.Type.MISS;
+      return mc.world.raycast(new RaycastContext(eye, hitVec, ShapeType.COLLIDER, FluidHandling.NONE, mc.player)).getType() == HitResult.Type.MISS;
    }
 
    private boolean isSolid(BlockPos pos) {

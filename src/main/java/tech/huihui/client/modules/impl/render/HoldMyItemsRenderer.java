@@ -477,6 +477,37 @@ public final class HoldMyItemsRenderer {
       boolean forwardHandsAttack = animation.animationMode.is("HMI Вперед");
       boolean normalHandsAttack = animation.animationMode.is("HMI Обычная");
 
+      if (animation.animationMode.is("HMI Копье")) {
+         matrices.translate(0.0D, 0.0D, 0.45D * swingRot);
+         matrices.translate(-0.25D * handDirection * swing, -0.35D * swingRot, -0.6D * swing);
+         matrices.translate(0.0D, 0.1D * swing, 0.0D);
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(15.0F * swingRot * ll));
+         matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(30.0F * swingRot * ll));
+         return;
+      }
+      if (animation.animationMode.is("HMI Инструмент")) {
+         matrices.translate(0.1D * ll * swingRot, 0.1D * swingRot, -0.5D * swing);
+         matrices.multiply(RotationAxis.NEGATIVE_X.rotationDegrees(-30.0F * swingRot));
+         matrices.multiply(RotationAxis.NEGATIVE_Z.rotationDegrees(20.0F * swingRot * ll));
+         matrices.multiply(RotationAxis.NEGATIVE_X.rotationDegrees(40.0F * swing));
+         return;
+      }
+      if (animation.animationMode.is("HMI Блок")) {
+         matrices.translate(0.1D * ll * swingRot, 0.1D * swingRot, -0.2D * swing);
+         matrices.multiply(RotationAxis.NEGATIVE_X.rotationDegrees(-10.0F * swingRot));
+         matrices.multiply(RotationAxis.NEGATIVE_Z.rotationDegrees(10.0F * swingRot * ll));
+         matrices.multiply(RotationAxis.NEGATIVE_X.rotationDegrees(20.0F * swing));
+         return;
+      }
+      if (animation.animationMode.is("HMI Лопата")) {
+         matrices.translate(0.0D, 0.15D * swingRot, -0.25D * swingRot);
+         matrices.translate(0.0D, 0.0D, -0.2D * swing);
+         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(15.0F * swingRot));
+         matrices.multiply(RotationAxis.NEGATIVE_X.rotationDegrees(35.0F * swingRot));
+         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(30.0F * swing));
+         return;
+      }
+
       if (stack.getItem() instanceof SwordItem && forwardHandsAttack) {
          matrices.translate(0.12D * ll * swingRot, 0.04D * swingRot, -0.95D * swing);
          matrices.translate(0.02D * ll * swing, 0.10D * swing, -0.10D * swingRot);
