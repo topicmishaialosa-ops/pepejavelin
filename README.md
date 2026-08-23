@@ -19,8 +19,5 @@
   - `misc/` — вспомогательные модули (AutoJoiner, Autofarm, CreeperFarm, ZarabotokReallyWorld и др.)
   - `render/` — рендер-модули (TargetHud, TargetESP, XRay и др.)
 - `src/main/java/tech/huihui/base/` — базовая система (модули, команды, события)
-- `src/main/java/tech/huihui/utility/` — утилиты и миксины
-
-## Дисклеймер
-
-Проект создан в образовательных целях. Используйте на свой страх и риск.
+- `src/main/java/tech/huihui/utility/` — утилиты
+- #шушапшурадвжсовдао
