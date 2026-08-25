@@ -10,6 +10,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.Items;
 import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.util.Hand;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import tech.huihui.base.events.impl.other.EventTick;
 import tech.huihui.client.modules.api.Category;
@@ -17,16 +18,19 @@ import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
 import tech.huihui.client.modules.api.setting.impl.BooleanSetting;
 import tech.huihui.client.modules.api.setting.impl.NumberSetting;
+import tech.huihui.utility.game.other.MessageUtil;
 import tech.huihui.utility.interfaces.IMinecraft;
 import tech.huihui.utility.math.Timer;
 
 @ModuleAnnotation(
    name = "CreeperFarm",
    category = Category.MISC,
-   description = "Фарм-платформа: патрулирует, бежит к криперам, бьёт мечом, отбегает от взрывов"
+   description = "Фарм-платформа: патрулирует, бежит к криперам, бьёт мечом, отбегает от взрывов. Навигация через Baritone (#goto/#stop)"
 )
 public final class CreeperFarm extends Module implements IMinecraft {
    public static final CreeperFarm INSTANCE = new CreeperFarm();
+
+   private static final boolean BARITONE_PRESENT = isBaritonePresent();
 
    private final NumberSetting distance = new NumberSetting("Дистанция поиска", 20.0F, 5.0F, 50.0F, 1.0F);
    private final NumberSetting attackRange = new NumberSetting("Дистанция атаки", 3.2F, 1.0F, 6.0F, 0.1F);
@@ -38,17 +42,30 @@ public final class CreeperFarm extends Module implements IMinecraft {
    private final BooleanSetting sprint = new BooleanSetting("Бег", true);
    private final BooleanSetting wander = new BooleanSetting("Патруль без цели", true);
    private final NumberSetting wanderRadius = new NumberSetting("Радиус патруля", 25.0F, 5.0F, 50.0F, 1.0F);
+   private final BooleanSetting useBaritone = new BooleanSetting("Навигация Baritone", true);
 
    private final Random random = new Random();
    private final Timer attackTimer = new Timer();
    private final Timer wanderTimer = new Timer();
+   private final Timer pathTimer = new Timer();
    private CreeperEntity target;
    private CreeperEntity exploding;
    private float wanderYaw;
    private double centerX;
    private double centerZ;
+   private boolean baritonePathing;
+   private BlockPos lastGoal;
 
    private CreeperFarm() {
+   }
+
+   private static boolean isBaritonePresent() {
+      try {
+         Class.forName("baritone.api.BaritoneAPI");
+         return true;
+      } catch (Throwable ignored) {
+         return false;
+      }
    }
 
    @Override
@@ -58,15 +75,22 @@ public final class CreeperFarm extends Module implements IMinecraft {
       this.exploding = null;
       this.attackTimer.reset();
       this.wanderTimer.reset();
+      this.pathTimer.reset();
+      this.baritonePathing = false;
+      this.lastGoal = null;
       this.wanderYaw = mc.player == null ? 0.0F : mc.player.getYaw();
       if (mc.player != null) {
          this.centerX = mc.player.getX();
          this.centerZ = mc.player.getZ();
       }
+      if (this.useBaritone.isEnabled() && !BARITONE_PRESENT) {
+         MessageUtil.displayInfo("Baritone не найден — CreeperFarm работает в ручном режиме");
+      }
    }
 
    @Override
    public void onDisable() {
+      this.stopBaritone();
       this.setKey(mc.options.forwardKey, false);
       this.setKey(mc.options.jumpKey, false);
       this.setKey(mc.options.sprintKey, false);
@@ -83,6 +107,35 @@ public final class CreeperFarm extends Module implements IMinecraft {
       this.updateCreeper();
       this.ensureSword();
 
+      boolean byBaritone = this.useBaritone.isEnabled() && BARITONE_PRESENT;
+      if (!byBaritone) {
+         this.manualTick();
+         return;
+      }
+
+      if (this.exploding != null && this.runFromBlast.isEnabled()) {
+         this.fleeBaritone();
+         return;
+      }
+
+      if (this.target == null) {
+         this.wanderBaritone();
+         return;
+      }
+
+      this.face(this.target);
+      double meleeRange = this.attackRange.getCurrent();
+      double distSq = mc.player.squaredDistanceTo(this.target);
+
+      if (distSq > meleeRange * meleeRange) {
+         this.sendGoto(this.target.getBlockPos());
+      } else {
+         this.stopBaritone();
+         this.attack(this.target);
+      }
+   }
+
+   private void manualTick() {
       if (this.exploding != null && this.runFromBlast.isEnabled()) {
          this.flee();
          return;
@@ -193,6 +246,63 @@ public final class CreeperFarm extends Module implements IMinecraft {
             || item == Items.GOLDEN_SWORD
             || item == Items.DIAMOND_SWORD
             || item == Items.NETHERITE_SWORD;
+   }
+
+   private void fleeBaritone() {
+      if (this.exploding == null) {
+         return;
+      }
+      double dx = mc.player.getX() - this.exploding.getX();
+      double dz = mc.player.getZ() - this.exploding.getZ();
+      double len = Math.sqrt(dx * dx + dz * dz);
+      if (len < 1.0E-4) {
+         dx = 1.0;
+         dz = 0.0;
+      } else {
+         dx /= len;
+         dz /= len;
+      }
+      double safe = this.blastRadius.getCurrent() + 8.0D;
+      double tx = mc.player.getX() + dx * safe;
+      double tz = mc.player.getZ() + dz * safe;
+      double ty = mc.player.getY();
+      this.sendGoto(BlockPos.ofFloored(tx, ty, tz));
+   }
+
+   private void wanderBaritone() {
+      if (!this.wander.isEnabled()) {
+         this.stopBaritone();
+         this.releaseKeys();
+         return;
+      }
+      double radius = this.wanderRadius.getCurrent();
+      double distFromCenter = Math.sqrt((mc.player.getX() - this.centerX) * (mc.player.getX() - this.centerX) + (mc.player.getZ() - this.centerZ) * (mc.player.getZ() - this.centerZ));
+      if (this.pathTimer.finished(4000L) || this.lastGoal == null || distFromCenter > radius) {
+         double targetX = this.centerX + (this.random.nextDouble() * 2.0D - 1.0D) * radius * 0.5D;
+         double targetZ = this.centerZ + (this.random.nextDouble() * 2.0D - 1.0D) * radius * 0.5D;
+         this.sendGoto(BlockPos.ofFloored(targetX, mc.player.getY(), targetZ));
+      }
+   }
+
+   private void sendGoto(BlockPos pos) {
+      if (pos == null) {
+         return;
+      }
+      if ((pos.equals(this.lastGoal) && this.baritonePathing) && !this.pathTimer.finished(1500L)) {
+         return;
+      }
+      mc.player.networkHandler.sendChatMessage("#goto " + pos.getX() + " " + pos.getY() + " " + pos.getZ());
+      this.lastGoal = pos;
+      this.baritonePathing = true;
+      this.pathTimer.reset();
+   }
+
+   private void stopBaritone() {
+      if (this.baritonePathing) {
+         mc.player.networkHandler.sendChatMessage("#stop");
+         this.baritonePathing = false;
+         this.lastGoal = null;
+      }
    }
 
    private void flee() {
