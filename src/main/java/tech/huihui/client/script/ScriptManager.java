@@ -7,6 +7,7 @@ import tech.huihui.client.script.loader.JavaLoader;
 import tech.huihui.client.script.loader.JsonLoader;
 import tech.huihui.client.script.loader.LuaLoader;
 import tech.huihui.utility.game.other.MessageUtil;
+import tech.huihui.client.script.ScriptErrorCapture;
 
 import java.io.File;
 import java.util.LinkedHashMap;
@@ -68,6 +69,7 @@ public class ScriptManager {
         } catch (Exception e) {
             api.dispose();
             MessageUtil.displayInfo("§cОшибка загрузки §f" + name + "§c: §f" + e.getMessage());
+            ScriptErrorCapture.capture(name, lang, e);
             e.printStackTrace();
         }
     }

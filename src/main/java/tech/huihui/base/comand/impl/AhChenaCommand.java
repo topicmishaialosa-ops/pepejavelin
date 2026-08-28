@@ -97,7 +97,9 @@ public class AhChenaCommand extends CommandAbstract {
       }
       String lowerQuery = this.query == null ? "" : this.query.toLowerCase(Locale.ROOT);
       int containerSlots = Math.min(screen.getScreenHandler().slots.size(), screen.getScreenHandler().getRows() * 9);
-      int minPrice = Integer.MAX_VALUE;
+      int minLotPrice = Integer.MAX_VALUE;
+      int minLotCount = 0;
+      int minPerItem = Integer.MAX_VALUE;
       int count = 0;
       for (int i = 0; i < containerSlots; i++) {
          Slot slot = screen.getScreenHandler().slots.get(i);
@@ -109,9 +111,17 @@ public class AhChenaCommand extends CommandAbstract {
          if (!lowerQuery.isEmpty() && !name.contains(lowerQuery)) {
             continue;
          }
-         int price = AutoBuyUtil.getServerPrice(stack);
-         if (price > 0 && price < minPrice) {
-            minPrice = price;
+         int stackCount = Math.max(1, stack.getCount());
+         int lotPrice = AutoBuyUtil.getPrice(stack);
+         if (lotPrice > 0) {
+            int perItem = lotPrice / stackCount;
+            if (lotPrice < minLotPrice) {
+               minLotPrice = lotPrice;
+               minLotCount = stackCount;
+            }
+            if (perItem < minPerItem) {
+               minPerItem = perItem;
+            }
          }
          count++;
       }
@@ -121,7 +131,7 @@ public class AhChenaCommand extends CommandAbstract {
          MessageUtil.displayInfo("[AH] Лотов с \"" + this.query + "\" не найдено на аукционе");
          return;
       }
-      if (minPrice == Integer.MAX_VALUE) {
+      if (minLotPrice == Integer.MAX_VALUE || minPerItem == Integer.MAX_VALUE) {
          this.active = false;
          mc.execute(() -> mc.setScreen(null));
          MessageUtil.displayInfo("[AH] Найдено " + count + " лотов \"" + this.query + "\", но цена не определена");
@@ -129,7 +139,9 @@ public class AhChenaCommand extends CommandAbstract {
       }
       this.active = false;
       mc.execute(() -> mc.setScreen(null));
-      MessageUtil.displayInfo("[AH] " + this.query + ": минимальная цена " + String.format(Locale.US, "%,d", minPrice) + " $, лотов: " + count);
+      MessageUtil.displayInfo("[AH] " + this.query + ": минимальная цена лота "
+         + String.format(Locale.US, "%,d", minLotPrice) + " $ (кол-во: " + minLotCount + "), за 1 шт: "
+         + String.format(Locale.US, "%,d", minPerItem) + " $, лотов: " + count);
    }
 
    private String handItemName() {

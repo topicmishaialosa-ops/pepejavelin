@@ -25,49 +25,63 @@ public final class ZaiAi {
    private ZaiAi() {
    }
 
-   public static void ask(String apiKey, String system, String user, Callback callback) {
-      if (apiKey == null || apiKey.isBlank()) {
-         callback.onError("API-ключ z.ai не задан (настройки BpAuto)");
-         return;
-      }
-      EXECUTOR.execute(() -> {
-         try {
-            callback.onResult(request(apiKey, system, user));
-         } catch (Exception e) {
-            callback.onError(e.getMessage());
-         }
-      });
-   }
+    public static void ask(String apiKey, String system, String user, Callback callback) {
+       ask(apiKey, system, user, true, 2048, 0.2, callback);
+    }
 
-   private static String request(String apiKey, String system, String user) throws Exception {
-      HttpURLConnection connection = (HttpURLConnection) new URL(ENDPOINT).openConnection();
-      connection.setRequestMethod("POST");
-      connection.setConnectTimeout(15000);
-      connection.setReadTimeout(60000);
-      connection.setRequestProperty("Content-Type", "application/json");
-      connection.setRequestProperty("Authorization", "Bearer " + apiKey);
-      connection.setDoOutput(true);
+    /**
+     * Режим для генерации скриптов: свободный markdown-ответ (без принудительного
+     * JSON), больше токенов и чуть выше температура для креатива.
+     */
+    public static void askMarkdown(String apiKey, String system, String user, Callback callback) {
+       ask(apiKey, system, user, false, 4096, 0.4, callback);
+    }
 
-      JsonObject body = new JsonObject();
-      body.addProperty("model", MODEL);
-      JsonArray messages = new JsonArray();
-      JsonObject systemMessage = new JsonObject();
-      systemMessage.addProperty("role", "system");
-      systemMessage.addProperty("content", system);
-      messages.add(systemMessage);
-      JsonObject userMessage = new JsonObject();
-      userMessage.addProperty("role", "user");
-      userMessage.addProperty("content", user);
-      messages.add(userMessage);
-      body.add("messages", messages);
-      JsonObject thinking = new JsonObject();
-      thinking.addProperty("type", "disabled");
-      body.add("thinking", thinking);
-      JsonObject responseFormat = new JsonObject();
-      responseFormat.addProperty("type", "json_object");
-      body.add("response_format", responseFormat);
-      body.addProperty("temperature", 0.2);
-      body.addProperty("max_tokens", 2048);
+    public static void ask(String apiKey, String system, String user, boolean json, int maxTokens, double temperature, Callback callback) {
+       if (apiKey == null || apiKey.isBlank()) {
+          callback.onError("API-ключ z.ai не задан");
+          return;
+       }
+       EXECUTOR.execute(() -> {
+          try {
+             callback.onResult(request(apiKey, system, user, json, maxTokens, temperature));
+          } catch (Exception e) {
+             callback.onError(e.getMessage());
+          }
+       });
+    }
+
+    private static String request(String apiKey, String system, String user, boolean json, int maxTokens, double temperature) throws Exception {
+       HttpURLConnection connection = (HttpURLConnection) new URL(ENDPOINT).openConnection();
+       connection.setRequestMethod("POST");
+       connection.setConnectTimeout(15000);
+       connection.setReadTimeout(90000);
+       connection.setRequestProperty("Content-Type", "application/json");
+       connection.setRequestProperty("Authorization", "Bearer " + apiKey);
+       connection.setDoOutput(true);
+
+       JsonObject body = new JsonObject();
+       body.addProperty("model", MODEL);
+       JsonArray messages = new JsonArray();
+       JsonObject systemMessage = new JsonObject();
+       systemMessage.addProperty("role", "system");
+       systemMessage.addProperty("content", system);
+       messages.add(systemMessage);
+       JsonObject userMessage = new JsonObject();
+       userMessage.addProperty("role", "user");
+       userMessage.addProperty("content", user);
+       messages.add(userMessage);
+       body.add("messages", messages);
+       JsonObject thinking = new JsonObject();
+       thinking.addProperty("type", "disabled");
+       body.add("thinking", thinking);
+       if (json) {
+          JsonObject responseFormat = new JsonObject();
+          responseFormat.addProperty("type", "json_object");
+          body.add("response_format", responseFormat);
+       }
+       body.addProperty("temperature", temperature);
+       body.addProperty("max_tokens", maxTokens);
 
       try (OutputStream output = connection.getOutputStream()) {
          output.write(body.toString().getBytes(StandardCharsets.UTF_8));
@@ -78,13 +92,13 @@ public final class ZaiAi {
          String error = read(connection.getErrorStream());
          throw new RuntimeException("Z.AI HTTP " + code + ": " + error);
       }
-      JsonObject json = JsonParser.parseString(read(connection.getInputStream())).getAsJsonObject();
-      JsonArray choices = json.getAsJsonArray("choices");
-      if (choices == null || choices.isEmpty()) {
-         throw new RuntimeException("Z.AI вернул пустой ответ");
-      }
-      JsonObject message = choices.get(0).getAsJsonObject().getAsJsonObject("message");
-      return message.get("content").getAsString();
+       JsonObject response = JsonParser.parseString(read(connection.getInputStream())).getAsJsonObject();
+       JsonArray choices = response.getAsJsonArray("choices");
+       if (choices == null || choices.isEmpty()) {
+          throw new RuntimeException("Z.AI вернул пустой ответ");
+       }
+       JsonObject message = choices.get(0).getAsJsonObject().getAsJsonObject("message");
+       return message.get("content").getAsString();
    }
 
    private static String read(InputStream stream) throws Exception {

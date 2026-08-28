@@ -45,6 +45,7 @@ import tech.huihui.client.modules.impl.misc.AutoAccept;
 import tech.huihui.client.modules.impl.misc.AutoDuel;
 import tech.huihui.client.modules.impl.misc.AutoWarden;
 import tech.huihui.client.modules.impl.misc.BpAuto;
+import tech.huihui.client.modules.impl.misc.VibeCoding;
 import tech.huihui.client.modules.impl.misc.BaseFinder;
 import tech.huihui.client.modules.impl.misc.AutoJoiner;import tech.huihui.client.modules.impl.misc.AutoKit;
 import tech.huihui.client.modules.impl.misc.AutoMineFunTime;
@@ -258,6 +259,7 @@ public final class ModuleManager implements IMinecraft {
         registerModule(AutoWarden.INSTANCE);
         registerModule(BpAuto.INSTANCE);
         registerModule(ChestStealer.INSTANCE);
+        registerModule(VibeCoding.INSTANCE);
      }
 
     private void registerModule(Module module) {
