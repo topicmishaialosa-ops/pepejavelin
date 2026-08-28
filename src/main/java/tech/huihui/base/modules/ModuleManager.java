@@ -36,6 +36,7 @@ import tech.huihui.client.modules.impl.combat.ClickPearl;
 import tech.huihui.client.modules.impl.combat.Surround;
 import tech.huihui.client.modules.impl.combat.AutoMace;
 import tech.huihui.client.modules.impl.combat.TargetPearl;
+import tech.huihui.client.modules.impl.combat.TPInfl;
 import tech.huihui.client.modules.impl.cosmetics.AnimalsModule;
 import tech.huihui.client.modules.impl.misc.AutoBuy;
 import tech.huihui.client.modules.impl.misc.Collector;
@@ -160,6 +161,7 @@ public final class ModuleManager implements IMinecraft {
       registerModule(ClickPearl.INSTANCE);
       registerModule(TargetPearl.INSTANCE);
       registerModule(AutoMace.INSTANCE);
+      registerModule(TPInfl.INSTANCE);
    }
 
    private void registerMovement() {
@@ -258,9 +260,20 @@ public final class ModuleManager implements IMinecraft {
         registerModule(ChestStealer.INSTANCE);
      }
 
-   private void registerModule(Module module) {
-      modules.add(module);
-   }
+    private void registerModule(Module module) {
+       modules.add(module);
+    }
+
+    public void registerScriptModule(Module module) {
+       modules.add(module);
+    }
+
+    public void unregisterModule(Module module) {
+       modules.remove(module);
+       if (module.isEnabled()) {
+          EventManager.unregister(module);
+       }
+    }
 
    public Module getModule(String name) {
       return modules.stream()

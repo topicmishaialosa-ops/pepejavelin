@@ -92,17 +92,18 @@ public final class Aura extends Module {
    private final ModeSetting.Value priorityHp;
    private final NumberSetting distance;
    private final NumberSetting distanceRotation;
-   private final BooleanSetting shieldBreak;
-   private final BooleanSetting legitSwap;
-   private final BooleanSetting raycastCheck;
-   private final BooleanSetting wallHit;
-   private final BooleanSetting predictOnElytra;
-   private final BooleanSetting elytraTarget;
-   public final NumberSetting predict;
-   public final NumberSetting predictTicks;
-   public final BooleanSetting critsOnlyWithSpace;
-   private LivingEntity target;
-   private float acceleration;
+private final BooleanSetting shieldBreak;
+    private final BooleanSetting legitSwap;
+    private final BooleanSetting raycastCheck;
+    private final BooleanSetting wallHit;
+    private final BooleanSetting predictOnElytra;
+    private final BooleanSetting elytraTarget;
+    private final BooleanSetting keepSprint;
+    public final NumberSetting predict;
+public final NumberSetting predictTicks;
+    public final BooleanSetting critsOnlyWithSpace;
+    private LivingEntity target;
+    private float acceleration;
    private boolean isBack;
    private final Timer hurtTimer;
    private final ScriptManager.ScriptTask script;
@@ -146,11 +147,12 @@ public final class Aura extends Module {
       this.legitSwap = new BooleanSetting("Легитно ломать", true, var10005::isEnabled);
       this.raycastCheck = new BooleanSetting("Проверка на наведение", false);
       this.wallHit = new BooleanSetting("Бить через стены", false);
-      this.predictOnElytra = new BooleanSetting("Перегонять противника", true);
-      this.elytraTarget = new BooleanSetting("Элитра-таргет", false);
-      this.predict = new NumberSetting("Насколько перегонять", 2.0F, 1.0F, 4.0F, 0.1F);
-      this.predictTicks = new NumberSetting("Тики предикта", 10.0F, 1.0F, 60.0F, 1.0F);
-      this.critsOnlyWithSpace = new BooleanSetting("Только с пробелом", true);
+this.predictOnElytra = new BooleanSetting("Перегонять противника", true);
+       this.elytraTarget = new BooleanSetting("Элитра-таргет", false);
+       this.keepSprint = new BooleanSetting("Keep Sprint", false);
+       this.predict = new NumberSetting("Насколько перегонять", 2.0F, 1.0F, 4.0F, 0.1F);
+       this.predictTicks = new NumberSetting("Тики предикта", 10.0F, 1.0F, 60.0F, 1.0F);
+       this.critsOnlyWithSpace = new BooleanSetting("Только с пробелом", true);
       this.target = null;
       this.hurtTimer = new Timer();
       this.script = new ScriptManager.ScriptTask();
@@ -230,16 +232,16 @@ public final class Aura extends Module {
       }
 
       if (this.target != null) {
-         if (this.isCanAttack() && this.hurtTimer.finished(458L) && !this.target.isBlocking()) {
-            if (mc.player.isSprinting() && !mc.player.isOnGround() && !mc.player.isSwimming()) {
-               mc.player.setSprinting(false);
-               mc.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(mc.player, Mode.STOP_SPRINTING));
-               if (!AutoSprint.INSTANCE.isEnabled()) {
-                  mc.options.sprintKey.setPressed(false);
-               }
-            }
+if (this.isCanAttack() && this.hurtTimer.finished(458L) && !this.target.isBlocking()) {
+             if (!this.keepSprint.isEnabled() && mc.player.isSprinting() && !mc.player.isOnGround() && !mc.player.isSwimming()) {
+                mc.player.setSprinting(false);
+                mc.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(mc.player, Mode.STOP_SPRINTING));
+                if (!AutoSprint.INSTANCE.isEnabled()) {
+                   mc.options.sprintKey.setPressed(false);
+                }
+             }
 
-            mc.interactionManager.attackEntity(mc.player, this.target);
+             mc.interactionManager.attackEntity(mc.player, this.target);
             mc.player.swingHand(Hand.MAIN_HAND);
             this.hurtTimer.reset();
             this.attackTicks = 0;
@@ -255,16 +257,16 @@ public final class Aura extends Module {
    @Native
    public void onTickMovement(EventTickMovement e) {
       if (this.target != null) {
-         if (this.target.isBlocking() && this.hurtTimer.finished(50L)) {
-            if (mc.player.isSprinting() && !mc.player.isOnGround() && !mc.player.isSwimming()) {
-               mc.player.setSprinting(false);
-               mc.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(mc.player, Mode.STOP_SPRINTING));
-               if (!AutoSprint.INSTANCE.isEnabled()) {
-                  mc.options.sprintKey.setPressed(false);
-               }
-            }
+if (this.target.isBlocking() && this.hurtTimer.finished(50L)) {
+             if (!this.keepSprint.isEnabled() && mc.player.isSprinting() && !mc.player.isOnGround() && !mc.player.isSwimming()) {
+                mc.player.setSprinting(false);
+                mc.getNetworkHandler().sendPacket(new ClientCommandC2SPacket(mc.player, Mode.STOP_SPRINTING));
+                if (!AutoSprint.INSTANCE.isEnabled()) {
+                   mc.options.sprintKey.setPressed(false);
+                }
+             }
 
-            this.breakShieldAndAttack();
+             this.breakShieldAndAttack();
             this.hurtTimer.reset();
          }
 
@@ -627,9 +629,13 @@ public final class Aura extends Module {
       }
    }
 
-   public LivingEntity getTarget() {
-      return this.isEnabled() ? this.target : null;
-   }
+    public LivingEntity getTarget() {
+       return this.isEnabled() ? this.target : null;
+    }
+
+    public float getAttackDistance() {
+       return this.distance.getCurrent();
+    }
 
    public void onEnable() {
       this.target = null;

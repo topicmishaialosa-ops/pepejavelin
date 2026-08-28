@@ -51,7 +51,7 @@ public final class ZarabotokReallyWorld extends Module {
    private final BooleanSetting depositToggle = new BooleanSetting("Складывать в сундуки", false);
    private final NumberSetting depositStacks = new NumberSetting("Стопки для склада", 4.0F, 1.0F, 36.0F, 1.0F);
    private final NumberSetting chestRadius = new NumberSetting("Радиус сундуков (блоки)", 15.0F, 5.0F, 50.0F, 1.0F);
-   private final NumberSetting rtpCooldownSeconds = new NumberSetting("Кулдаун /rtp (сек)", 30.0F, 5.0F, 300.0F, 5.0F);
+   private final NumberSetting rtpCooldownSeconds = new NumberSetting("Кулдаун /rtpdefault (сек)", 30.0F, 5.0F, 300.0F, 5.0F);
    private final BooleanSetting rtpOnDamage = new BooleanSetting("Телепорт при уроне", false);
    private final BooleanSetting detectHostiles = new BooleanSetting("Детект враждебных мобов", false);
 
@@ -188,21 +188,31 @@ public final class ZarabotokReallyWorld extends Module {
          this.rtpAttempts = 0;
          this.cmdSent = false;
          this.send("#stop");
-         MessageUtil.displayInfo("Регион защищён — телепортируюсь (/rtp)");
+         MessageUtil.displayInfo("Регион защищён — телепортируюсь (/rtpdefault)");
          this.stage = this.isAncientDebris() ? Stage.NETHER_WALK : Stage.RTP;
       }
    }
 
-   private boolean isProtectedArea(String lower) {
-      return lower.contains("не можете сломать")
-            || lower.contains("не можете ломать")
-            || lower.contains("нельзя сломать")
-            || lower.contains("нельзя ломать")
-            || lower.contains("cannot break")
-            || lower.contains("защищен")
-            || lower.contains("защищён")
-            || lower.contains("приват");
-   }
+private boolean isProtectedArea(String lower) {
+       return lower.contains("не можете сломать")
+             || lower.contains("не можете ломать")
+             || lower.contains("нельзя сломать")
+             || lower.contains("нельзя ломать")
+             || lower.contains("could not break this")
+             || lower.contains("cannot break")
+             || lower.contains("cannot get")
+             || lower.contains("cannot use")
+             || lower.contains("cannot")
+             || lower.contains("защищен")
+             || lower.contains("защищён")
+             || lower.contains("приват")
+             || lower.contains("but you can")
+             || lower.contains("but you cant")
+             || lower.contains("but you can't")
+             || lower.contains("but you cannot")
+             || lower.contains("zone protected")
+             || lower.contains("this zone");
+    }
 
    private boolean isNearProtectedSpot() {
       for (BlockPos spot : this.protectedSpots) {
@@ -219,7 +229,7 @@ public final class ZarabotokReallyWorld extends Module {
       this.lastHealth = health;
       if (this.rtpOnDamage.isEnabled() && tookDamage && this.damageTpTimer.finished(10000L)) {
          this.damageTpTimer.reset();
-         this.startEmergencyTeleport("Получен урон — телепортируюсь (/rtp)");
+         this.startEmergencyTeleport("Получен урон — телепортируюсь (/rtpdefault)");
       }
    }
 
@@ -234,7 +244,7 @@ public final class ZarabotokReallyWorld extends Module {
       List<Entity> monsters = mc.world.getOtherEntities(mc.player, box, (entity) -> entity instanceof Monster);
       if (!monsters.isEmpty()) {
          this.hostileTpTimer.reset();
-         this.startEmergencyTeleport("Враждебный моб рядом — телепортируюсь (/rtp)");
+         this.startEmergencyTeleport("Враждебный моб рядом — телепортируюсь (/rtpdefault)");
       }
    }
 
@@ -567,32 +577,16 @@ public final class ZarabotokReallyWorld extends Module {
             this.rtpCooldown = false;
             this.rtpAttempts = 0;
             this.cmdSent = false;
-            MessageUtil.displayInfo("Кулдаун /rtp прошёл — пробую снова");
+            MessageUtil.displayInfo("Кулдаун /rtpdefault прошёл — пробую снова");
          }
          return;
       }
       if (!this.cmdSent) {
          this.cmdSent = true;
          this.timer.reset();
-         this.send("/rtp");
-         return;
-      }
-      if (mc.currentScreen instanceof GenericContainerScreen screen) {
-         int slot = this.findItemSlot(screen, Items.ENDER_PEARL);
-         if (slot != -1) {
-            this.click(screen, slot);
-            this.cmdSent = false;
-            this.rtpStartPos = mc.player.getPos();
-            this.timer.reset();
-            this.stage = Stage.WAIT_TP;
-         }
-      } else if (this.timer.finished(7000L)) {
-         this.rtpAttempts++;
-         this.cmdSent = false;
-         if (this.rtpAttempts >= 3) {
-            MessageUtil.displayInfo("Не удалось вызвать /rtp — продолжаю без него");
-            this.stage = Stage.MINE;
-         }
+         this.rtpStartPos = mc.player.getPos();
+         this.send("/rtpdefault");
+         this.stage = Stage.WAIT_TP;
       }
    }
 
@@ -605,7 +599,7 @@ public final class ZarabotokReallyWorld extends Module {
                MessageUtil.displayInfo("Везде защищённые регионы — копаю без телепорта");
                this.stage = Stage.MINE;
             } else {
-               MessageUtil.displayInfo("Снова защищённый регион — пробую /rtp ещё раз");
+               MessageUtil.displayInfo("Снова защищённый регион — пробую /rtpdefault ещё раз");
                this.stage = Stage.RTP;
             }
          } else {
@@ -620,7 +614,7 @@ public final class ZarabotokReallyWorld extends Module {
             MessageUtil.displayInfo("Телепорт не выполнился — продолжаю без него");
             this.stage = Stage.MINE;
          } else {
-            MessageUtil.displayInfo("Телепорт не выполнился — повторяю /rtp");
+            MessageUtil.displayInfo("Телепорт не выполнился — повторяю /rtpdefault");
             this.stage = Stage.RTP;
          }
       }
@@ -833,7 +827,7 @@ public final class ZarabotokReallyWorld extends Module {
             MessageUtil.displayInfo("Собрано " + this.collectedCount + " шт — складываю и останавливаюсь");
             this.setToggled(false);
          } else {
-            MessageUtil.displayInfo("Собрано паутины: " + this.collectedCount + " шт — сложена в сундук, телепортируюсь (/rtp)");
+            MessageUtil.displayInfo("Собрано паутины: " + this.collectedCount + " шт — сложена в сундук, телепортируюсь (/rtpdefault)");
             this.stage = Stage.RTP;
          }
       } else {
@@ -858,7 +852,7 @@ public final class ZarabotokReallyWorld extends Module {
             MessageUtil.displayInfo("Собрано " + this.collectedCount + " шт — нет сундука, останавливаюсь");
             this.setToggled(false);
          } else {
-            MessageUtil.displayInfo("Собрано паутины: " + this.collectedCount + " шт — нет сундука, выбросил и телепортируюсь (/rtp)");
+            MessageUtil.displayInfo("Собрано паутины: " + this.collectedCount + " шт — нет сундука, выбросил и телепортируюсь (/rtpdefault)");
             this.stage = Stage.RTP;
          }
       }

@@ -25,6 +25,7 @@ import tech.huihui.base.comand.impl.PilotCommand;
 import tech.huihui.base.comand.impl.RCTCommand;
 import tech.huihui.base.comand.impl.RtpFunTimeCommand;
 import tech.huihui.base.comand.impl.StopCommand;
+import tech.huihui.base.comand.impl.ScriptCommand;
 import tech.huihui.base.comand.impl.TPCommand;
 
 public class CommandManager {
@@ -55,6 +56,7 @@ this.registerCommand(new RtpFunTimeCommand());
           this.registerCommand(new AhSearchCommand());
           this.registerCommand(new AhChenaCommand());
           this.registerCommand(new TPCommand());
+        this.registerCommand(new ScriptCommand());
      }
 
    @Native

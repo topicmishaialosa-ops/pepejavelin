@@ -12,6 +12,7 @@ import net.minecraft.client.util.DefaultSkinHelper;
 import net.minecraft.client.util.math.Vector2f;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec2f;
 import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.events.impl.input.EventMouse;
@@ -37,12 +38,14 @@ import tech.huihui.utility.render.display.base.GuiUtil;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
 import tech.huihui.utility.render.display.shader.DrawUtil;
 
-@ModuleAnnotation(name = "Watermark", category = Category.RENDER, description = "Ватермарка с 10 стилями")
+@ModuleAnnotation(name = "Watermark", category = Category.RENDER, description = "Ватермарка с 20 стилями")
 public final class Watermark extends Module {
 
    private static final String[] STYLES = new String[]{
       "Классика", "Минимал", "Градиент", "Неон", "Акцент-бар",
-      "Профиль", "Стек", "Часы", "Терминал", "Бейдж"
+      "Профиль", "Стек", "Часы", "Терминал", "Бейдж",
+      "Пиксель", "Стекло", "Глитч", "Кольцо", "Маркиза",
+      "Карточка", "Компас", "График", "Прогресс", "Лента"
    };
    private static final String ICON_NICK = "\uf007";
    private static final String ICON_PING = "\uf1eb";
@@ -306,9 +309,19 @@ public final class Watermark extends Module {
          case 6 -> this.renderStack(ctx, x, y);
          case 7 -> this.renderClock(ctx, x, y);
          case 8 -> this.renderTerminal(ctx, x, y);
-         case 9 -> this.renderBadge(ctx, x, y);
-         default -> this.renderClassic(ctx, x, y);
-      }
+          case 9 -> this.renderBadge(ctx, x, y);
+          case 10 -> this.renderPixel(ctx, x, y);
+          case 11 -> this.renderGlass(ctx, x, y);
+          case 12 -> this.renderGlitch(ctx, x, y);
+          case 13 -> this.renderRing(ctx, x, y);
+          case 14 -> this.renderMarquee(ctx, x, y);
+          case 15 -> this.renderCard(ctx, x, y);
+          case 16 -> this.renderCompass(ctx, x, y);
+          case 17 -> this.renderGraph(ctx, x, y);
+          case 18 -> this.renderProgress(ctx, x, y);
+          case 19 -> this.renderRibbon(ctx, x, y);
+          default -> this.renderClassic(ctx, x, y);
+       }
       if (this.dragging) {
          DrawUtil.drawRoundedBorder(ctx.getMatrices(), x - 1.0F, y - 1.0F, this.lastSize[0] + 2.0F, this.lastSize[1] + 2.0F, 1.0F, BorderRadius.all(5.0F), this.accent());
       }
@@ -523,6 +536,232 @@ public final class Watermark extends Module {
       if (!values.isEmpty()) {
          cursor += 14.0F;
          ctx.drawText(Fonts.REGULAR.getFont(6.5F), values, cursor, y + 5.5F, DIM);
+      }
+      this.lastSize = new float[]{width, height};
+   }
+
+   private final float[] fpsHistory = new float[48];
+   private int fpsHistIndex;
+
+   private void pushFps() {
+      int fps = mc.getCurrentFps();
+      this.fpsHistory[this.fpsHistIndex % this.fpsHistory.length] = (float) fps;
+      this.fpsHistIndex++;
+   }
+
+   private float avgFps() {
+      float sum = 0.0F;
+      for (float f : this.fpsHistory) {
+         sum += f;
+      }
+      return sum / (float) this.fpsHistory.length;
+   }
+
+   private void renderPixel(CustomDrawContext ctx, float x, float y) {
+      this.pushFps();
+      List<String> parts = new ArrayList<>();
+      for (Cell cell : this.cells()) {
+         parts.add(cell.label());
+      }
+      String text = String.join(" | ", parts);
+      float width = 10.0F + Fonts.REGULAR.getWidth(text, 8.0F);
+      float height = 16.0F;
+      DrawUtil.drawRect(ctx.getMatrices(), x, y, width, height, new ColorRGBA(8, 12, 8, 230));
+      DrawUtil.drawRect(ctx.getMatrices(), x, y, width, 2.0F, new ColorRGBA(60, 255, 90, 255));
+      ctx.drawText(Fonts.REGULAR.getFont(8.0F), text, x + 5.0F, y + 5.5F, new ColorRGBA(70, 255, 110, 255));
+      this.lastSize = new float[]{width, height};
+   }
+
+   private void renderGlass(CustomDrawContext ctx, float x, float y) {
+      List<Cell> cells = this.cells();
+      float width = 16.0F + this.logoSlot() + Math.max(this.cellsWidth(cells, 7.25F), 40.0F);
+      float height = 22.0F;
+      DrawUtil.drawBlurHud(ctx.getMatrices(), x - 3.0F, y - 3.0F, width + 6.0F, height + 6.0F, 7.0F, BorderRadius.all(7.0F), new ColorRGBA(255, 255, 255, 60));
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(7.0F), new ColorRGBA(255, 255, 255, 22));
+      DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, width, height, 1.0F, BorderRadius.all(7.0F), this.accent().withAlpha(170));
+      float cursor = x + 8.0F;
+      this.renderLogo(ctx, cursor + 0.5F, y + 7.0F, this.accent());
+      cursor += this.logoSlot();
+      this.renderCells(ctx, cells, cursor, y + 2.0F, this.accent());
+      this.lastSize = new float[]{width, height};
+   }
+
+   private void renderGlitch(CustomDrawContext ctx, float x, float y) {
+      List<String> parts = new ArrayList<>();
+      for (Cell cell : this.cells()) {
+         parts.add(cell.label());
+      }
+      String text = String.join("  ", parts);
+      float width = 12.0F + Fonts.BOLD.getWidth(text, 8.5F);
+      float height = 18.0F;
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(3.0F), new ColorRGBA(6, 6, 10, 200));
+      float shift = (float) (Math.sin(System.currentTimeMillis() / 90.0D) * 2.0D);
+      ctx.drawText(Fonts.BOLD.getFont(8.5F), text, x + 6.0F + shift, y + 5.0F, new ColorRGBA(255, 40, 80, 220));
+      ctx.drawText(Fonts.BOLD.getFont(8.5F), text, x + 6.0F - shift, y + 5.0F, new ColorRGBA(40, 220, 255, 220));
+      ctx.drawText(Fonts.BOLD.getFont(8.5F), text, x + 6.0F, y + 5.0F, new ColorRGBA(235, 235, 235, 255));
+      this.lastSize = new float[]{width, height};
+   }
+
+   private void renderRing(CustomDrawContext ctx, float x, float y) {
+      this.pushFps();
+      float size = 72.0F;
+      ColorRGBA accent = this.accent();
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, size, size, BorderRadius.all(size / 2.0F), new ColorRGBA(10, 10, 16, 200));
+      DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, size, size, 2.0F, BorderRadius.all(size / 2.0F), accent.withAlpha(220));
+      String name = RenamePasterClient.getClientName();
+      float nameW = Fonts.SEMIBOLD.getWidth(name, 7.5F);
+      ctx.drawText(Fonts.SEMIBOLD.getFont(7.5F), name, x + size / 2.0F - nameW / 2.0F, y + 24.0F, TEXT);
+      String fps = mc.getCurrentFps() + "";
+      float fpsW = Fonts.COMFORTA_REGULAR.getWidth(fps, 18.0F);
+      ctx.drawText(Fonts.COMFORTA_REGULAR.getFont(18.0F), fps, x + size / 2.0F - fpsW / 2.0F, y + 36.0F, accent.brighter(0.2F));
+      this.lastSize = new float[]{size, size};
+   }
+
+   private void renderMarquee(CustomDrawContext ctx, float x, float y) {
+      List<Cell> cells = this.cells();
+      float width = 20.0F + this.logoSlot() + Math.max(this.cellsWidth(cells, 7.5F), 60.0F);
+      float height = 20.0F;
+      float hue = (System.currentTimeMillis() % 6000L) / 6000.0F;
+      ColorRGBA c1 = ColorRGBA.fromHSB(hue, 0.7F, 1.0F).withAlpha(215);
+      ColorRGBA c2 = ColorRGBA.fromHSB(hue + 0.15F, 0.7F, 1.0F).withAlpha(215);
+      ColorRGBA c3 = ColorRGBA.fromHSB(hue + 0.3F, 0.7F, 1.0F).withAlpha(215);
+      ColorRGBA c4 = ColorRGBA.fromHSB(hue + 0.45F, 0.7F, 1.0F).withAlpha(215);
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(6.0F), c1, c2, c3, c4);
+      float cursor = x + 10.0F;
+      this.renderLogo(ctx, cursor + 0.5F, y + 6.5F, new ColorRGBA(255, 255, 255, 255));
+      cursor += this.logoSlot();
+      this.renderCells(ctx, cells, cursor, y + 1.0F, new ColorRGBA(255, 255, 255, 255));
+      this.lastSize = new float[]{width, height};
+   }
+
+   private void renderCard(CustomDrawContext ctx, float x, float y) {
+      List<Cell> cells = this.cells();
+      float gap = this.cellGap.getCurrent();
+      float maxW = 0.0F;
+      for (Cell cell : cells) {
+         maxW = Math.max(maxW, this.cellIconWidth(cell) + 4.0F + Fonts.REGULAR.getWidth(cell.label(), 6.5F));
+      }
+      float width = 18.0F + Math.max(maxW, 70.0F);
+      float height = 18.0F + cells.size() * 12.0F;
+      ColorRGBA accent = this.accent();
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(6.0F), new ColorRGBA(14, 14, 20, 205));
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, 13.0F, BorderRadius.all(6.0F), accent.withAlpha(200));
+      DrawUtil.drawRect(ctx.getMatrices(), x, y + 7.0F, width, 6.0F, accent.withAlpha(200));
+      ctx.drawText(Fonts.SEMIBOLD.getFont(7.0F), cells.get(0).label(), x + 9.0F, y + 3.5F, new ColorRGBA(255, 255, 255, 255));
+      float lineY = y + 20.0F;
+      for (int i = 1; i < cells.size(); i++) {
+         Cell cell = cells.get(i);
+         if (i > 1) {
+            DrawUtil.drawLine(ctx.getMatrices(), new Vec2f(x + 6.0F, lineY - 4.0F), new Vec2f(x + width - 6.0F, lineY - 4.0F), new ColorRGBA(255, 255, 255, 30));
+         }
+         float cursor = x + 9.0F;
+         if (!cell.icon().isEmpty()) {
+            this.renderCellIcon(ctx, cell, cursor, lineY + 0.5F, accent);
+            cursor += this.cellIconWidth(cell) + 4.0F;
+         }
+         ctx.drawText(Fonts.REGULAR.getFont(6.5F), cell.label(), cursor, lineY, TEXT);
+         lineY += 12.0F;
+      }
+      this.lastSize = new float[]{width, height};
+   }
+
+   private void renderCompass(CustomDrawContext ctx, float x, float y) {
+      this.pushFps();
+      float size = 66.0F;
+      float cx = x + size / 2.0F;
+      float cy = y + size / 2.0F;
+      ColorRGBA accent = this.accent();
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, size, size, BorderRadius.all(size / 2.0F), new ColorRGBA(8, 10, 16, 210));
+      DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, size, size, 1.5F, BorderRadius.all(size / 2.0F), accent.withAlpha(170));
+      ctx.drawText(Fonts.REGULAR.getFont(6.0F), "N", cx - 2.0F, y + 4.0F, new ColorRGBA(255, 90, 90, 255));
+      ctx.drawText(Fonts.REGULAR.getFont(6.0F), "S", cx - 2.0F, y + size - 11.0F, DIM);
+      ctx.drawText(Fonts.REGULAR.getFont(6.0F), "W", x + 4.0F, cy - 3.0F, DIM);
+      ctx.drawText(Fonts.REGULAR.getFont(6.0F), "E", x + size - 9.0F, cy - 3.0F, DIM);
+      float yaw = mc.player != null ? mc.player.getYaw() : 0.0F;
+      double rad = Math.toRadians(yaw + 90.0F);
+      float nx = cx + (float) Math.cos(rad) * (size / 2.0F - 12.0F);
+      float ny = cy + (float) Math.sin(rad) * (size / 2.0F - 12.0F);
+      DrawUtil.drawLine(ctx.getMatrices(), new Vec2f(cx, cy), new Vec2f(nx, ny), accent.withAlpha(255));
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), cx - 2.0F, cy - 2.0F, 4.0F, 4.0F, BorderRadius.all(2.0F), accent);
+      this.lastSize = new float[]{size, size};
+   }
+
+   private void renderGraph(CustomDrawContext ctx, float x, float y) {
+      this.pushFps();
+      float width = 150.0F;
+      float height = 46.0F;
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(5.0F), new ColorRGBA(8, 10, 14, 205));
+      DrawUtil.drawRoundedBorder(ctx.getMatrices(), x, y, width, height, 1.0F, BorderRadius.all(5.0F), this.accent().withAlpha(150));
+      float pad = 6.0F;
+      int n = this.fpsHistory.length;
+      float minV = 0.0F;
+      float maxV = 240.0F;
+      ColorRGBA accent = this.accent();
+      Vec2f prev = null;
+      for (int i = 0; i < n; i++) {
+         int idx = (this.fpsHistIndex + i) % n;
+         float v = this.fpsHistory[idx];
+         float px = x + pad + (width - pad * 2.0F) * ((float) i / (float) (n - 1));
+         float py = y + height - pad - (height - pad * 2.0F) * (MathHelper.clamp(v, minV, maxV) / maxV);
+         Vec2f cur = new Vec2f(px, py);
+         if (prev != null) {
+            DrawUtil.drawLine(ctx.getMatrices(), prev, cur, accent.withAlpha(220));
+         }
+         prev = cur;
+      }
+      String label = "FPS " + mc.getCurrentFps() + "  avg " + (int) this.avgFps();
+      ctx.drawText(Fonts.REGULAR.getFont(6.0F), label, x + 6.0F, y + 4.0F, TEXT);
+      this.lastSize = new float[]{width, height};
+   }
+
+   private void renderProgress(CustomDrawContext ctx, float x, float y) {
+      this.pushFps();
+      float tps = HuihuiClient.getInstance().getServerHandler().getTPS();
+      float ratio = MathHelper.clamp(tps / 20.0F, 0.0F, 1.0F);
+      float ping = mc.getNetworkHandler() != null && mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid()) != null
+            ? (float) mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid()).getLatency() : 0.0F;
+      String name = RenamePasterClient.getClientName();
+      float width = Math.max(150.0F, 20.0F + Fonts.SEMIBOLD.getWidth(name, 8.0F));
+      float height = 40.0F;
+      ColorRGBA accent = this.accent();
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(6.0F), new ColorRGBA(12, 12, 18, 205));
+      ctx.drawText(Fonts.SEMIBOLD.getFont(8.0F), name, x + 8.0F, y + 5.0F, TEXT);
+      float barX = x + 8.0F;
+      float barY = y + 19.0F;
+      float barW = width - 16.0F;
+      float barH = 9.0F;
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), barX, barY, barW, barH, BorderRadius.all(4.0F), new ColorRGBA(40, 40, 50, 200));
+      ColorRGBA fill = ColorRGBA.fromHSB(0.33F * ratio, 0.8F, 1.0F).withAlpha(255);
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), barX, barY, barW * ratio, barH, BorderRadius.all(4.0F), fill);
+      String stat = "TPS " + Math.round(tps * 10.0F) / 10.0F + "   ping " + (int) ping + "ms";
+      ctx.drawText(Fonts.REGULAR.getFont(6.0F), stat, x + 8.0F, y + 31.0F, DIM);
+      this.lastSize = new float[]{width, height};
+   }
+
+   private void renderRibbon(CustomDrawContext ctx, float x, float y) {
+      List<Cell> cells = this.cells();
+      String name = cells.get(0).label();
+      StringBuilder sb = new StringBuilder();
+      for (int i = 1; i < Math.min(cells.size(), 3); i++) {
+         if (sb.length() > 0) {
+            sb.append(" · ");
+         }
+         sb.append(cells.get(i).label());
+      }
+      String sub = sb.toString();
+      float textW = Fonts.SEMIBOLD.getWidth(name, 8.0F);
+      float subW = sub.isEmpty() ? 0.0F : Fonts.REGULAR.getWidth(sub, 6.0F);
+      float width = 14.0F + this.logoSlot() + textW + (sub.isEmpty() ? 0.0F : 10.0F + subW);
+      float height = 22.0F;
+      ColorRGBA accent = this.accent();
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x, y, width, height, BorderRadius.all(4.0F), accent.withAlpha(235));
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + width - 6.0F, y + height - 6.0F, 12.0F, 12.0F, BorderRadius.all(4.0F), accent.darker(0.3F).withAlpha(235));
+      float cursor = x + 7.0F;
+      this.renderLogo(ctx, cursor + 0.5F, y + 7.0F, new ColorRGBA(255, 255, 255, 255));
+      cursor += this.logoSlot();
+      ctx.drawText(Fonts.SEMIBOLD.getFont(8.0F), name, cursor, y + 4.0F, new ColorRGBA(255, 255, 255, 255));
+      if (!sub.isEmpty()) {
+         ctx.drawText(Fonts.REGULAR.getFont(6.0F), sub, cursor, y + 14.0F, new ColorRGBA(255, 255, 255, 220));
       }
       this.lastSize = new float[]{width, height};
    }

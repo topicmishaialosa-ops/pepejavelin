@@ -26,6 +26,7 @@ dependencies {
     implementation(shadow(files("libs/media-player-info-0.1.0.jar")))
     implementation(shadow("org.jetbrains.kotlin:kotlin-stdlib:1.9.20"))
     implementation(shadow("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3"))
+    implementation(shadow("org.luaj:luaj-jse:3.0.1"))
     implementation(shadow("com.github.hypfvieh:dbus-java-core:5.0.0"))
     implementation(shadow("com.github.hypfvieh:dbus-java-transport-jnr-unixsocket:5.0.0"))
     implementation(shadow("org.sejda.imageio:webp-imageio:0.1.6"))
