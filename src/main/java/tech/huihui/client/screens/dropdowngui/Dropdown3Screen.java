@@ -15,6 +15,7 @@ import net.minecraft.util.math.Vec2f;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.font.Font;
 import tech.huihui.base.font.Fonts;
+import tech.huihui.base.font.MsdfFont;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
@@ -29,6 +30,7 @@ import tech.huihui.client.modules.api.setting.impl.NumberSetting;
 import tech.huihui.client.modules.api.setting.impl.StringSetting;
 import tech.huihui.client.modules.impl.render.ClickGUI;
 import tech.huihui.client.modules.impl.render.EditClickGUI;
+import tech.huihui.client.screens.clickgui.ConfigScriptPanel;
 import tech.huihui.utility.render.display.Keyboard;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
@@ -90,6 +92,65 @@ public final class Dropdown3Screen extends Screen {
 
     private static final class Holder {
         private static final Dropdown3Screen INSTANCE = new Dropdown3Screen();
+    }
+
+    private ConfigScriptPanel configScriptPanel;
+
+    private ConfigScriptPanel configScriptPanel() {
+        if (this.configScriptPanel == null) {
+            this.configScriptPanel = new ConfigScriptPanel(new ConfigScriptPanel.Host() {
+                @Override
+                public int width() {
+                    return Dropdown3Screen.screenWidth;
+                }
+
+                @Override
+                public int height() {
+                    return Dropdown3Screen.screenHeight;
+                }
+
+                @Override
+                public void scissor(CustomDrawContext draw, float x, float y, float w, float h) {
+                    Dropdown3Screen.this.scissor(draw, x, y, w, h);
+                }
+
+                @Override
+                public ColorRGBA accent() {
+                    return ColorRGBA.fromHSB(0.0F, 0.55F, 1.0F);
+                }
+
+                @Override
+                public ColorRGBA bg() {
+                    return Dropdown3Screen.this.panelBg();
+                }
+
+                @Override
+                public ColorRGBA border() {
+                    return new ColorRGBA(21, 21, 21);
+                }
+
+                @Override
+                public ColorRGBA textMain() {
+                    return TEXT_MAIN;
+                }
+
+                @Override
+                public ColorRGBA textDim() {
+                    return TEXT_DIM;
+                }
+
+                @Override
+                public MsdfFont headerFont() {
+                    return Fonts.BOLD;
+                }
+
+                @Override
+                public MsdfFont textFont() {
+                    return Fonts.REGULAR;
+                }
+            });
+        }
+        return this.configScriptPanel;
     }
 
     @Override
@@ -352,6 +413,9 @@ public final class Dropdown3Screen extends Screen {
             this.renderPanel(draw, this.categories.get(i), i, this.panelX(i), startY, lx, ly);
         }
         this.renderTheme(draw, lx, ly);
+        if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled()) {
+            this.configScriptPanel().render(draw, 1.0F, lx, ly);
+        }
         context.getMatrices().pop();
     }
 
@@ -695,6 +759,12 @@ public final class Dropdown3Screen extends Screen {
         float my = this.inverseY(mouseY);
         float startX = this.startX();
         float startY = this.startY();
+        if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled() && this.configScriptPanel().mouseClicked(mx, my, button)) {
+            this.searchFocused = false;
+            this.editingString = null;
+            this.bindCapturing = false;
+            return true;
+        }
         if (this.themePicker.mouseClicked(mx, my, this.themeX(), this.themeY())) {
             this.searchFocused = false;
             this.editingString = null;
@@ -933,6 +1003,9 @@ public final class Dropdown3Screen extends Screen {
         float mx = this.inverseX(mouseX);
         float my = this.inverseY(mouseY);
         float startY = this.startY();
+        if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled() && this.configScriptPanel().mouseScrolled(mx, my, verticalAmount)) {
+            return true;
+        }
         for (int i = 0; i < this.categories.size(); i++) {
             float x = this.panelX(i);
             if (mx >= x && mx <= x + this.panelWidth() && my >= startY && my <= startY + this.panelHeight()) {

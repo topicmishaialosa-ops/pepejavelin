@@ -20,6 +20,7 @@ import tech.huihui.base.events.impl.server.EventPacket;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
+import tech.huihui.client.modules.api.setting.impl.BooleanSetting;
 import tech.huihui.utility.game.other.BaritoneUtil;
 import tech.huihui.utility.game.player.MovingUtil;
 import tech.huihui.utility.render.level.Render3DUtil;
@@ -31,9 +32,14 @@ import tech.huihui.utility.render.level.Render3DUtil;
 )
 public final class FreeCam extends Module {
    public static final FreeCam INSTANCE = new FreeCam();
+   private final BooleanSetting noGravity = new BooleanSetting("No Gravity", true);
    public Vec3d pos;
    public Vec3d prevPos;
    private boolean cameraMode;
+   private boolean followEnabled;
+   private Vec3d followPos;
+   private float followYaw;
+   private float followPitch;
    private Vec3d camPos;
    private Vec3d camVel = Vec3d.ZERO;
    private float camYaw;
@@ -81,7 +87,38 @@ public final class FreeCam extends Module {
    }
 
    public boolean isCameraMode() {
-      return this.cameraMode && this.camPos != null;
+      return (this.cameraMode || this.followEnabled) && (this.camPos != null || this.followPos != null);
+   }
+
+   public void beginFollow(Vec3d pos, float fYaw, float fPitch) {
+      if (!this.isEnabled()) {
+         this.toggle();
+      }
+      this.followEnabled = true;
+      this.followPos = pos;
+      this.followYaw = fYaw;
+      this.followPitch = fPitch;
+      this.cameraMode = true;
+      this.camPos = pos;
+      this.camYaw = fYaw;
+      this.camPitch = fPitch;
+   }
+
+   public void endFollow() {
+      this.followEnabled = false;
+      this.followPos = null;
+      if (this.isEnabled()) {
+         this.toggle();
+      }
+   }
+
+   public void updateFollow(Vec3d pos, float fYaw, float fPitch) {
+      if (!this.followEnabled || pos == null) {
+         return;
+      }
+      this.followPos = pos;
+      this.followYaw = fYaw;
+      this.followPitch = fPitch;
    }
 
    public Vec3d getCamPos() {
@@ -97,6 +134,12 @@ public final class FreeCam extends Module {
    }
 
    public void tickCamera() {
+      if (this.followEnabled && this.followPos != null) {
+         this.camPos = this.followPos;
+         this.camYaw = this.followYaw;
+         this.camPitch = this.followPitch;
+         return;
+      }
       if (mc.player == null) {
          return;
       }
@@ -134,6 +177,10 @@ public final class FreeCam extends Module {
 
    @EventTarget
    private void onGameUpdate(EventGameUpdate e) {
+      if (this.followEnabled) {
+         this.cameraMode = true;
+         return;
+      }
       boolean baritoneBusy = BaritoneUtil.isPathing();
       if (this.cameraMode != baritoneBusy) {
          this.cameraMode = baritoneBusy;
@@ -178,6 +225,10 @@ public final class FreeCam extends Module {
    @EventTarget
    public void onMove(EventMove e) {
       if (this.isCameraMode()) {
+         return;
+      }
+
+      if (!noGravity.isEnabled()) {
          return;
       }
 

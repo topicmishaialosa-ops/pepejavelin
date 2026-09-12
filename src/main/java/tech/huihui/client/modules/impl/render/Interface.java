@@ -14,6 +14,7 @@ import tech.huihui.base.events.impl.input.EventSetScreen;
 import tech.huihui.base.events.impl.other.EventWindowResize;
 import tech.huihui.base.events.impl.player.EventUpdate;
 import tech.huihui.base.events.impl.render.EventHudRender;
+import tech.huihui.base.font.MsdfRenderer;
 import tech.huihui.client.hud.elements.component.InformationComponent;
 import tech.huihui.client.hud.elements.component.KeybindsComponent;
 import tech.huihui.client.hud.elements.component.HelperBindsComponent;
@@ -51,6 +52,7 @@ public final class Interface extends Module {
    private static final float[] DEFAULT_OFFSET_X = new float[]{10.0F, 119.15234F, 10.0F, 157.03516F, 10.0F, -122.0F};
    private static final float[] DEFAULT_OFFSET_Y = new float[]{10.0F, 73.0F, 73.0F, -72.5F, 41.5F, 73.0F};
    public final ModeSetting lang = new ModeSetting("Язык", "Русский", "English", "中文");
+   public final ModeSetting hudStyle = new ModeSetting("Стиль HUD", "Стиль 1", "Стиль 2");
    public final NumberSetting hudSpacing = new NumberSetting("Отступ элементов", 11.0F, 6.0F, 20.0F, 1.0F);
    private final MultiBooleanSetting elementsSetting = MultiBooleanSetting.create("Элементы", List.of("Ватермарка", "Эффекты", "Модераторы", "Уведомления", "Информация", "Бинды", "Музыка", "Бинды хелперов"));
    private final List<DraggableHudElement> elements = new ArrayList();
@@ -127,21 +129,27 @@ public final class Interface extends Module {
       float width = (float)mc.getWindow().getWidth() / this.getCustomScale();
       float height = (float)mc.getWindow().getHeight() / this.getCustomScale();
       if (!mc.options.hudHidden) {
-         Iterator var5 = this.elements.iterator();
+         MsdfRenderer.beginTextBatch();
 
-         while(var5.hasNext()) {
-            DraggableHudElement element = (DraggableHudElement)var5.next();
-            if (this.shouldRender(element)) {
-               try {
-                  element.render(ctx);
-               } catch (Exception var10) {
-                  var10.printStackTrace();
-               }
+         try {
+            Iterator var5 = this.elements.iterator();
 
-               if (this.draggingElement != element && System.currentTimeMillis() - this.init < 5000L) {
-                  element.windowResized(width, height);
+            while(var5.hasNext()) {
+               DraggableHudElement element = (DraggableHudElement)var5.next();
+               if (this.shouldRender(element)) {
+                  try {
+                     element.render(ctx);
+                  } catch (Exception var10) {
+                     var10.printStackTrace();
+                  }
+
+                  if (this.draggingElement != element && System.currentTimeMillis() - this.init < 5000L) {
+                     element.windowResized(width, height);
+                  }
                }
             }
+         } finally {
+            MsdfRenderer.endTextBatch();
          }
       }
 

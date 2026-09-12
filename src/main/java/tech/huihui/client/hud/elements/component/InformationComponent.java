@@ -13,6 +13,7 @@ import tech.huihui.base.font.Fonts;
 import tech.huihui.base.lang.Lang;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
+import tech.huihui.client.hud.elements.style.HudStyle2;
 import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
@@ -42,6 +43,10 @@ public class InformationComponent extends DraggableHudElement {
 
    @Native
    public void render(CustomDrawContext ctx) {
+      if (Interface.INSTANCE.hudStyle.is("Стиль 2")) {
+         this.renderStyle2(ctx);
+         return;
+      }
       Theme theme = HuihuiClient.getInstance().getThemeManager().getCurrentTheme();
       if (mc.currentScreen instanceof ChatScreen) {
          this.yAnimation.update((float)(mc.getWindow().getScaledHeight() - 15));
@@ -65,5 +70,34 @@ public class InformationComponent extends DraggableHudElement {
       DrawUtil.drawRoundedRect(ctx.getMatrices(), 18.5F + coordsWidth + 3.0F, this.yAnimation.getValue() - 11.0F, 2.0F, 2.0F, BorderRadius.all(0.5F), theme.getColor());
       ctx.drawText(Fonts.ICONS2.getFont(7.5F), "\uf70c", 24.0F + coordsWidth + 3.5F, this.yAnimation.getValue() - 12.5F, theme.getColor());
       ctx.drawText(Fonts.REGULAR.getFont(7.5F), speedText + speedUnit, 24.0F + coordsWidth + 12.0F, this.yAnimation.getValue() - 12.5F, ColorRGBA.WHITE);
+   }
+
+   private void renderStyle2(CustomDrawContext ctx) {
+      int px = (int) Math.floor(mc.player.getX());
+      int py = (int) Math.floor(mc.player.getY());
+      int pz = (int) Math.floor(mc.player.getZ());
+      double speed = Math.hypot(mc.player.getX() - mc.player.prevX, mc.player.getZ() - mc.player.prevZ);
+      long bps = Math.round(speed * 20.0D);
+
+      String coordsText = "x: " + px + "  y: " + py + "  z: " + pz;
+      String bpsText = "BPS: " + bps;
+
+      float x = 4.0F;
+      float y = this.yAnimation.getValue() - 24.0F;
+      float w = Fonts.REGULAR.getWidth(coordsText, 6.5F) + 20.0F;
+      float bpsW = Fonts.REGULAR.getWidth(bpsText, 6.5F) + 20.0F;
+      if (bpsW > w) w = bpsW;
+      float totalH = 22.0F;
+
+      HudStyle2.drawCard(ctx, x, y, w, totalH, 255.0F);
+
+      ctx.drawText(Fonts.ICONS2.getFont(6.5F), "\uf57d", x + 5.0F, y + 4.0F, HudStyle2.ACCENT);
+      ctx.drawText(Fonts.REGULAR.getFont(6.5F), coordsText, x + 14.0F, y + 4.0F, HudStyle2.TEXT_PRIMARY);
+
+      ctx.drawText(Fonts.ICONS2.getFont(6.5F), "\uf70c", x + 5.0F, y + 13.0F, HudStyle2.GREEN);
+      ctx.drawText(Fonts.REGULAR.getFont(6.5F), bpsText, x + 14.0F, y + 13.0F, HudStyle2.TEXT_PRIMARY);
+
+      this.width = w;
+      this.height = totalH;
    }
 }

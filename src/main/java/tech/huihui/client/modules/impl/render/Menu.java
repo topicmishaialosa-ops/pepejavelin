@@ -32,16 +32,21 @@ public final class Menu extends Module implements MenuAccessor {
       "Центр-сплит", "Левая колонка", "Правая колонка", "Нижний ряд", "Верхний ряд", "Углы", "Диагональ", "Вразброс", "Случайный"
    };
 
-   public static final int STYLE_DARK = 0;
-   public static final int STYLE_OUTLINE = 1;
-   public static final int STYLE_GRADIENT = 2;
-   public static final int STYLE_LIGHT = 3;
-   public static final int STYLE_NEON = 4;
-   public static final String[] STYLES = new String[]{"Тёмный", "Контур", "Градиент", "Светлый", "Неон"};
+public static final int STYLE_DARK = 0;
+    public static final int STYLE_OUTLINE = 1;
+    public static final int STYLE_GRADIENT = 2;
+    public static final int STYLE_LIGHT = 3;
+    public static final int STYLE_NEON = 4;
+    public static final String[] STYLES = new String[]{"Тёмный", "Контур", "Градиент", "Светлый", "Неон"};
 
-   private final ModeSetting mode = new ModeSetting("Режим меню", MODES);
-   private final ModeSetting layout = new ModeSetting("Расположение меню", LAYOUTS);
-   private final ModeSetting style = new ModeSetting("Стиль кнопок", STYLES);
+    public static final int RENDER_STYLE_ROUNDED = 0;
+    public static final int RENDER_STYLE_CUT = 1;
+    public static final String[] RENDER_STYLES = new String[]{"Скруглённый", "Срезанные углы"};
+
+    private final ModeSetting mode = new ModeSetting("Режим меню", MODES);
+    private final ModeSetting layout = new ModeSetting("Расположение меню", LAYOUTS);
+    private final ModeSetting style = new ModeSetting("Стиль кнопок", STYLES);
+    private final ModeSetting renderStyle = new ModeSetting("Стиль рендера", RENDER_STYLES);
 
    static {
       INSTANCE = new Menu();
@@ -100,8 +105,22 @@ public final class Menu extends Module implements MenuAccessor {
       }
    }
 
-   public void cycleStyle(int step) {
+public void cycleStyle(int step) {
       this.setStyleIndex((this.getStyleIndex() + step + STYLES.length) % STYLES.length);
+    }
+
+   public int getRenderStyleIndex() {
+      return Math.max(0, this.renderStyle.getValues().indexOf(this.renderStyle.getValue()));
+   }
+
+   public boolean isCutRenderStyle() {
+      return this.renderStyle.is(RENDER_STYLES[RENDER_STYLE_CUT]);
+   }
+
+   public void setRenderStyleIndex(int index) {
+      if (index >= 0 && index < RENDER_STYLES.length) {
+         this.renderStyle.set(RENDER_STYLES[index]);
+      }
    }
 
    @Override

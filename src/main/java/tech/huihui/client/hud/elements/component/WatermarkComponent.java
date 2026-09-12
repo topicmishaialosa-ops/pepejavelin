@@ -2,6 +2,8 @@ package tech.huihui.client.hud.elements.component;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 import net.minecraft.client.network.PlayerListEntry;
 import ru.nexusguard.protection.annotations.Native;
 import tech.huihui.HuihuiClient;
@@ -10,7 +12,9 @@ import tech.huihui.base.font.MsdfFont;
 import tech.huihui.base.lang.Lang;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
+import tech.huihui.client.hud.elements.style.HudStyle2;
 import tech.huihui.client.modules.impl.misc.NameProtect;
+import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.client.modules.impl.misc.RenamePasterClient;
 import tech.huihui.client.modules.impl.render.Watermark;
 import tech.huihui.client.screens.watermark.WatermarkLogo;
@@ -21,6 +25,17 @@ import tech.huihui.utility.render.display.shader.DrawUtil;
 
 public class WatermarkComponent extends DraggableHudElement {
    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+   private final Map<String, CachedLogo> logoCache = new HashMap<>();
+
+   private static final class CachedLogo {
+      final String data;
+      final WatermarkLogo logo;
+
+      CachedLogo(String data, WatermarkLogo logo) {
+         this.data = data;
+         this.logo = logo;
+      }
+   }
 
    public WatermarkComponent(String name, float initialX, float initialY, float windowWidth, float windowHeight, float offsetX, float offsetY, DraggableHudElement.Align align) {
       super(name, initialX, initialY, windowWidth, windowHeight, offsetX, offsetY, align);
@@ -28,6 +43,10 @@ public class WatermarkComponent extends DraggableHudElement {
 
    @Native
    public void render(CustomDrawContext ctx) {
+      if (Interface.INSTANCE.hudStyle.is("Стиль 2")) {
+         this.renderStyle2(ctx);
+         return;
+      }
       Watermark module = Watermark.INSTANCE;
       float scale = module.logoScale.getCurrent();
       float x = this.getX();
@@ -81,8 +100,61 @@ public class WatermarkComponent extends DraggableHudElement {
       this.height = 29.0F;
    }
 
+   private void renderStyle2(CustomDrawContext ctx) {
+      Watermark module = Watermark.INSTANCE;
+      float x = this.getX();
+      float y = this.getY();
+      String name = RenamePasterClient.getClientName();
+      String fps = mc.getCurrentFps() + "";
+      PlayerListEntry list = mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid());
+      String latency = list != null ? list.getLatency() + "" : "0";
+      String serverName = mc.getCurrentServerEntry() != null && mc.getCurrentServerEntry().address != null ? mc.getCurrentServerEntry().address : "Unknown";
+      String time = LocalTime.now().format(TIME_FORMAT);
+      String tpsText = formatTps(HuihuiClient.getInstance().getServerHandler().getTPS());
+      double speed = Math.hypot(mc.player.getX() - mc.player.prevX, mc.player.getZ() - mc.player.prevZ);
+      long bps = Math.round(speed * 20.0D);
+
+      float cardW = 130.0F;
+      float headerH = 18.0F;
+      float rowH = 11.0F;
+      float totalH = headerH + rowH * 3 + 6.0F;
+
+      HudStyle2.drawCard(ctx, x, y, cardW, totalH, 255.0F);
+      HudStyle2.drawHeader(ctx, "\uf0ac", name, x, y, cardW, 255.0F, HudStyle2.GREEN);
+      float ry = y + headerH + 3.0F;
+
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 3.0F, ry, cardW - 6.0F, rowH, HudStyle2.RADIUS_SM,
+         HudStyle2.CARD_BG.withAlpha(180));
+      HudStyle2.drawKeyValue(ctx, "FPS: ", fps, x + 7.0F, ry + 2.0F, 255.0F);
+      HudStyle2.drawKeyValue(ctx, "Ping: ", latency + "ms", x + 50.0F, ry + 2.0F, 255.0F);
+      ry += rowH + 2.0F;
+
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 3.0F, ry, cardW - 6.0F, rowH, HudStyle2.RADIUS_SM,
+         HudStyle2.CARD_BG.withAlpha(180));
+      HudStyle2.drawKeyValue(ctx, "TPS: ", tpsText, x + 7.0F, ry + 2.0F, 255.0F);
+      HudStyle2.drawKeyValue(ctx, "Time: ", time, x + 55.0F, ry + 2.0F, 255.0F);
+      ry += rowH + 2.0F;
+
+      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 3.0F, ry, cardW - 6.0F, rowH, HudStyle2.RADIUS_SM,
+         HudStyle2.CARD_BG.withAlpha(180));
+      HudStyle2.drawKeyValue(ctx, "BPS: ", bps + "", x + 7.0F, ry + 2.0F, 255.0F);
+      HudStyle2.drawKeyValue(ctx, "Server: ", serverName, x + 50.0F, ry + 2.0F, 255.0F);
+
+      this.width = cardW;
+      this.height = totalH;
+   }
+
    private void renderCustomIcon(CustomDrawContext ctx, Watermark module, String id, String fallback, float x, float y, float fontSize, ColorRGBA color) {
-      WatermarkLogo custom = WatermarkLogo.deserialize(module.getIconLogoData(id));
+      String data = module.getIconLogoData(id);
+      CachedLogo cached = this.logoCache.get(id);
+      WatermarkLogo custom;
+      if (cached != null && cached.data.equals(data)) {
+         custom = cached.logo;
+      } else {
+         custom = WatermarkLogo.deserialize(data);
+         this.logoCache.put(id, new CachedLogo(data, custom));
+      }
+
       if (custom != null && !custom.isEmpty()) {
          float slot = 8.0F * module.logoScale.getCurrent();
          custom.renderFit(ctx.getMatrices(), x, y + 0.5F, slot, slot, color);

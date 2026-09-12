@@ -15,6 +15,7 @@ import net.minecraft.util.math.Vec2f;
 import tech.huihui.HuihuiClient;
 import tech.huihui.base.font.Font;
 import tech.huihui.base.font.Fonts;
+import tech.huihui.base.font.MsdfFont;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
@@ -29,6 +30,7 @@ import tech.huihui.client.modules.api.setting.impl.NumberSetting;
 import tech.huihui.client.modules.api.setting.impl.StringSetting;
 import tech.huihui.client.modules.impl.render.ClickGUI;
 import tech.huihui.client.modules.impl.render.EditClickGUI;
+import tech.huihui.client.screens.clickgui.ConfigScriptPanel;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
 import tech.huihui.utility.render.display.base.ToggleSwitch;
@@ -93,6 +95,65 @@ public final class Csgui1Screen extends Screen {
 
     private static final class Holder {
         private static final Csgui1Screen INSTANCE = new Csgui1Screen();
+    }
+
+    private ConfigScriptPanel configScriptPanel;
+
+    private ConfigScriptPanel configScriptPanel() {
+        if (this.configScriptPanel == null) {
+            this.configScriptPanel = new ConfigScriptPanel(new ConfigScriptPanel.Host() {
+                @Override
+                public int width() {
+                    return Csgui1Screen.screenWidth;
+                }
+
+                @Override
+                public int height() {
+                    return Csgui1Screen.screenHeight;
+                }
+
+                @Override
+                public void scissor(CustomDrawContext draw, float x, float y, float w, float h) {
+                    Csgui1Screen.this.scissor(draw, x, y, w, h);
+                }
+
+                @Override
+                public ColorRGBA accent() {
+                    return Csgui1Screen.this.accent();
+                }
+
+                @Override
+                public ColorRGBA bg() {
+                    return Csgui1Screen.this.panelBg();
+                }
+
+                @Override
+                public ColorRGBA border() {
+                    return new ColorRGBA(21, 21, 21);
+                }
+
+                @Override
+                public ColorRGBA textMain() {
+                    return TEXT_MAIN;
+                }
+
+                @Override
+                public ColorRGBA textDim() {
+                    return TEXT_DIM;
+                }
+
+                @Override
+                public MsdfFont headerFont() {
+                    return Fonts.MEDIUM;
+                }
+
+                @Override
+                public MsdfFont textFont() {
+                    return Fonts.REGULAR;
+                }
+            });
+        }
+        return this.configScriptPanel;
     }
 
     @Override
@@ -278,6 +339,9 @@ public final class Csgui1Screen extends Screen {
         this.renderRail(draw, lx, ly);
         this.renderPanel(draw, lx, ly);
         this.renderTheme(draw, lx, ly);
+        if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled()) {
+            this.configScriptPanel().render(draw, 1.0F, lx, ly);
+        }
         context.getMatrices().pop();
     }
 
@@ -697,6 +761,13 @@ public final class Csgui1Screen extends Screen {
         float my = this.inverseY(mouseY);
         float startY = this.startY();
 
+        if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled() && this.configScriptPanel().mouseClicked(mx, my, button)) {
+            this.searchFocused = false;
+            this.editingString = null;
+            this.bindCapturing = false;
+            return true;
+        }
+
         if (this.themePicker.mouseClicked(mx, my, this.themeX(), this.themeY())) {
             this.searchFocused = false;
             this.editingString = null;
@@ -936,6 +1007,9 @@ public final class Csgui1Screen extends Screen {
         float my = this.inverseY(mouseY);
         float px = this.panelX();
         float startY = this.startY();
+        if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled() && this.configScriptPanel().mouseScrolled(mx, my, verticalAmount)) {
+            return true;
+        }
         if (mx >= px && mx <= px + this.panelW() && my >= startY && my <= startY + this.panelH()) {
             float max = this.calculateMaxScroll(this.modulesOf(this.selected));
             float next = this.scroll.getOrDefault(this.selected, 0.0F) - (float) verticalAmount * 18.0F;

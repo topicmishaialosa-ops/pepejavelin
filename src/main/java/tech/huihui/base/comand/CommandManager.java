@@ -14,6 +14,7 @@ import tech.huihui.base.comand.impl.AhChenaCommand;
 import tech.huihui.base.comand.impl.AhSearchCommand;
 import tech.huihui.base.comand.impl.BindCommand;
 import tech.huihui.base.comand.impl.BlockESPCommand;
+import tech.huihui.base.comand.impl.BotFocusScreenCommand;
 import tech.huihui.base.comand.impl.ClipCommand;
 import tech.huihui.base.comand.impl.ConfigCommand;
 import tech.huihui.base.comand.impl.FarmCommand;
@@ -57,6 +58,7 @@ this.registerCommand(new RtpFunTimeCommand());
           this.registerCommand(new AhChenaCommand());
           this.registerCommand(new TPCommand());
         this.registerCommand(new ScriptCommand());
+        this.registerCommand(new BotFocusScreenCommand());
      }
 
    @Native

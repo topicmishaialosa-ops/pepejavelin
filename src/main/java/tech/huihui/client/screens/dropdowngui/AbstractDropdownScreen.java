@@ -29,6 +29,7 @@ import tech.huihui.client.modules.api.setting.impl.NumberSetting;
 import tech.huihui.client.modules.api.setting.impl.StringSetting;
 import tech.huihui.client.modules.impl.render.ClickGUI;
 import tech.huihui.client.modules.impl.render.EditClickGUI;
+import tech.huihui.client.screens.clickgui.ConfigScriptPanel;
 import tech.huihui.utility.render.display.Keyboard;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
@@ -78,6 +79,66 @@ public abstract class AbstractDropdownScreen extends Screen {
     }
 
     protected abstract DropdownDesign design();
+
+    private ConfigScriptPanel configScriptPanel;
+
+    private ConfigScriptPanel configScriptPanel() {
+        if (this.configScriptPanel == null) {
+            this.configScriptPanel = new ConfigScriptPanel(new ConfigScriptPanel.Host() {
+                @Override
+                public int width() {
+                    return AbstractDropdownScreen.screenWidth;
+                }
+
+                @Override
+                public int height() {
+                    return AbstractDropdownScreen.screenHeight;
+                }
+
+                @Override
+                public void scissor(CustomDrawContext draw, float x, float y, float w, float h) {
+                    AbstractDropdownScreen.this.scissor(draw, x, y, w, h);
+                }
+
+                @Override
+                public ColorRGBA accent() {
+                    DropdownDesign d = AbstractDropdownScreen.this.design();
+                    return d.rainbow ? ColorRGBA.fromHSB((d.baseHue % 360.0F) / 360.0F, 0.55F, 1.0F) : d.accent;
+                }
+
+                @Override
+                public ColorRGBA bg() {
+                    return AbstractDropdownScreen.this.panelBg();
+                }
+
+                @Override
+                public ColorRGBA border() {
+                    return AbstractDropdownScreen.this.design().border;
+                }
+
+                @Override
+                public ColorRGBA textMain() {
+                    return AbstractDropdownScreen.this.design().textMain;
+                }
+
+                @Override
+                public ColorRGBA textDim() {
+                    return AbstractDropdownScreen.this.design().textDim;
+                }
+
+                @Override
+                public MsdfFont headerFont() {
+                    return AbstractDropdownScreen.this.design().moduleFont;
+                }
+
+                @Override
+                public MsdfFont textFont() {
+                    return AbstractDropdownScreen.this.design().textFont;
+                }
+            });
+        }
+        return this.configScriptPanel;
+    }
 
     @Override
     protected void init() {
@@ -376,6 +437,9 @@ public abstract class AbstractDropdownScreen extends Screen {
             }
         }
         this.renderTheme(draw, lx, ly);
+        if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled()) {
+            this.configScriptPanel().render(draw, 1.0F, lx, ly);
+        }
         context.getMatrices().pop();
     }
 
@@ -812,6 +876,12 @@ public abstract class AbstractDropdownScreen extends Screen {
         float my = this.inverseY(mouseY);
         float startX = this.startX();
         float startY = this.startY();
+        if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled() && this.configScriptPanel().mouseClicked(mx, my, button)) {
+            this.searchFocused = false;
+            this.editingString = null;
+            this.bindCapturing = false;
+            return true;
+        }
         if (this.themePicker.mouseClicked(mx, my, this.themeX(), this.themeY())) {
             this.searchFocused = false;
             this.editingString = null;
@@ -1065,6 +1135,9 @@ public abstract class AbstractDropdownScreen extends Screen {
         float mx = this.inverseX(mouseX);
         float my = this.inverseY(mouseY);
         float startY = this.startY();
+        if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled() && this.configScriptPanel().mouseScrolled(mx, my, verticalAmount)) {
+            return true;
+        }
         for (int i = 0; i < this.panelCount(); i++) {
             float x = this.panelX(i);
             if (mx >= x && mx <= x + this.panelWidthAt(i) && my >= startY && my <= startY + this.panelHeight()) {

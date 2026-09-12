@@ -31,6 +31,7 @@ import tech.huihui.base.font.Fonts;
 import tech.huihui.client.modules.api.Category;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.api.ModuleAnnotation;
+import tech.huihui.client.modules.api.setting.impl.BooleanSetting;
 import tech.huihui.client.modules.impl.misc.NameProtect;
 import tech.huihui.client.modules.impl.misc.ScoreboardHealth;
 import tech.huihui.utility.game.other.ReplaceUtil;
@@ -47,6 +48,11 @@ import tech.huihui.utility.render.display.shader.DrawUtil;
 )
 public final class EntityESP extends Module {
    public static final EntityESP INSTANCE = new EntityESP();
+   private final BooleanSetting showItems = new BooleanSetting("Items", true);
+   private final BooleanSetting showArmor = new BooleanSetting("Armor", true);
+   private final BooleanSetting showEnchantments = new BooleanSetting("Enchantments", true);
+   private final BooleanSetting showMainHand = new BooleanSetting("Main Hand", true);
+   private final BooleanSetting showOffHand = new BooleanSetting("Off Hand", true);
    private static final Text GRAY_OPEN = Text.literal(" [").setStyle(Style.EMPTY.withColor(Formatting.GRAY));
    private static final Text GRAY_CLOSE = Text.literal("]").setStyle(Style.EMPTY.withColor(Formatting.GRAY));
    private static final ColorRGBA BG_DARK = new ColorRGBA(0, 0, 0, 123);
@@ -148,27 +154,32 @@ public final class EntityESP extends Module {
          }
          DrawUtil.drawRoundedRect(e.getContext().getMatrices(), (float)(position.x + (position.z - position.x) / 2.0D - (double)(textWidth / 2.0F) - 3.0D), posY - 2.5F, textWidth + 5.0F, 10.0F, BorderRadius.ZERO, HuihuiClient.getInstance().getFriendManager().isFriend(entity.getNameForScoreboard()) ? EntityESP.BG_FRIEND : EntityESP.BG_DARK);
          e.getContext().drawText(Fonts.REGULAR.getFont(6.5F), nameWithHp, (float)(position.x + (position.z - position.x) / 2.0D - (double)(textWidth / 2.0F)), posY, 255.0F);
-         int itemCount = 0;
-         EquipmentSlot[] var18 = EntityESP.EQUIP_SLOTS;
-         int var19 = var18.length;
+          int itemCount = 0;
+          if (showItems.isEnabled()) {
+             EquipmentSlot[] var18 = EntityESP.EQUIP_SLOTS;
+             int var19 = var18.length;
 
-         for(int var20 = 0; var20 < var19; ++var20) {
-            EquipmentSlot slot = var18[var20];
-            ItemStack stack = entity.getEquippedStack(slot);
-            if (!stack.isEmpty()) {
-               this.itemArray[itemCount++] = stack;
-            }
-         }
+             for(int var20 = 0; var20 < var19; ++var20) {
+                EquipmentSlot slot = var18[var20];
+                if (!showArmor.isEnabled() && slot != EquipmentSlot.MAINHAND && slot != EquipmentSlot.OFFHAND) {
+                   continue;
+                }
+                ItemStack stack = entity.getEquippedStack(slot);
+                if (!stack.isEmpty()) {
+                   this.itemArray[itemCount++] = stack;
+                }
+             }
 
-         ItemStack mainHand = entity.getMainHandStack();
-         if (!mainHand.isEmpty()) {
-            this.itemArray[itemCount++] = mainHand;
-         }
+             ItemStack mainHand = entity.getMainHandStack();
+             if (showMainHand.isEnabled() && !mainHand.isEmpty()) {
+                this.itemArray[itemCount++] = mainHand;
+             }
 
-         ItemStack offHand = entity.getOffHandStack();
-         if (!offHand.isEmpty()) {
-            this.itemArray[itemCount++] = offHand;
-         }
+             ItemStack offHand = entity.getOffHandStack();
+             if (showOffHand.isEnabled() && !offHand.isEmpty()) {
+                this.itemArray[itemCount++] = offHand;
+             }
+          }
          if (itemCount == 0) {
             continue;
          }
@@ -184,9 +195,9 @@ public final class EntityESP extends Module {
             ItemStack stack = this.itemArray[i];
             if (stack != null && !stack.isEmpty()) {
                float x2 = startX + (float)i * (iconSize + spacing);
-               ItemEnchantmentsComponent enchComp = EnchantmentHelper.getEnchantments(stack);
-               float enchantmentY;
-               if (!enchComp.isEmpty()) {
+                ItemEnchantmentsComponent enchComp = EnchantmentHelper.getEnchantments(stack);
+                float enchantmentY;
+                if (showEnchantments.isEnabled() && !enchComp.isEmpty()) {
                   enchantmentY = iconY - 16.0F;
                   EnchText[] cachedEnch = this.enchCache.get(stack);
                   int enchSize = enchComp.getSize();

@@ -10,7 +10,9 @@ import tech.huihui.utility.game.other.MessageUtil;
 import tech.huihui.client.script.ScriptErrorCapture;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -116,6 +118,59 @@ public class ScriptManager {
             sb.append("§f").append(ls.name).append("§7(").append(ls.lang).append(") ");
         }
         MessageUtil.displayInfo(sb.toString());
+    }
+
+    public static final String[] LANGS = {"java", "lua", "json"};
+
+    public static boolean isLoaded(String name) {
+        return scripts.containsKey(name);
+    }
+
+    public static List<String> getLoadedNames() {
+        return new ArrayList<>(scripts.keySet());
+    }
+
+    public static List<ScriptFile> listScriptsOnDisk() {
+        List<ScriptFile> result = new ArrayList<>();
+        File root = getScriptsDir();
+        if (root == null || !root.exists()) return result;
+        collectScripts(root, "", result);
+        return result;
+    }
+
+    private static void collectScripts(File dir, String prefix, List<ScriptFile> out) {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            if (f.isDirectory()) {
+                collectScripts(f, prefix + f.getName() + "/", out);
+            } else {
+                String name = f.getName();
+                int dot = name.lastIndexOf('.');
+                if (dot <= 0) continue;
+                String lang = name.substring(dot + 1).toLowerCase();
+                for (String l : LANGS) {
+                    if (l.equals(lang)) {
+                        String base = name.substring(0, dot);
+                        String display = prefix.isEmpty() ? base : prefix + base;
+                        out.add(new ScriptFile(display, lang, f));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    public static class ScriptFile {
+        public final String name;
+        public final String lang;
+        public final File file;
+
+        public ScriptFile(String name, String lang, File file) {
+            this.name = name;
+            this.lang = lang;
+            this.file = file;
+        }
     }
 
     private static File resolveFile(String lang, String name) {

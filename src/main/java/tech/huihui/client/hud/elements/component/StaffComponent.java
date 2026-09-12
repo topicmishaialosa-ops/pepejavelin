@@ -25,6 +25,7 @@ import tech.huihui.base.font.Fonts;
 import tech.huihui.base.lang.Lang;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
+import tech.huihui.client.hud.elements.style.HudStyle2;
 import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.CustomDrawContext;
@@ -63,6 +64,12 @@ public class StaffComponent extends DraggableHudElement {
       this.modules.entrySet().removeIf((entry) -> {
          return ((StaffComponent.StaffModule)entry.getValue()).isDelete();
       });
+
+      if (Interface.INSTANCE.hudStyle.is("Стиль 2")) {
+         this.renderStyle2(ctx);
+         return;
+      }
+
       float posX = this.getX();
       float posY = this.getY();
       float spacing = Interface.INSTANCE.hudSpacing.getCurrent();
@@ -134,6 +141,58 @@ public class StaffComponent extends DraggableHudElement {
       float headerTextWidth = Fonts.REGULAR.getWidth(headerText, 7.0F) + 19.5F + 6.0F;
       this.widthAnimation.update(Math.max(defaultWidth, headerTextWidth));
       this.width = this.widthAnimation.getValue();
+      this.height = height;
+   }
+
+   private void renderStyle2(CustomDrawContext ctx) {
+      float posX = this.getX();
+      float posY = this.getY();
+      float spacing = Interface.INSTANCE.hudSpacing.getCurrent();
+      float height = 0.0F;
+      float maxW = 60.0F;
+
+      String headerText = "Администрация";
+      float hw = Fonts.REGULAR.getWidth(headerText, 6.0F) + 20.0F;
+      if (hw > maxW) maxW = hw;
+
+      HudStyle2.drawCard(ctx, posX, posY, maxW, 18.0F, 255.0F);
+      ctx.drawText(Fonts.ICONS2.getFont(6.0F), "\uf728", posX + 5.0F, posY + 4.0F, HudStyle2.ACCENT);
+      ctx.drawText(Fonts.REGULAR.getFont(6.0F), headerText, posX + 14.0F, posY + 4.0F, HudStyle2.TEXT_PRIMARY);
+      height += 18.0F;
+
+      for (Entry<String, StaffModule> entry : this.modules.entrySet()) {
+         StaffModule module = entry.getValue();
+         if (module.animation.getValue() != 0.0F) {
+            Identifier skinTexture = this.skinTextureCache.get(module.name);
+            if (skinTexture == null && mc.getNetworkHandler() != null) {
+               PlayerListEntry player = mc.getNetworkHandler().getPlayerList().stream()
+                  .filter(p -> p.getProfile() != null && module.name.equals(p.getProfile().getName()))
+                  .findFirst().orElse(null);
+               if (player != null && player.getSkinTextures() != null) {
+                  skinTexture = player.getSkinTextures().texture();
+                  this.skinTextureCache.put(module.name, skinTexture);
+               }
+            }
+            if (skinTexture == null) {
+               skinTexture = DefaultSkinHelper.getSteve().texture();
+            }
+
+            float cardH = 12.0F;
+            float cardY = posY + height;
+            HudStyle2.drawCard(ctx, posX, cardY, maxW, cardH, module.animation.getValue() * 255.0F);
+
+            DrawUtil.drawPlayerHeadWithRoundedShader(ctx.getMatrices(), skinTexture, posX + 3.0F, cardY + 2.5F, 5.5F, BorderRadius.all(1.5F), ColorRGBA.WHITE.withAlpha(module.animation.getValue() * 255.0F));
+            ctx.drawText(Fonts.REGULAR.getFont(5.5F), module.displayNameText, posX + 10.5F, cardY + 3.5F, module.animation.getValue() * 255.0F);
+
+            ColorRGBA dotColor = module.status == StaffComponent.Status.NONE ? HudStyle2.GREEN : HudStyle2.RED;
+            int dotAlpha = (int)(module.animation.getValue() * 255.0F);
+            DrawUtil.drawRoundedRect(ctx.getMatrices(), posX + maxW - 7.0F, cardY + 3.5F, 3.0F, 3.0F, BorderRadius.all(1.5F), dotColor.withAlpha(dotAlpha));
+
+            height += cardH + spacing;
+         }
+      }
+
+      this.width = maxW;
       this.height = height;
    }
 

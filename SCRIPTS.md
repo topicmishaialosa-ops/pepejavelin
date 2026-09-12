@@ -309,9 +309,9 @@ api:registerHud("Lua FPS", "RENDER", -1, 10, 40, 120, 20, {
 Пример (Lua):
 
 ```lua
-api.clickSlot(15, 1, "throw")          -- выбросить предмет из слота 15 открытого контейнера (ПКМ)
-api.clickSlotInventory(0, 1, "throw")  -- выбросить предмет из 1-го слота хотбара своего инвентаря
-api.selectHotbar(0)                    -- выбрать первый слот хотбара
+api:clickSlot(15, 1, "throw")          -- выбросить предмет из слота 15 открытого контейнера (ПКМ)
+api:clickSlotInventory(0, 1, "throw")  -- выбросить предмет из 1-го слота хотбара своего инвентаря
+api:selectHotbar(0)                    -- выбрать первый слот хотбара
 ```
 
 ### Создание кастомных модулей
@@ -330,10 +330,10 @@ api.module(name)
 Lua-аналог:
 
 ```lua
-api.registerModule("My Mod", "MISC", -1, {
-    onEnable  = function() api.print("on") end,
-    onDisable = function() api.print("off") end,
-    onTick    = function() api.print("tick") end
+api:registerModule("My Mod", "MISC", -1, {
+    onEnable  = function() api:print("on") end,
+    onDisable = function() api:print("off") end,
+    onTick    = function() api:print("tick") end
 })
 ```
 
@@ -355,7 +355,7 @@ api.hud(name)
 Lua-аналог:
 
 ```lua
-api.registerHud("My HUD", "RENDER", -1, x, y, w, h, {
+api:registerHud("My HUD", "RENDER", -1, x, y, w, h, {
     onRender = function(ctx) ... end
 })
 ```
@@ -542,15 +542,15 @@ api.onRender3D((ctx) -> {
 
 ```lua
 -- name: AuraSync
-api.onModuleEnable("KillAura", function()
-  api.setModuleMode("KillAura", "target", "Nearest")
-  api.setModuleNumber("KillAura", "range", 4.5)
-  api.print("KillAura настроен скриптом")
+api:onModuleEnable("KillAura", function()
+  api:setModuleMode("KillAura", "target", "Nearest")
+  api:setModuleNumber("KillAura", "range", 4.5)
+  api:print("KillAura настроен скриптом")
 end)
 
-api.onTick(function()
-  if api.isModuleEnabled("KillAura") then
-    api.setModuleNumber("KillAura", "aps", 12)
+api:onTick(function()
+  if api:isModuleEnabled("KillAura") then
+    api:setModuleNumber("KillAura", "aps", 12)
   end
 end)
 ```

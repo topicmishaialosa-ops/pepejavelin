@@ -11,6 +11,7 @@ uniform vec2 Size;
 uniform vec4 Radius;
 uniform float Smoothness;
 uniform float BlurRadius;
+uniform float Style; // 0 = скруглённые углы, 1 = срезанные углы
 
 out vec4 OutColor;
 
@@ -29,7 +30,13 @@ void main() {
     average /= 80.0;
 
     vec4 color = vec4(average, 1.0) * FragColor;
-    color.a *= ralpha(Size, FragCoord, Radius, Smoothness);
+    vec2 center = Size * 0.5;
+    vec2 pos = center - (FragCoord * Size);
+    vec2 halfSize = center - 1.0;
+    float distRounded = rdist(pos, halfSize, Radius);
+    float distCut = cutCornerSDF(pos, halfSize, cutLegFromRadius(Radius));
+    float dist = mix(distRounded, distCut, Style);
+    color.a *= (1.0 - smoothstep(1.0 - Smoothness, 1.0, dist));
 
     if (color.a == 0.0) {
         discard;

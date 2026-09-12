@@ -13,6 +13,7 @@ import tech.huihui.base.animations.base.Animation;
 import tech.huihui.base.animations.base.Easing;
 import tech.huihui.base.font.Font;
 import tech.huihui.base.font.Fonts;
+import tech.huihui.base.font.MsdfFont;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.base.theme.ThemeManager;
 import tech.huihui.client.modules.api.Category;
@@ -39,6 +40,57 @@ public class ClickGuiScreen extends Screen implements IClient {
    private static final float EDIT_BTN_SIZE = 18.0F;
 
    private final List<Panel> panels = new ArrayList();
+   private final ConfigScriptPanel configScriptPanel = new ConfigScriptPanel(new ConfigScriptPanel.Host() {
+      @Override
+      public int width() {
+         return ClickGuiScreen.screenWidth;
+      }
+
+      @Override
+      public int height() {
+         return ClickGuiScreen.screenHeight;
+      }
+
+      @Override
+      public void scissor(CustomDrawContext draw, float x, float y, float w, float h) {
+         ClickGuiScreen.this.scissor(draw, x, y, w, h);
+      }
+
+      @Override
+      public ColorRGBA accent() {
+         return HuihuiClient.getInstance().getThemeManager().getCurrentTheme().getColor();
+      }
+
+      @Override
+      public ColorRGBA bg() {
+         return EditClickGUI.INSTANCE.getBgColor().getColor().withAlpha((int) EditClickGUI.INSTANCE.getOpacity().getCurrent());
+      }
+
+      @Override
+      public ColorRGBA border() {
+         return EditClickGUI.INSTANCE.getBorderColor().getColor();
+      }
+
+      @Override
+      public ColorRGBA textMain() {
+         return new ColorRGBA(222, 222, 222);
+      }
+
+      @Override
+      public ColorRGBA textDim() {
+         return new ColorRGBA(153, 153, 153);
+      }
+
+      @Override
+      public MsdfFont headerFont() {
+         return Fonts.MEDIUM;
+      }
+
+      @Override
+      public MsdfFont textFont() {
+         return Fonts.REGULAR;
+      }
+   });
    private final Animation openAnimation = new Animation(300L, Easing.EXPO_OUT);
    private final Animation themeAnim = new Animation(180L, Easing.CUBIC_OUT);
    private boolean closing;
@@ -52,8 +104,8 @@ public class ClickGuiScreen extends Screen implements IClient {
    private boolean searchDirty = true;
 
    private static float transformScale = 1.0F;
-   private static int screenWidth;
-   private static int screenHeight;
+   static int screenWidth;
+   static int screenHeight;
 
    public static float transformX(float x) {
       return (float) screenWidth / 2.0F + (x - (float) screenWidth / 2.0F) * transformScale;
@@ -291,6 +343,10 @@ public class ClickGuiScreen extends Screen implements IClient {
 
       this.renderDescription(draw, theme, anim);
 
+      if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled()) {
+         this.configScriptPanel.render(draw, anim, this.inverseX(mouseX), this.inverseY(mouseY));
+      }
+
       context.getMatrices().pop();
    }
 
@@ -393,6 +449,9 @@ public class ClickGuiScreen extends Screen implements IClient {
    public boolean mouseClicked(double mouseX, double mouseY, int button) {
       float mx = this.inverseX(mouseX);
       float my = this.inverseY(mouseY);
+      if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled() && this.configScriptPanel.mouseClicked(mx, my, button)) {
+         return true;
+      }
       if (this.isSearchHovered(mx, my)) {
          this.searchFocused = true;
          this.themeOpen = false;
@@ -453,6 +512,9 @@ public class ClickGuiScreen extends Screen implements IClient {
    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
       float mx = this.inverseX(mouseX);
       float my = this.inverseY(mouseY);
+      if (EditClickGUI.INSTANCE.getPanelEnabled().isEnabled() && this.configScriptPanel.mouseScrolled(mx, my, verticalAmount)) {
+         return true;
+      }
       for (Panel panel : this.panels) {
          if (MathUtil.isHovered(mx, my, panel.getX(), panel.getY(), this.panelWidth(), this.panelHeight())) {
             panel.mouseScrolled(verticalAmount);

@@ -18,6 +18,7 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec2f;
 import org.joml.Matrix4f;
 import tech.huihui.HuihuiClient;
+import tech.huihui.client.modules.impl.render.Menu;
 import tech.huihui.utility.interfaces.IWindow;
 import tech.huihui.utility.math.MathUtil;
 import tech.huihui.utility.render.display.Render2DUtil;
@@ -172,6 +173,7 @@ public final class GlDrawRenderer implements IWindow {
       squircleProgram.findUniform("Radius").set(borderRadius.topLeftRadius() * squirt / 2.0F, borderRadius.bottomLeftRadius() * squirt / 2.0F, borderRadius.topRightRadius() * squirt / 2.0F, borderRadius.bottomRightRadius() * squirt / 2.0F);
       squircleProgram.findUniform("Smoothness").set(smoothness);
       squircleProgram.findUniform("CornerSmoothness").set(squirt);
+      squircleProgram.findUniform("Style").set(styleFactor());
       drawSetup();
       float horizontalPadding = -smoothness / 2.0F + smoothness * 2.0F;
       float verticalPadding = smoothness / 2.0F + smoothness;
@@ -205,6 +207,7 @@ public final class GlDrawRenderer implements IWindow {
       loadingProgram.findUniform("Progress").set(progress);
       loadingProgram.findUniform("StripeWidth").set(0.0F);
       loadingProgram.findUniform("Fade").set(0.5F);
+      loadingProgram.findUniform("Style").set(styleFactor());
       drawSetup();
       float horizontalPadding = -smoothness / 2.0F + smoothness * 2.0F;
       float verticalPadding = smoothness / 2.0F + smoothness;
@@ -236,6 +239,7 @@ public final class GlDrawRenderer implements IWindow {
       rectangleProgram.findUniform("Size").set(width, height);
       rectangleProgram.findUniform("Radius").set(borderRadius.topLeftRadius(), borderRadius.bottomLeftRadius(), borderRadius.topRightRadius(), borderRadius.bottomRightRadius());
       rectangleProgram.findUniform("Smoothness").set(smoothness);
+      rectangleProgram.findUniform("Style").set(styleFactor());
       drawSetup();
       float horizontalPadding = -smoothness / 2.0F + smoothness * 2.0F;
       float verticalPadding = smoothness / 2.0F + smoothness;
@@ -261,6 +265,7 @@ public final class GlDrawRenderer implements IWindow {
       gradientRectangleProgram.findUniform("Size").set(width, height);
       gradientRectangleProgram.findUniform("Radius").set(borderRadius.topLeftRadius(), borderRadius.bottomLeftRadius(), borderRadius.topRightRadius(), borderRadius.bottomRightRadius());
       gradientRectangleProgram.findUniform("Smoothness").set(smoothness);
+      gradientRectangleProgram.findUniform("Style").set(styleFactor());
       gradientRectangleProgram.findUniform("TopLeftColor").set((float)color1.getRed() / 255.0F, (float)color1.getGreen() / 255.0F, (float)color1.getBlue() / 255.0F, (float)color1.getAlpha() / 255.0F);
       gradientRectangleProgram.findUniform("BottomLeftColor").set((float)color2.getRed() / 255.0F, (float)color2.getGreen() / 255.0F, (float)color2.getBlue() / 255.0F, (float)color2.getAlpha() / 255.0F);
       gradientRectangleProgram.findUniform("BottomRightColor").set((float)color3.getRed() / 255.0F, (float)color3.getGreen() / 255.0F, (float)color3.getBlue() / 255.0F, (float)color3.getAlpha() / 255.0F);
@@ -296,6 +301,7 @@ public final class GlDrawRenderer implements IWindow {
       borderProgram.findUniform("Radius").set(borderRadius.topLeftRadius(), borderRadius.bottomLeftRadius(), borderRadius.topRightRadius(), borderRadius.bottomRightRadius());
       borderProgram.findUniform("Smoothness").set(internalSmoothness, externalSmoothness);
       borderProgram.findUniform("Thickness").set(borderThickness);
+      borderProgram.findUniform("Style").set(styleFactor());
       drawSetup();
       float horizontalPadding = -externalSmoothness / 2.0F + externalSmoothness * 2.0F;
       float verticalPadding = externalSmoothness / 2.0F + externalSmoothness;
@@ -329,6 +335,7 @@ public final class GlDrawRenderer implements IWindow {
       metaballsProgram.findUniform("OutlineColor").set((float)outlineColor.getRed() / 255.0F, (float)outlineColor.getGreen() / 255.0F, (float)outlineColor.getBlue() / 255.0F, (float)outlineColor.getAlpha() / 255.0F);
       metaballsProgram.findUniform("Radius").set(radius, radius, radius, radius);
       metaballsProgram.findUniform("Smoothness").set(0.8F);
+      metaballsProgram.findUniform("Style").set(styleFactor());
       drawSetup();
       BufferBuilder bb = RenderSystem.renderThreadTesselator().begin(DrawMode.QUADS, VertexFormats.POSITION_COLOR);
       bb.vertex(mat, x, y, 0.0F).color(255, 255, 255, 255);
@@ -362,6 +369,7 @@ public final class GlDrawRenderer implements IWindow {
       figmaBorderProgram.findUniform("Smoothness").set(internalSmoothness, externalSmoothness);
       figmaBorderProgram.findUniform("Thickness").set(borderThickness);
       figmaBorderProgram.findUniform("CornerIndex").set(cornerIdex);
+      figmaBorderProgram.findUniform("Style").set(styleFactor());
       drawSetup();
       float horizontalPadding = -externalSmoothness / 2.0F + externalSmoothness * 2.0F;
       float verticalPadding = externalSmoothness / 2.0F + externalSmoothness;
@@ -452,6 +460,7 @@ public final class GlDrawRenderer implements IWindow {
       roundedTextureProgram.findUniform("Size").set(width, height);
       roundedTextureProgram.findUniform("Radius").set(borderRadius.topLeftRadius(), borderRadius.bottomLeftRadius(), borderRadius.topRightRadius(), borderRadius.bottomRightRadius());
       roundedTextureProgram.findUniform("Smoothness").set(smoothness);
+      roundedTextureProgram.findUniform("Style").set(styleFactor());
       drawSetup();
       float horizontalPadding = -smoothness / 2.0F + smoothness * 2.0F;
       float verticalPadding = smoothness / 2.0F + smoothness;
@@ -477,6 +486,7 @@ public final class GlDrawRenderer implements IWindow {
       rectangleProgram.findUniform("Size").set(width, height);
       rectangleProgram.findUniform("Radius").set(borderRadius.topLeftRadius() * 3.0F, borderRadius.bottomLeftRadius() * 3.0F, borderRadius.topRightRadius() * 3.0F, borderRadius.bottomRightRadius() * 3.0F);
       rectangleProgram.findUniform("Smoothness").set(softness);
+      rectangleProgram.findUniform("Style").set(styleFactor());
       drawSetup();
       float horizontalPadding = -softness / 2.0F + softness * 2.0F;
       float verticalPadding = softness / 2.0F + softness;
@@ -529,6 +539,7 @@ public final class GlDrawRenderer implements IWindow {
       blurProgram.findUniform("Radius").set(borderRadius.topLeftRadius(), borderRadius.bottomLeftRadius(), borderRadius.topRightRadius(), borderRadius.bottomRightRadius());
       blurProgram.findUniform("Smoothness").set(1.0F);
       blurProgram.findUniform("BlurRadius").set(blurRadius);
+      blurProgram.findUniform("Style").set(styleFactor());
       int screenWidth = mc.getWindow().getScaledWidth();
       int screenHeight = mc.getWindow().getScaledHeight();
       float u = x / (float)screenWidth;
@@ -586,6 +597,7 @@ public final class GlDrawRenderer implements IWindow {
       roundedTextureProgram.findUniform("Size").set(width, height);
       roundedTextureProgram.findUniform("Radius").set(borderRadius.topLeftRadius(), borderRadius.bottomLeftRadius(), borderRadius.topRightRadius(), borderRadius.bottomRightRadius());
       roundedTextureProgram.findUniform("Smoothness").set(smoothness);
+      roundedTextureProgram.findUniform("Style").set(styleFactor());
       drawSetup();
       float horizontalPadding = -smoothness / 2.0F + smoothness * 2.0F;
       float verticalPadding = smoothness / 2.0F + smoothness;
@@ -623,6 +635,10 @@ public final class GlDrawRenderer implements IWindow {
    public static void drawSetup() {
       RenderSystem.enableBlend();
       RenderSystem.defaultBlendFunc();
+   }
+
+   private static float styleFactor() {
+      return Menu.INSTANCE.isCutRenderStyle() ? 1.0F : 0.0F;
    }
 
    public static void drawEnd() {

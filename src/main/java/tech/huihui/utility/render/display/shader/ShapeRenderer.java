@@ -10,6 +10,7 @@ import net.minecraft.client.render.VertexFormat.DrawMode;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
+import tech.huihui.client.modules.impl.render.Menu;
 import tech.huihui.utility.render.display.base.BorderRadius;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
 
@@ -22,6 +23,18 @@ public final class ShapeRenderer {
    private static float radiusAA(float radius) {
       float aaf = Math.min(AA, radius * 0.4F);
       return Math.max(0.2F, Math.min(aaf, Math.max(radius, 0.0F)));
+   }
+
+   private static boolean cutStyle() {
+      return Menu.INSTANCE.isCutRenderStyle();
+   }
+
+   private static float shapeSDF(boolean cut, float px, float py, float cx, float cy, float hw, float hh, float radius) {
+      return cut ? cutSDF(px, py, cx, cy, hw, hh, radius) : roundedSDF(px, py, cx, cy, hw, hh, radius);
+   }
+
+   private static float shapeCoverage(boolean cut, float px, float py, float cx, float cy, float hw, float hh, float radius, float aaf) {
+      return 1.0F - smoothstepf(-aaf, aaf, shapeSDF(cut, px, py, cx, cy, hw, hh, radius));
    }
 
    private static float computeCell(float width, float height) {
@@ -47,7 +60,7 @@ public final class ShapeRenderer {
       final float covAA = radiusAA(cr);
       final int rgb = color.getRGB() & 0xFFFFFF;
       final float ar = color.getAlpha();
-      drawCells(matrices.peek().getPositionMatrix(), x, y, width, height, cr, covAA, (px, py, u, v, cov) -> {
+      drawCells(matrices.peek().getPositionMatrix(), x, y, width, height, cr, covAA, cutStyle(), (px, py, u, v, cov) -> {
          return pack(rgb, ar * cov);
       });
    }
@@ -68,7 +81,7 @@ public final class ShapeRenderer {
       final float ih = Math.max(height - thickness * 2.0F, 0.0F);
       final int rgb = borderColor.getRGB() & 0xFFFFFF;
       final float ar = borderColor.getAlpha();
-      drawBorderCells(matrices.peek().getPositionMatrix(), x, y, width, height, cr, outerAA, ir, innerAA, ix, iy, iw, ih, rgb, ar);
+      drawBorderCells(matrices.peek().getPositionMatrix(), x, y, width, height, cr, outerAA, ir, innerAA, ix, iy, iw, ih, rgb, ar, cutStyle());
    }
 
    public static void drawRoundedTexture(MatrixStack matrices, Identifier identifier, float x, float y, float width, float height, float u1, float v1, float u2, float v2, BorderRadius radius, ColorRGBA color) {
@@ -84,7 +97,7 @@ public final class ShapeRenderer {
       final float covAA = radiusAA(rr);
       final int rgb = color.getRGB() & 0xFFFFFF;
       final float ar = color.getAlpha();
-      drawTexCells(matrices.peek().getPositionMatrix(), x, y, width, height, u1, v1, u2, v2, rr, covAA, (px, py, u, v, cov) -> {
+      drawTexCells(matrices.peek().getPositionMatrix(), x, y, width, height, u1, v1, u2, v2, rr, covAA, cutStyle(), (px, py, u, v, cov) -> {
          return pack(rgb, ar * cov);
       });
       RenderSystem.setShaderTexture(0, 0);
@@ -107,7 +120,7 @@ public final class ShapeRenderer {
       final float blA = bl.getAlpha();
       final float brA = br.getAlpha();
       final float trA = tr.getAlpha();
-      drawCells(matrices.peek().getPositionMatrix(), x, y, width, height, rr, covAA, (px, py, u, v, cov) -> {
+      drawCells(matrices.peek().getPositionMatrix(), x, y, width, height, rr, covAA, cutStyle(), (px, py, u, v, cov) -> {
          if (cov <= 0.001F) {
             return 0;
          }
@@ -130,11 +143,12 @@ public final class ShapeRenderer {
          return;
       }
       baseSetup();
+      final boolean cut = cutStyle();
       final float glow = Math.max(2.0F, softness);
       final float rr = Math.min(Math.min(radius.topLeftRadius(), radius.topRightRadius()), Math.min(radius.bottomLeftRadius(), radius.bottomRightRadius()));
       final int rgb = color.getRGB() & 0xFFFFFF;
       final float ar = color.getAlpha();
-      drawCells(matrices.peek().getPositionMatrix(), x, y, width, height, rr, glow, (px, py, u, v, cov) -> {
+      drawCells(matrices.peek().getPositionMatrix(), x, y, width, height, rr, glow, cut, (px, py, u, v, cov) -> {
          return pack(rgb, ar * cov);
       });
    }
@@ -149,7 +163,7 @@ public final class ShapeRenderer {
       int color(float px, float py, float u, float v, float cov);
    }
 
-   private static void drawCells(Matrix4f matrix4f, float x, float y, float width, float height, float radius, float covAA, CellColor cellColor) {
+   private static void drawCells(Matrix4f matrix4f, float x, float y, float width, float height, float radius, float covAA, boolean cut, CellColor cellColor) {
       float cell = computeCell(width, height);
       int nx = Math.max(4, Math.min((int) Math.ceil(width / cell), MAX_CELLS));
       int ny = Math.max(4, Math.min((int) Math.ceil(height / cell), MAX_CELLS));
@@ -174,7 +188,7 @@ public final class ShapeRenderer {
             float nextY = cellY + hh;
             float v0 = (float) cy0 / (float) ny;
             float v1 = (float) (cy0 + 1) / (float) ny;
-            float d = roundedSDF(cellX + hw * 0.5F, cellY + hh * 0.5F, cx, cy, hwHalf, hhHalf, radius);
+            float d = shapeSDF(cut, cellX + hw * 0.5F, cellY + hh * 0.5F, cx, cy, hwHalf, hhHalf, radius);
             if (d >= covAA + diag) {
                continue;
             }
@@ -188,10 +202,10 @@ public final class ShapeRenderer {
                c2 = cellColor.color(nextX, nextY, u1, v1, 1.0F);
                c3 = cellColor.color(nextX, cellY, u1, v0, 1.0F);
             } else {
-               c0 = cellColor.color(cellX, cellY, u0, v0, roundedCoverage(cellX, cellY, cx, cy, hwHalf, hhHalf, radius, covAA));
-               c1 = cellColor.color(cellX, nextY, u0, v1, roundedCoverage(cellX, nextY, cx, cy, hwHalf, hhHalf, radius, covAA));
-               c2 = cellColor.color(nextX, nextY, u1, v1, roundedCoverage(nextX, nextY, cx, cy, hwHalf, hhHalf, radius, covAA));
-               c3 = cellColor.color(nextX, cellY, u1, v0, roundedCoverage(nextX, cellY, cx, cy, hwHalf, hhHalf, radius, covAA));
+               c0 = cellColor.color(cellX, cellY, u0, v0, shapeCoverage(cut, cellX, cellY, cx, cy, hwHalf, hhHalf, radius, covAA));
+               c1 = cellColor.color(cellX, nextY, u0, v1, shapeCoverage(cut, cellX, nextY, cx, cy, hwHalf, hhHalf, radius, covAA));
+               c2 = cellColor.color(nextX, nextY, u1, v1, shapeCoverage(cut, nextX, nextY, cx, cy, hwHalf, hhHalf, radius, covAA));
+               c3 = cellColor.color(nextX, cellY, u1, v0, shapeCoverage(cut, nextX, cellY, cx, cy, hwHalf, hhHalf, radius, covAA));
             }
             if ((c0 | c1 | c2 | c3) == 0) {
                continue;
@@ -209,7 +223,7 @@ public final class ShapeRenderer {
       }
    }
 
-   private static void drawBorderCells(Matrix4f matrix4f, float x, float y, float width, float height, float outerR, float outerAA, float innerR, float innerAA, float ix, float iy, float iw, float ih, int rgb, float ar) {
+   private static void drawBorderCells(Matrix4f matrix4f, float x, float y, float width, float height, float outerR, float outerAA, float innerR, float innerAA, float ix, float iy, float iw, float ih, int rgb, float ar, boolean cut) {
       float cell = computeCell(width, height);
       int nx = Math.max(4, Math.min((int) Math.ceil(width / cell), MAX_CELLS));
       int ny = Math.max(4, Math.min((int) Math.ceil(height / cell), MAX_CELLS));
@@ -235,7 +249,7 @@ public final class ShapeRenderer {
          for(int cy = 0; cy < ny; ++cy) {
             float cellY = y + hh * (float) cy;
             float nextY = cellY + hh;
-            float dOuter = roundedSDF(cellX + hw * 0.5F, cellY + hh * 0.5F, ocx, ocy, ohw, ohh, outerR);
+            float dOuter = shapeSDF(cut, cellX + hw * 0.5F, cellY + hh * 0.5F, ocx, ocy, ohw, ohh, outerR);
             if (dOuter >= outerAA + diag) {
                continue;
             }
@@ -243,17 +257,17 @@ public final class ShapeRenderer {
             int c1;
             int c2;
             int c3;
-            if (dOuter <= -outerAA - diag && (!innerExists || roundedSDF(cellX + hw * 0.5F, cellY + hh * 0.5F, icx, icy, ihw, ihh, innerR) >= innerAA + diag)) {
+            if (dOuter <= -outerAA - diag && (!innerExists || shapeSDF(cut, cellX + hw * 0.5F, cellY + hh * 0.5F, icx, icy, ihw, ihh, innerR) >= innerAA + diag)) {
                c0 = c1 = c2 = c3 = pack(rgb, ar);
             } else {
-               float o0 = roundedCoverage(cellX, cellY, ocx, ocy, ohw, ohh, outerR, outerAA);
-               float o1 = roundedCoverage(cellX, nextY, ocx, ocy, ohw, ohh, outerR, outerAA);
-               float o2 = roundedCoverage(nextX, nextY, ocx, ocy, ohw, ohh, outerR, outerAA);
-               float o3 = roundedCoverage(nextX, cellY, ocx, ocy, ohw, ohh, outerR, outerAA);
-               float i0 = innerExists ? roundedCoverage(cellX, cellY, icx, icy, ihw, ihh, innerR, innerAA) : 0.0F;
-               float i1 = innerExists ? roundedCoverage(cellX, nextY, icx, icy, ihw, ihh, innerR, innerAA) : 0.0F;
-               float i2 = innerExists ? roundedCoverage(nextX, nextY, icx, icy, ihw, ihh, innerR, innerAA) : 0.0F;
-               float i3 = innerExists ? roundedCoverage(nextX, cellY, icx, icy, ihw, ihh, innerR, innerAA) : 0.0F;
+               float o0 = shapeCoverage(cut, cellX, cellY, ocx, ocy, ohw, ohh, outerR, outerAA);
+               float o1 = shapeCoverage(cut, cellX, nextY, ocx, ocy, ohw, ohh, outerR, outerAA);
+               float o2 = shapeCoverage(cut, nextX, nextY, ocx, ocy, ohw, ohh, outerR, outerAA);
+               float o3 = shapeCoverage(cut, nextX, cellY, ocx, ocy, ohw, ohh, outerR, outerAA);
+               float i0 = innerExists ? shapeCoverage(cut, cellX, cellY, icx, icy, ihw, ihh, innerR, innerAA) : 0.0F;
+               float i1 = innerExists ? shapeCoverage(cut, cellX, nextY, icx, icy, ihw, ihh, innerR, innerAA) : 0.0F;
+               float i2 = innerExists ? shapeCoverage(cut, nextX, nextY, icx, icy, ihw, ihh, innerR, innerAA) : 0.0F;
+               float i3 = innerExists ? shapeCoverage(cut, nextX, cellY, icx, icy, ihw, ihh, innerR, innerAA) : 0.0F;
                c0 = pack(rgb, ar * o0 * (1.0F - i0));
                c1 = pack(rgb, ar * o1 * (1.0F - i1));
                c2 = pack(rgb, ar * o2 * (1.0F - i2));
@@ -275,7 +289,7 @@ public final class ShapeRenderer {
       }
    }
 
-   private static void drawTexCells(Matrix4f matrix4f, float x, float y, float width, float height, float u1, float v1, float u2, float v2, float radius, float covAA, CellColor cellColor) {
+   private static void drawTexCells(Matrix4f matrix4f, float x, float y, float width, float height, float u1, float v1, float u2, float v2, float radius, float covAA, boolean cut, CellColor cellColor) {
       float cell = computeCell(width, height);
       int nx = Math.max(4, Math.min((int) Math.ceil(width / cell), MAX_CELLS));
       int ny = Math.max(4, Math.min((int) Math.ceil(height / cell), MAX_CELLS));
@@ -300,7 +314,7 @@ public final class ShapeRenderer {
             float nextY = y + hh * (float) (cy0 + 1);
             float v0 = v1 + (v2 - v1) * ((float) cy0 / (float) ny);
             float v3 = v1 + (v2 - v1) * ((float) (cy0 + 1) / (float) ny);
-            float d = roundedSDF(cellX + hw * 0.5F, cellY + hh * 0.5F, cx, cy, hwHalf, hhHalf, radius);
+            float d = shapeSDF(cut, cellX + hw * 0.5F, cellY + hh * 0.5F, cx, cy, hwHalf, hhHalf, radius);
             if (d >= covAA + diag) {
                continue;
             }
@@ -314,10 +328,10 @@ public final class ShapeRenderer {
                c2 = cellColor.color(nextX, nextY, u3, v3, 1.0F);
                c3 = cellColor.color(nextX, cellY, u3, v0, 1.0F);
             } else {
-               c0 = cellColor.color(cellX, cellY, u0, v0, roundedCoverage(cellX, cellY, cx, cy, hwHalf, hhHalf, radius, covAA));
-               c1 = cellColor.color(cellX, nextY, u0, v3, roundedCoverage(cellX, nextY, cx, cy, hwHalf, hhHalf, radius, covAA));
-               c2 = cellColor.color(nextX, nextY, u3, v3, roundedCoverage(nextX, nextY, cx, cy, hwHalf, hhHalf, radius, covAA));
-               c3 = cellColor.color(nextX, cellY, u3, v0, roundedCoverage(nextX, cellY, cx, cy, hwHalf, hhHalf, radius, covAA));
+               c0 = cellColor.color(cellX, cellY, u0, v0, shapeCoverage(cut, cellX, cellY, cx, cy, hwHalf, hhHalf, radius, covAA));
+               c1 = cellColor.color(cellX, nextY, u0, v3, shapeCoverage(cut, cellX, nextY, cx, cy, hwHalf, hhHalf, radius, covAA));
+               c2 = cellColor.color(nextX, nextY, u3, v3, shapeCoverage(cut, nextX, nextY, cx, cy, hwHalf, hhHalf, radius, covAA));
+               c3 = cellColor.color(nextX, cellY, u3, v0, shapeCoverage(cut, nextX, cellY, cx, cy, hwHalf, hhHalf, radius, covAA));
             }
             if ((c0 | c1 | c2 | c3) == 0) {
                continue;
@@ -341,6 +355,13 @@ public final class ShapeRenderer {
       float ox = Math.max(qx, 0.0F);
       float oy = Math.max(qy, 0.0F);
       return (float)(Math.sqrt((double)(ox * ox + oy * oy)) + (double)Math.min(Math.max(qx, qy), 0.0F)) - radius;
+   }
+
+   private static float cutSDF(float px, float py, float cx, float cy, float hw, float hh, float leg) {
+      float qx = Math.abs(px - cx) - hw;
+      float qy = Math.abs(py - cy) - hh;
+      float dCut = (qx + qy - leg) * 0.7071067811865476F;
+      return Math.max(qx, Math.max(qy, dCut));
    }
 
    private static float roundedCoverage(float px, float py, float cx, float cy, float hw, float hh, float radius, float aaf) {

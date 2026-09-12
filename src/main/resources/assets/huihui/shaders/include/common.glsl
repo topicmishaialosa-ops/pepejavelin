@@ -28,6 +28,32 @@ float roundedBoxSDF(vec2 CenterPosition, vec2 Size, vec4 Radius) {
 }
 
 /**
+ * Средний по всем четырём углам радиус (используется как катет срезанного угла).
+ */
+float cutLegFromRadius(vec4 Radius) {
+    return (Radius.x + Radius.y + Radius.z + Radius.w) * 0.25;
+}
+
+/**
+ * SDF для прямоугольника со срезанными (шамферными) углами.
+ * Тот же контракт, что и у roundedBoxSDF: отрицательное значение — внутри,
+ * положительное — снаружи.
+ *
+ * @param CenterPosition - координата точки относительно центра прямоугольника.
+ * @param Size - половина ширины и высоты прямоугольника (от центра до края).
+ * @param CutRadius - длина среза (катет) каждого угла в пикселях.
+ */
+float cutCornerSDF(vec2 CenterPosition, vec2 Size, float CutRadius) {
+    vec2 halfSize = Size;
+    float c = min(CutRadius, min(halfSize.x, halfSize.y));
+    vec2 q = abs(CenterPosition) - halfSize;
+    float dVert = q.x;
+    float dHor = q.y;
+    float dCut = (q.x + q.y + c) * 0.7071067811865476;
+    return max(dVert, max(dHor, dCut));
+}
+
+/**
  * Я ебал меня сосали
  *
  * Вершины идут по часовой стрелке:

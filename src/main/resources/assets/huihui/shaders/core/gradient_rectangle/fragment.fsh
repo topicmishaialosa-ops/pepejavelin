@@ -8,6 +8,7 @@ in vec4 FragColor;
 uniform vec2 Size;
 uniform vec4 Radius;
 uniform float Smoothness;
+uniform float Style; // 0 = скруглённые углы, 1 = срезанные углы
 uniform vec4 ColorModulator;
 
 uniform vec4 TopLeftColor;
@@ -34,7 +35,11 @@ void main() {
 
     vec4 gradientColor = bilinearInterpolation(uv);
 
-    float distance = roundedBoxSDF(center - (FragCoord * Size), center - 1.0, Radius);
+    vec2 pos = center - (FragCoord * Size);
+    vec2 halfSize = center - 1.0;
+    float distRounded = roundedBoxSDF(pos, halfSize, Radius);
+    float distCut = cutCornerSDF(pos, halfSize, cutLegFromRadius(Radius));
+    float distance = mix(distRounded, distCut, Style);
     float alpha = 1.0 - smoothstep(1.0 - Smoothness, 1.0, distance);
 
     vec4 finalColor = vec4(gradientColor.rgb, gradientColor.a * alpha);

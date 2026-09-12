@@ -1,0 +1,178 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+def bundledModsDir = file("bundled-mods")
+def bundledModJars = bundledModsDir.exists()
+        ? bundledModsDir.listFiles().findAll { it.isFile() && it.name.endsWith(".jar") }.sort { it.name }
+        : []
+def baritoneModJar = bundledModJars.find { it.name.startsWith("baritone-fabric-") }
+def bundledModsJson = groovy.json.JsonOutput.toJson(
+        bundledModJars.collect { [file: "META-INF/jars/${it.name}"] }
+)
+
+
+repositories {
+    // Add repositories to retrieve artifacts from in here.
+    // You should only use this when depending on other mods because
+    // Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
+    // See https://docs.gradle.org/current/userguide/declaring_repositories.html
+    // for more information about repositories.
+}
+
+loom {
+    mods {
+        "blade" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+
+dependencies {
+    // To change the versions see the gradle.properties file
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    implementation "com.github.weisj:jsvg:2.1.0"
+    include("com.github.weisj:jsvg:2.1.0") {
+        exclude group: "org.apache.xmlgraphics"
+        exclude group: "org.junit.jupiter"
+        exclude group: "com.github.weisj", module: "image-comparison"
+    }
+
+    bundledModJars.each { bundledModJar ->
+        localRuntime(files(bundledModJar))
+    }
+    if (baritoneModJar != null) {
+        compileOnly(files(baritoneModJar))
+    }
+
+    compileOnly "org.projectlombok:lombok:1.18.46"
+    annotationProcessor "org.projectlombok:lombok:1.18.46"
+
+    testImplementation platform("org.junit:junit-bom:5.12.2")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+    useJUnitPlatform()
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraft_version", project.minecraft_version
+    inputs.property "loader_version", project.loader_version
+    inputs.property "bundled_mods_json", bundledModsJson
+    filteringCharset "UTF-8"
+
+    // Local copies keep the execution-time closures configuration-cache safe
+    // (no 'project' access during the execution phase).
+    def modVersion = project.version.toString()
+    def minecraftVersion = project.minecraft_version.toString()
+    def loaderVersion = project.loader_version.toString()
+    filesMatching("fabric.mod.json") {
+        expand "version": modVersion,
+                "minecraft_version": minecraftVersion,
+                "loader_version": loaderVersion
+    }
+
+    // The source fabric.mod.json stays valid JSON ("jars": []); the real
+    // bundled jar list is injected into the processed output here.
+    def resolvedBundledModsJson = bundledModsJson
+    doLast { task ->
+        def modJsonFile = new File(task.destinationDir, "fabric.mod.json")
+        if (modJsonFile.exists()) {
+            def slurper = new groovy.json.JsonSlurper()
+            def modJson = slurper.parse(modJsonFile, "UTF-8")
+            modJson.jars = slurper.parseText(resolvedBundledModsJson)
+            modJsonFile.setText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(modJson)), "UTF-8")
+        }
+    }
+}
+
+// Offline GLSL validation of the bundled shaders; skipped when glslang is not installed.
+tasks.register("validateShaders", Exec) {
+    group = "verification"
+    description = "Validates blade shaders with glslang (skipped if glslang is not on PATH)."
+    inputs.dir("src/main/resources/assets/blade/shaders")
+    inputs.file("scripts/validate_shaders.py")
+    commandLine "python3", "scripts/validate_shaders.py"
+    onlyIf {
+        def path = System.getenv("PATH") ?: ""
+        path.split(File.pathSeparator).any { dir ->
+            new File(dir, "glslang").canExecute() || new File(dir, "glslang.exe").canExecute()
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn "validateShaders"
+}
+
+def targetJavaVersion = 25
+tasks.withType(JavaCompile).configureEach {
+    // ensure that the encoding is set to UTF-8, no matter what the system default is
+    // this fixes some edge cases with special characters not displaying correctly
+    // see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
+    // If Javadoc is generated, this must be specified in that task too.
+    it.options.encoding = "UTF-8"
+    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+        it.options.release.set(targetJavaVersion)
+    }
+}
+
+java {
+    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
+    // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
+    // if it is present.
+    // If you remove this line, sources will not be generated.
+    withSourcesJar()
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${project.archives_base_name}" }
+    }
+    from("third-party/baritone") {
+        include "LICENSE-LGPL-3.0.txt", "SOURCE.md"
+        into "META-INF/licenses/baritone"
+    }
+
+    if (!bundledModJars.isEmpty()) {
+        from(bundledModJars) {
+            into "META-INF/jars"
+        }
+    }
+}
+
+// configure the maven publication
+publishing {
+    publications {
+        create("mavenJava", MavenPublication) {
+            artifactId = project.archives_base_name
+            from components.java
+        }
+    }
+
+    // See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
+    repositories {
+        // Add repositories to publish to here.
+        // Notice: This block does NOT have the same function as the block in the top level.
+        // The repositories here will be used for publishing your artifact, not for
+        // retrieving dependencies.
+    }
+}

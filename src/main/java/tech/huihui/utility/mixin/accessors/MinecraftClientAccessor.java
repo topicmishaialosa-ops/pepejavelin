@@ -2,7 +2,10 @@ package tech.huihui.utility.mixin.accessors;
 
 import com.mojang.authlib.minecraft.MinecraftSessionService;
 import com.mojang.authlib.minecraft.UserApiService;
+import net.minecraft.client.Keyboard;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Mouse;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.session.ProfileKeys;
 import net.minecraft.client.session.Session;
 import net.minecraft.client.session.report.AbuseReportContext;
@@ -36,4 +39,13 @@ public interface MinecraftClientAccessor {
    @Mutable
    @Accessor("abuseReportContext")
    void setAbuseReportContext(AbuseReportContext abuseReportContext);
+
+   @Accessor("keyboard")
+   Keyboard getKeyboard();
+
+   @Accessor("mouse")
+   Mouse getMouse();
+
+   @Accessor("currentScreen")
+   void setCurrentScreen(Screen screen);
 }

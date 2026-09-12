@@ -10,6 +10,7 @@ import tech.huihui.base.font.Fonts;
 import tech.huihui.base.lang.Lang;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
+import tech.huihui.client.hud.elements.style.HudStyle2;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.utility.render.display.Keyboard;
@@ -32,6 +33,10 @@ public class KeybindsComponent extends DraggableHudElement {
 
    @Native
    public void render(CustomDrawContext ctx) {
+      if (Interface.INSTANCE.hudStyle.is("Стиль 2")) {
+         this.renderStyle2(ctx);
+         return;
+      }
       float posX = this.getX();
       float posY = this.getY();
       float spacing = Interface.INSTANCE.hudSpacing.getCurrent();
@@ -103,5 +108,56 @@ public class KeybindsComponent extends DraggableHudElement {
       this.widthAnimation.update(defaultWidth);
       this.width = this.widthAnimation.getValue();
       this.height = height;
+   }
+
+   private void renderStyle2(CustomDrawContext ctx) {
+      float posX = this.getX();
+      float posY = this.getY();
+      float spacing = Interface.INSTANCE.hudSpacing.getCurrent();
+      float alpha = 255.0F;
+      boolean isFound = false;
+      for (Module module : HuihuiClient.getInstance().getModuleManager().getModules()) {
+         if (module.isEnabled() && module.getKeyCode() != -1) {
+            isFound = true;
+            break;
+         }
+      }
+      if (!isFound && !(mc.currentScreen instanceof ChatScreen)) alpha = 0.0F;
+      if (mc.currentScreen instanceof ChatScreen) alpha = 255.0F;
+
+      float headerH = 18.0F;
+      float itemH = spacing;
+      float contentH = 0.0F;
+      for (Module module : HuihuiClient.getInstance().getModuleManager().getModules()) {
+         if (module.getAnimation().getValue() != 0.0F && module.getKeyCode() != -1) {
+            contentH += module.getAnimation().getValue();
+         }
+      }
+      float totalH = headerH + contentH * itemH;
+      float w = 90.0F;
+
+      HudStyle2.drawHeader(ctx, "\uf11c", "Hot-Keys", posX, posY, w, alpha, HudStyle2.ACCENT);
+      posY += headerH;
+
+      for (Module module : HuihuiClient.getInstance().getModuleManager().getModules()) {
+         if (module.getAnimation().getValue() == 0.0F || module.getKeyCode() == -1) continue;
+         String bind = Keyboard.getKeyName(module.getKeyCode());
+         String moduleName = module.getName();
+         float a = alpha * module.getAnimation().getValue();
+
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), posX + 2.0F, posY, w - 4.0F, itemH, HudStyle2.RADIUS_SM,
+            HudStyle2.CARD_BG.withAlpha((int)(a * 0.8F)));
+         ctx.drawText(Fonts.ICONS.getFont(5.0F), module.getCategory().getIcon(), posX + 5.0F,
+            posY + (itemH - 5.0F) / 2.0F, HudStyle2.ACCENT.withAlpha((int)(a)));
+         ctx.drawText(Fonts.REGULAR.getFont(6.5F), moduleName, posX + 14.0F,
+            posY + (itemH - 6.5F) / 2.0F, HudStyle2.TEXT_PRIMARY.withAlpha((int)(a)));
+         float bindWidth = Fonts.REGULAR.getWidth(bind, 6.5F);
+         ctx.drawText(Fonts.REGULAR.getFont(6.5F), bind, posX + w - bindWidth - 6.0F,
+            posY + (itemH - 6.5F) / 2.0F, HudStyle2.TEXT_SECONDARY.withAlpha((int)(a)));
+         posY += itemH * module.getAnimation().getValue();
+      }
+
+      this.width = w;
+      this.height = totalH;
    }
 }

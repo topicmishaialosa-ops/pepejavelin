@@ -16,6 +16,7 @@ import tech.huihui.base.font.Fonts;
 import tech.huihui.base.lang.Lang;
 import tech.huihui.base.theme.Theme;
 import tech.huihui.client.hud.elements.draggable.DraggableHudElement;
+import tech.huihui.client.hud.elements.style.HudStyle2;
 import tech.huihui.client.modules.api.Module;
 import tech.huihui.client.modules.impl.render.Interface;
 import tech.huihui.utility.render.display.base.BorderRadius;
@@ -74,35 +75,39 @@ public class NotifyComponent extends DraggableHudElement {
       float notificationHeight = 12.0F;
       float x = (float)mc.getWindow().getScaledWidth() / 2.0F - 44.0F;
       float y = (float)mc.getWindow().getScaledHeight() / 2.0F + 16.0F;
-      DrawUtil.drawBlur(ctx.getMatrices(), x + 0.5F, y, 88.0F, notificationHeight, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, 255.0F * this.toggleAnimation.getValue()));
-      ColorRGBA color = new ColorRGBA(76, 255, 76);
-      String icon = "\uf058";
-      if (System.currentTimeMillis() % 2500L > 500L) {
-         icon = "\uf057";
-         color = new ColorRGBA(255, 76, 76);
-      }
 
-      if (System.currentTimeMillis() % 2500L > 1000L) {
-         icon = "\uf06a";
-         color = new ColorRGBA(255, 234, 13);
+      if (Interface.INSTANCE.hudStyle.is("Стиль 2")) {
+         HudStyle2.drawCard(ctx, x - 2.0F, y, 92.0F, notificationHeight, 255.0F * this.toggleAnimation.getValue());
+         ColorRGBA color2 = new ColorRGBA(76, 255, 76);
+         String icon2 = "\uf058";
+         if (System.currentTimeMillis() % 2500L > 500L) { icon2 = "\uf057"; color2 = new ColorRGBA(255, 76, 76); }
+         if (System.currentTimeMillis() % 2500L > 1000L) { icon2 = "\uf06a"; color2 = new ColorRGBA(255, 234, 13); }
+         if (System.currentTimeMillis() % 2500L > 1500L) { icon2 = "\uf05a"; color2 = ColorRGBA.WHITE; }
+         if (System.currentTimeMillis() % 2500L > 2000L) {
+            icon2 = "";
+            ctx.drawTexture(Identifier.of("minecraft", "textures/item/totem_of_undying.png"), x + 3.15F, y + 2.0F, 8.0F, 8.0F, ColorRGBA.WHITE.withAlpha(this.toggleAnimation.getValue() * 255.0F));
+         }
+         if (System.currentTimeMillis() % 2500L < 2000L) {
+            ctx.drawText(iconFont, icon2, x + (14.5F - iconFont.width(icon2)) / 2.0F, y + 0.25F + (notificationHeight - iconFont.height()) / 2.0F, color2.withAlpha(255.0F * this.toggleAnimation.getValue()));
+         }
+         ctx.drawText(textFont, this.t("Пример уведомления", "Example notification", "示例通知"), x + 17.0F, y + (12.0F - textFont.height()) / 2.0F, ColorRGBA.WHITE.withAlpha(255.0F * this.toggleAnimation.getValue()));
+      } else {
+         DrawUtil.drawBlur(ctx.getMatrices(), x + 0.5F, y, 88.0F, notificationHeight, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, 255.0F * this.toggleAnimation.getValue()));
+         ColorRGBA color = new ColorRGBA(76, 255, 76);
+         String icon = "\uf058";
+         if (System.currentTimeMillis() % 2500L > 500L) { icon = "\uf057"; color = new ColorRGBA(255, 76, 76); }
+         if (System.currentTimeMillis() % 2500L > 1000L) { icon = "\uf06a"; color = new ColorRGBA(255, 234, 13); }
+         if (System.currentTimeMillis() % 2500L > 1500L) { icon = "\uf05a"; color = new ColorRGBA(255, 255, 255); }
+         if (System.currentTimeMillis() % 2500L > 2000L) {
+            icon = "";
+            ctx.drawTexture(Identifier.of("minecraft", "textures/item/totem_of_undying.png"), x + 3.15F, y + 2.0F, 8.0F, 8.0F, ColorRGBA.WHITE.withAlpha(this.toggleAnimation.getValue() * 255.0F));
+         }
+         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 13.0F, y + 1.0F, 0.5F, notificationHeight - 1.5F, BorderRadius.all(0.0F), new ColorRGBA(166, 166, 166, 255.0F * this.toggleAnimation.getValue()));
+         if (System.currentTimeMillis() % 2500L < 2000L) {
+            ctx.drawText(iconFont, icon, x + (14.5F - iconFont.width(icon)) / 2.0F, y + 0.25F + (notificationHeight - iconFont.height()) / 2.0F, color.withAlpha(255.0F * this.toggleAnimation.getValue()));
+         }
+         ctx.drawText(textFont, this.t("Пример уведомления", "Example notification", "示例通知"), x + 17.0F, y + (12.0F - textFont.height()) / 2.0F, ColorRGBA.WHITE.withAlpha(255.0F * this.toggleAnimation.getValue()));
       }
-
-      if (System.currentTimeMillis() % 2500L > 1500L) {
-         icon = "\uf05a";
-         color = new ColorRGBA(255, 255, 255);
-      }
-
-      if (System.currentTimeMillis() % 2500L > 2000L) {
-         icon = "";
-         ctx.drawTexture(Identifier.of("minecraft", "textures/item/totem_of_undying.png"), x + 3.15F, y + 2.0F, 8.0F, 8.0F, ColorRGBA.WHITE.withAlpha(this.toggleAnimation.getValue() * 255.0F));
-      }
-
-      DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 13.0F, y + 1.0F, 0.5F, notificationHeight - 1.5F, BorderRadius.all(0.0F), new ColorRGBA(166, 166, 166, 255.0F * this.toggleAnimation.getValue()));
-      if (System.currentTimeMillis() % 2500L < 2000L) {
-         ctx.drawText(iconFont, icon, x + (14.5F - iconFont.width(icon)) / 2.0F, y + 0.25F + (notificationHeight - iconFont.height()) / 2.0F, color.withAlpha(255.0F * this.toggleAnimation.getValue()));
-      }
-
-      ctx.drawText(textFont, this.t("Пример уведомления", "Example notification", "示例通知"), x + 17.0F, y + (12.0F - textFont.height()) / 2.0F, ColorRGBA.WHITE.withAlpha(255.0F * this.toggleAnimation.getValue()));
 
       NotifyComponent.BaseNotification n;
       float spacing = Interface.INSTANCE.hudSpacing.getCurrent();
@@ -157,15 +162,27 @@ public class NotifyComponent extends DraggableHudElement {
          Font iconFont = Fonts.ICONS2.getFont(6.75F);
          String icon = this.enabled ? "\uf058" : "\uf057";
          x -= width / 2.0F;
-         DrawUtil.drawBlur(ctx.getMatrices(), x, y, width, notificationHeight, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, this.alphaAnimation.getValue() * 255.0F));
-         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 13.0F, y + 1.0F, 0.5F, notificationHeight - 1.5F, BorderRadius.all(0.0F), new ColorRGBA(166, 166, 166, this.alphaAnimation.getValue() * 255.0F));
-         float iconX = x + (14.5F - iconFont.width(icon)) / 2.0F;
-         float iconY = y + 0.25F + (notificationHeight - iconFont.height()) / 2.0F;
-         ctx.drawText(iconFont, icon, iconX, iconY, textColor);
-         float textX = x + iconBgWidth;
-         float textY = y + (notificationHeight - textFont.height()) / 2.0F;
-         ctx.drawText(textFont, moduleName, textX - 1.0F, textY, ColorRGBA.WHITE.withAlpha(this.alphaAnimation.getValue() * 255.0F));
-         ctx.drawText(textFont, statusText, textX - 1.0F + moduleNameWidth, textY, textColor);
+
+         if (Interface.INSTANCE.hudStyle.is("Стиль 2")) {
+            HudStyle2.drawCard(ctx, x - 2.0F, y, width + 4.0F, notificationHeight, this.alphaAnimation.getValue() * 255.0F);
+            float iconX = x + (14.5F - iconFont.width(icon)) / 2.0F;
+            float iconY = y + 0.25F + (notificationHeight - iconFont.height()) / 2.0F;
+            ctx.drawText(iconFont, icon, iconX, iconY, textColor);
+            float textX = x + iconBgWidth;
+            float textY = y + (notificationHeight - textFont.height()) / 2.0F;
+            ctx.drawText(textFont, moduleName, textX - 1.0F, textY, ColorRGBA.WHITE.withAlpha(this.alphaAnimation.getValue() * 255.0F));
+            ctx.drawText(textFont, statusText, textX - 1.0F + moduleNameWidth, textY, textColor);
+         } else {
+            DrawUtil.drawBlur(ctx.getMatrices(), x, y, width, notificationHeight, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, this.alphaAnimation.getValue() * 255.0F));
+            DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 13.0F, y + 1.0F, 0.5F, notificationHeight - 1.5F, BorderRadius.all(0.0F), new ColorRGBA(166, 166, 166, this.alphaAnimation.getValue() * 255.0F));
+            float iconX = x + (14.5F - iconFont.width(icon)) / 2.0F;
+            float iconY = y + 0.25F + (notificationHeight - iconFont.height()) / 2.0F;
+            ctx.drawText(iconFont, icon, iconX, iconY, textColor);
+            float textX = x + iconBgWidth;
+            float textY = y + (notificationHeight - textFont.height()) / 2.0F;
+            ctx.drawText(textFont, moduleName, textX - 1.0F, textY, ColorRGBA.WHITE.withAlpha(this.alphaAnimation.getValue() * 255.0F));
+            ctx.drawText(textFont, statusText, textX - 1.0F + moduleNameWidth, textY, textColor);
+         }
       }
    }
 
@@ -192,14 +209,25 @@ public class NotifyComponent extends DraggableHudElement {
          Font iconFont = Fonts.ICONS2.getFont(6.75F);
          String icon = this.icon;
          x -= width / 2.0F;
-         DrawUtil.drawBlur(ctx.getMatrices(), x, y, width, notificationHeight, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, this.alphaAnimation.getValue() * 255.0F));
-         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 13.0F, y + 1.0F, 0.5F, notificationHeight - 1.5F, BorderRadius.all(0.0F), new ColorRGBA(166, 166, 166, this.alphaAnimation.getValue() * 255.0F));
-         float iconX = x + (14.5F - iconFont.width(icon)) / 2.0F;
-         float iconY = y + 0.25F + (notificationHeight - iconFont.height()) / 2.0F;
-         ctx.drawText(iconFont, icon, iconX, iconY, textColor);
-         float textX = x + iconBgWidth + 3.0F;
-         float textY = y + (notificationHeight - textFont.height()) / 2.0F;
-         ctx.drawText(textFont, moduleName, textX + (spectate ? 5.5F : 0.0F), textY, this.alphaAnimation.getValue() * 255.0F);
+
+         if (Interface.INSTANCE.hudStyle.is("Стиль 2")) {
+            HudStyle2.drawCard(ctx, x - 2.0F, y, width + 4.0F, notificationHeight, this.alphaAnimation.getValue() * 255.0F);
+            float iconX = x + (14.5F - iconFont.width(icon)) / 2.0F;
+            float iconY = y + 0.25F + (notificationHeight - iconFont.height()) / 2.0F;
+            ctx.drawText(iconFont, icon, iconX, iconY, textColor);
+            float textX = x + iconBgWidth + 3.0F;
+            float textY = y + (notificationHeight - textFont.height()) / 2.0F;
+            ctx.drawText(textFont, moduleName, textX + (spectate ? 5.5F : 0.0F), textY, this.alphaAnimation.getValue() * 255.0F);
+         } else {
+            DrawUtil.drawBlur(ctx.getMatrices(), x, y, width, notificationHeight, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, this.alphaAnimation.getValue() * 255.0F));
+            DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 13.0F, y + 1.0F, 0.5F, notificationHeight - 1.5F, BorderRadius.all(0.0F), new ColorRGBA(166, 166, 166, this.alphaAnimation.getValue() * 255.0F));
+            float iconX = x + (14.5F - iconFont.width(icon)) / 2.0F;
+            float iconY = y + 0.25F + (notificationHeight - iconFont.height()) / 2.0F;
+            ctx.drawText(iconFont, icon, iconX, iconY, textColor);
+            float textX = x + iconBgWidth + 3.0F;
+            float textY = y + (notificationHeight - textFont.height()) / 2.0F;
+            ctx.drawText(textFont, moduleName, textX + (spectate ? 5.5F : 0.0F), textY, this.alphaAnimation.getValue() * 255.0F);
+         }
       }
    }
 
@@ -222,15 +250,23 @@ public class NotifyComponent extends DraggableHudElement {
          float moduleNameWidth = textFont.width(moduleName);
          float width = iconBgWidth + 4.0F + moduleNameWidth;
          x -= width / 2.0F;
-         DrawUtil.drawBlur(ctx.getMatrices(), x, y, width, notificationHeight, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, this.alphaAnimation.getValue() * 255.0F));
-         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 13.0F, y + 1.0F, 0.5F, notificationHeight - 1.5F, BorderRadius.all(0.0F), new ColorRGBA(166, 166, 166, this.alphaAnimation.getValue() * 255.0F));
-         float iconX = x + 3.15F;
-         float iconY = y + 2.0F;
-         ctx.drawTexture(Identifier.of("minecraft", "textures/item/totem_of_undying.png"), iconX, iconY, 8.0F, 8.0F, ColorRGBA.WHITE.withAlpha(this.alphaAnimation.getValue() * 255.0F));
-         float textX = x + iconBgWidth - 14.0F;
-         float textY = y + (notificationHeight - textFont.height()) / 2.0F;
-         ctx.drawText(textFont, moduleName, textX, textY, ColorRGBA.WHITE.withAlpha(this.alphaAnimation.getValue() * 255.0F));
-         DrawUtil.drawRoundedRect(ctx.getMatrices(), x + width - 10.0F, y + 3.5F, 5.0F, 5.0F, BorderRadius.all(2.0F), new ColorRGBA(this.enchanted ? 32 : 255, this.enchanted ? 255 : 32, 32, this.alphaAnimation.getValue() * 255.0F));
+
+         if (Interface.INSTANCE.hudStyle.is("Стиль 2")) {
+            HudStyle2.drawCard(ctx, x - 2.0F, y, width + 4.0F, notificationHeight, this.alphaAnimation.getValue() * 255.0F);
+            ctx.drawTexture(Identifier.of("minecraft", "textures/item/totem_of_undying.png"), x + 3.15F, y + 2.0F, 8.0F, 8.0F, ColorRGBA.WHITE.withAlpha(this.alphaAnimation.getValue() * 255.0F));
+            float textX = x + iconBgWidth - 14.0F;
+            float textY = y + (notificationHeight - textFont.height()) / 2.0F;
+            ctx.drawText(textFont, moduleName, textX, textY, ColorRGBA.WHITE.withAlpha(this.alphaAnimation.getValue() * 255.0F));
+            DrawUtil.drawRoundedRect(ctx.getMatrices(), x + width - 10.0F, y + 3.5F, 5.0F, 5.0F, BorderRadius.all(2.0F), new ColorRGBA(this.enchanted ? 32 : 255, this.enchanted ? 255 : 32, 32, this.alphaAnimation.getValue() * 255.0F));
+         } else {
+            DrawUtil.drawBlur(ctx.getMatrices(), x, y, width, notificationHeight, 11.0F, BorderRadius.all(3.0F), new ColorRGBA(80, 80, 80, this.alphaAnimation.getValue() * 255.0F));
+            DrawUtil.drawRoundedRect(ctx.getMatrices(), x + 13.0F, y + 1.0F, 0.5F, notificationHeight - 1.5F, BorderRadius.all(0.0F), new ColorRGBA(166, 166, 166, this.alphaAnimation.getValue() * 255.0F));
+            ctx.drawTexture(Identifier.of("minecraft", "textures/item/totem_of_undying.png"), x + 3.15F, y + 2.0F, 8.0F, 8.0F, ColorRGBA.WHITE.withAlpha(this.alphaAnimation.getValue() * 255.0F));
+            float textX = x + iconBgWidth - 14.0F;
+            float textY = y + (notificationHeight - textFont.height()) / 2.0F;
+            ctx.drawText(textFont, moduleName, textX, textY, ColorRGBA.WHITE.withAlpha(this.alphaAnimation.getValue() * 255.0F));
+            DrawUtil.drawRoundedRect(ctx.getMatrices(), x + width - 10.0F, y + 3.5F, 5.0F, 5.0F, BorderRadius.all(2.0F), new ColorRGBA(this.enchanted ? 32 : 255, this.enchanted ? 255 : 32, 32, this.alphaAnimation.getValue() * 255.0F));
+         }
       }
    }
 

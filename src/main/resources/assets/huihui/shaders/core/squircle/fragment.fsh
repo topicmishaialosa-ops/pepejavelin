@@ -9,6 +9,7 @@ uniform vec2 Size;
 uniform vec4 Radius;
 uniform float Smoothness;
 uniform float CornerSmoothness;
+uniform float Style; // 0 = скруглённые углы, 1 = срезанные углы
 uniform vec4 ColorModulator;
 
 out vec4 OutColor;
@@ -27,12 +28,14 @@ float roundedBoxSDF(vec2 p, vec2 b, vec4 r, float smoothness) {
 void main() {
     vec2 center = Size * 0.5;
 
-    float distance = roundedBoxSDF(
+    float distRounded = roundedBoxSDF(
         center - (FragCoord * Size),
         center - 1.0,
         Radius,
         CornerSmoothness
     );
+    float distCut = cutCornerSDF(center - (FragCoord * Size), center - 1.0, cutLegFromRadius(Radius));
+    float distance = mix(distRounded, distCut, Style);
 
     float alpha = 1.0 - smoothstep(1.0 - Smoothness, 1.0, distance);
     vec4 finalColor = vec4(FragColor.rgb, FragColor.a * alpha);

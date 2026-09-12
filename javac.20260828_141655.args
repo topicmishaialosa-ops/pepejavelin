@@ -1,0 +1,5 @@
+-cp
+/home/krasava/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged/1.21.4-net.fabricmc.yarn.1_21_4.1.21.4+build.8-v2/minecraft-merged-1.21.4-net.fabricmc.yarn.1_21_4.1.21.4+build.8-v2.jar:/home/krasava/.minecraft/mods/huihuiclient-0.4.2-dev.jar
+-d
+/tmp/sccheck
+scripts/examples/AresMinePvPWarpChestAuto.java

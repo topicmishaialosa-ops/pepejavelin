@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "blade",
+  "version": "${version}",
+  "name": "blade",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/blade/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "org.blade.Blade"
+    ]
+  },
+  "jars": [],
+  "mixins": [
+    "blade.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "baritone": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}

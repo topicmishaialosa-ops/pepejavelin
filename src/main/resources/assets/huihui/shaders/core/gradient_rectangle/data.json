@@ -9,6 +9,7 @@
         { "name": "Radius", "type": "float", "count": 4, "values": [ 0.0, 0.0, 0.0, 0.0 ] },
         { "name": "ColorModulator", "type": "float", "count": 4, "values": [ 1.0, 1.0, 1.0, 1.0 ] },
         { "name": "Smoothness", "type": "float", "count": 1, "values": [ 1.0 ] },
+        { "name": "Style", "type": "float", "count": 1, "values": [ 0.0 ] },
         { "name": "TopLeftColor", "type": "float", "count": 4, "values": [ 1.0, 1.0, 1.0, 1.0 ] },
         { "name": "BottomLeftColor", "type": "float", "count": 4, "values": [ 1.0, 1.0, 1.0, 1.0 ] },
         { "name": "TopRightColor", "type": "float", "count": 4, "values": [ 1.0, 1.0, 1.0, 1.0 ] },

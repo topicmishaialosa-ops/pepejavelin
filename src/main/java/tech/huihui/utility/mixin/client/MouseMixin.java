@@ -20,6 +20,8 @@ import tech.huihui.base.events.impl.input.EventKey;
 import tech.huihui.base.events.impl.input.EventMouse;
 import tech.huihui.base.events.impl.input.EventMouseRotation;
 import tech.huihui.base.events.impl.player.EventLook;
+import tech.huihui.base.bots.InstanceBotManager;
+import tech.huihui.client.screens.bots.InstanceBotScreen;
 import tech.huihui.utility.interfaces.IMinecraft;
 
 @Mixin({Mouse.class})
@@ -48,6 +50,21 @@ public class MouseMixin {
          EventManager.call(new EventMouse(button, action));
       }
 
+   }
+
+   @Inject(
+      method = {"onCursorPos"},
+      at = {@At("HEAD")}
+   )
+   private void onCursorPosHook(long window, double x, double y, CallbackInfo ci) {
+      if (window != IMinecraft.mc.getWindow().getHandle()) {
+         return;
+      }
+      if (InstanceBotManager.INSTANCE.isFocused()
+         && IMinecraft.mc.currentScreen instanceof InstanceBotScreen
+         && !InstanceBotManager.INSTANCE.isChatOpen()) {
+         InstanceBotManager.INSTANCE.addRawCursorDelta(x, y);
+      }
    }
 
    @Inject(

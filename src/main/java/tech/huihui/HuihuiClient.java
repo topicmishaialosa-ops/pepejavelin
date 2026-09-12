@@ -95,6 +95,7 @@ public enum HuihuiClient implements ClientModInitializer {
          this.moduleManager = new ModuleManager();
          this.configManager = new ConfigManager();
           this.commandManager = new CommandManager();
+         tech.huihui.base.bots.InstanceBotManager.INSTANCE.init();
           tech.huihui.client.script.ScriptManager.init();
          this.scriptManager = new ScriptManager();
          this.waypointManager = new WaypointManager();

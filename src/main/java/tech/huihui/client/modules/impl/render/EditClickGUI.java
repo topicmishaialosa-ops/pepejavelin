@@ -38,6 +38,9 @@ public final class EditClickGUI extends Module {
    });
    private final NumberSetting scrollSpeed = new NumberSetting("Скорость скролла", 12.0F, 1.0F, 60.0F, 1.0F);
    private final NumberSetting scrollElasticity = new NumberSetting("Упругость скролла", 0.0F, 0.0F, 100.0F, 1.0F);
+   private final BooleanSetting panelEnabled = new BooleanSetting("Панель конфигов/скриптов", true);
+   private final ModeSetting panelPosition = new ModeSetting("Позиция панели", "Слева", "Справа");
+   private final NumberSetting panelWidth = new NumberSetting("Ширина панели", 165.0F, 120.0F, 240.0F, 5.0F);
 
    private EditClickGUI() {
    }
@@ -150,5 +153,20 @@ public final class EditClickGUI extends Module {
    @Generated
    public NumberSetting getScrollElasticitySetting() {
       return this.scrollElasticity;
+   }
+
+   @Generated
+   public BooleanSetting getPanelEnabled() {
+      return this.panelEnabled;
+   }
+
+   @Generated
+   public ModeSetting getPanelPosition() {
+      return this.panelPosition;
+   }
+
+   @Generated
+   public NumberSetting getPanelWidth() {
+      return this.panelWidth;
    }
 }

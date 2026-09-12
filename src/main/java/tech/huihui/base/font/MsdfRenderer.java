@@ -3,6 +3,8 @@ package tech.huihui.base.font;
 import com.mojang.blaze3d.systems.RenderSystem;
 import java.util.Iterator;
 import java.util.List;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import lombok.Generated;
 import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.render.BufferBuilder;
@@ -17,6 +19,55 @@ import tech.huihui.utility.render.display.base.Gradient;
 import tech.huihui.utility.render.display.base.color.ColorRGBA;
 
 public final class MsdfRenderer {
+   private static final Map<MsdfFont, Tessellator> batchTessellators = new IdentityHashMap<>();
+   private static final Map<MsdfFont, BufferBuilder> activeBuilders = new IdentityHashMap<>();
+   private static boolean batching = false;
+
+   public static void beginTextBatch() {
+      batching = true;
+      activeBuilders.clear();
+   }
+
+   public static void endTextBatch() {
+      if (!batching) {
+         return;
+      } else {
+         batching = false;
+         if (!activeBuilders.isEmpty()) {
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+            RenderSystem.disableCull();
+
+            for(Map.Entry<MsdfFont, BufferBuilder> entry : activeBuilders.entrySet()) {
+               MsdfFont font = entry.getKey();
+               BufferBuilder builder = entry.getValue();
+               BuiltBuffer builtBuffer = builder.endNullable();
+               if (builtBuffer != null) {
+                  RenderSystem.setShader(ShaderProgramKeys.POSITION_TEX_COLOR);
+                  RenderSystem.setShaderTexture(0, font.getBakedTextureId());
+                  BufferRenderer.drawWithGlobalProgram(builtBuffer);
+               }
+            }
+
+            RenderSystem.setShaderTexture(0, 0);
+            RenderSystem.enableCull();
+            RenderSystem.disableBlend();
+         }
+
+         activeBuilders.clear();
+      }
+   }
+
+   private static Tessellator getBatchTessellator(MsdfFont font) {
+      Tessellator tessellator = batchTessellators.get(font);
+      if (tessellator == null) {
+         tessellator = new Tessellator(1048576);
+         batchTessellators.put(font, tessellator);
+      }
+
+      return tessellator;
+   }
+
    public static void renderText(MsdfFont font, String text, float size, int color, Matrix4f matrix, float x, float y, float z) {
       renderText(font, text, size, color, matrix, x, y, z, false, 0.0F, 1.0F, 0.0F);
    }
@@ -24,6 +75,17 @@ public final class MsdfRenderer {
    public static void renderText(MsdfFont font, String text, float size, int color, Matrix4f matrix, float x, float y, float z, boolean enableFadeout, float fadeoutStart, float fadeoutEnd, float maxWidth) {
       float thickness = 0.05F;
       float spacing = 0.0F;
+      if (batching) {
+         BufferBuilder builder = activeBuilders.get(font);
+         if (builder == null) {
+            builder = getBatchTessellator(font).begin(DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
+            activeBuilders.put(font, builder);
+         }
+
+         font.applyGlyphs(matrix, builder, text, size, thickness * 0.5F * size, spacing, x - 0.75F, y + size * 0.7F, z, color, enableFadeout, fadeoutStart, fadeoutEnd, maxWidth);
+         return;
+      }
+
       RenderSystem.enableBlend();
       RenderSystem.defaultBlendFunc();
       RenderSystem.disableCull();

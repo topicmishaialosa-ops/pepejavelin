@@ -12,12 +12,17 @@ uniform vec4 ColorModulator;
 uniform float Progress;
 uniform float StripeWidth;
 uniform float Fade;
+uniform float Style; // 0 = скруглённые углы, 1 = срезанные углы
 
 out vec4 OutColor;
 
 void main() {
     vec2 center = Size * 0.5;
-    float distance = roundedBoxSDF(center - (FragCoord * Size), center - 1.0, Radius);
+    vec2 pos = center - (FragCoord * Size);
+    vec2 halfSize = center - 1.0;
+    float distRounded = roundedBoxSDF(pos, halfSize, Radius);
+    float distCut = cutCornerSDF(pos, halfSize, cutLegFromRadius(Radius));
+    float distance = mix(distRounded, distCut, Style);
     float alpha = 1.0 - smoothstep(1.0 - Smoothness, 1.0, distance);
 
     float diag = (FragCoord.x + FragCoord.y) * 0.5;

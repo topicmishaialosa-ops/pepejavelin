@@ -68,6 +68,7 @@ import tech.huihui.client.modules.impl.misc.PilotSettings;
 import tech.huihui.client.modules.impl.misc.ScoreboardHealth;
 import tech.huihui.client.modules.impl.misc.ServerHelper;
 import tech.huihui.client.modules.impl.misc.ZarabotokReallyWorld;
+import tech.huihui.client.modules.impl.misc.InstanceBot;
 import tech.huihui.client.modules.impl.movement.AirStuck;
 import tech.huihui.client.modules.impl.movement.AntiElytraTarget;
 import tech.huihui.client.modules.impl.movement.AutoSprint;
@@ -101,6 +102,7 @@ import tech.huihui.client.modules.impl.render.CustomModel;
 import tech.huihui.client.modules.impl.render.ClickGUI;
 import tech.huihui.client.modules.impl.render.EditClickGUI;
 import tech.huihui.client.modules.impl.render.EntityESP;
+import tech.huihui.client.modules.impl.render.FireFlyModule;
 import tech.huihui.client.modules.impl.render.FullBright;
 import tech.huihui.client.modules.impl.render.GlowHands;
 import tech.huihui.client.modules.impl.render.Interface;
@@ -213,6 +215,7 @@ public final class ModuleManager implements IMinecraft {
        registerModule(XRay.INSTANCE);
        registerModule(ScoreboardHud.INSTANCE);
        registerModule(WingsModule.INSTANCE);
+      registerModule(FireFlyModule.INSTANCE);
        registerModule(AnimalsModule.INSTANCE);
        registerModule(CustomHotbar.INSTANCE);
        registerModule(UseAnimation.INSTANCE);
@@ -259,8 +262,9 @@ public final class ModuleManager implements IMinecraft {
         registerModule(AutoWarden.INSTANCE);
         registerModule(BpAuto.INSTANCE);
         registerModule(ChestStealer.INSTANCE);
-        registerModule(VibeCoding.INSTANCE);
-     }
+         registerModule(VibeCoding.INSTANCE);
+         registerModule(InstanceBot.INSTANCE);
+      }
 
     private void registerModule(Module module) {
        modules.add(module);
