@@ -25,11 +25,11 @@ public final class MovingUtil {
         }
         float forward = (player.input.keyPresses.forward() ? 1.0F : (player.input.keyPresses.backward() ? -1.0F : 0.0F));
         float sideways = (player.input.keyPresses.right() ? 1.0F : (player.input.keyPresses.left() ? -1.0F : 0.0F));
-        double yaw = player.getYRot();
-        double sinYaw = Math.sin(Math.toRadians(yaw + 90.0D));
-        double cosYaw = Math.cos(Math.toRadians(yaw + 90.0D));
-        double x = (double)forward * velocity * cosYaw + (double)sideways * velocity * sinYaw;
-        double z = (double)forward * velocity * sinYaw - (double)sideways * velocity * cosYaw;
+        double radYaw = Math.toRadians(player.getYRot());
+        double sinYaw = Math.sin(radYaw);
+        double cosYaw = Math.cos(radYaw);
+        double x = (-forward * sinYaw - sideways * cosYaw) * velocity;
+        double z = (forward * cosYaw - sideways * sinYaw) * velocity;
         player.setDeltaMovement(x, player.getDeltaMovement().y, z);
     }
 }

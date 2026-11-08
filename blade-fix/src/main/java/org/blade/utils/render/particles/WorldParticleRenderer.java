@@ -154,7 +154,7 @@ public final class WorldParticleRenderer {
                         ? (throughWalls ? THROUGH_WALLS_PIPELINE : PIPELINE)
                         : (throughWalls ? ALPHA_THROUGH_WALLS_PIPELINE : ALPHA_PIPELINE);
                 pass.setPipeline(pipeline);
-                pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
+                pass.setUniform("Projection", Render3DUtil.levelProjectionBuffer());
                 pass.setUniform("WorldParticleUniforms", uniformBuffer);
                 pass.bindTexture("BloomSampler", bloomView, sampler);
                 pass.setVertexBuffer(0, vertexBuffer.slice());

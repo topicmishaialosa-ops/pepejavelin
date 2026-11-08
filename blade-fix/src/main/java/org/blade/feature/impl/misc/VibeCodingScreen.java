@@ -8,9 +8,14 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ArrayListDeque;
+import org.blade.context.RenderContext;
 import org.blade.menu.ui.controls.MenuClipboard;
 import org.blade.utils.ColorUtil;
 import org.blade.utils.ai.ZaiAi;
+import org.blade.utils.render.gui.Render2DUtil;
+import org.blade.utils.render.gui.TextAlign;
+import org.blade.utils.render.gui.UiFontStyle;
+import org.blade.utils.render.gui.UiFonts;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +24,13 @@ import java.util.Locale;
 public class VibeCodingScreen extends Screen {
     private static final int MAX_INPUT = 500;
     private static final int MAX_RETRIES = 4;
+
+    private static final float TS = 8.0F;
+    private static final float TS_TITLE = 9.5F;
+    private static final float R_PANEL = 12.0F;
+    private static final float R_CARD = 6.0F;
+    private static final float R_FIELD = 8.0F;
+    private static final float R_MODAL = 10.0F;
 
     private static final List<VibeSession> SESSIONS = new ArrayList<>();
     private static int activeSessionIdx = -1;
@@ -181,87 +193,108 @@ public class VibeCodingScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         this.openAnim += (1.0F - this.openAnim) * (this.style2 ? 0.15F : 0.18F);
-        if (this.openAnim > (this.style2 ? 0.995F : 0.997F)) {
-            this.openAnim = this.style2 ? 1.0F : 1.0F;
+        if (this.openAnim > 0.997F) {
+            this.openAnim = 1.0F;
         }
         float a = this.openAnim;
         Layout L = this.layout();
         int accent = this.module.accent.getValue();
 
-        gfx.fill(0, 0, this.width, this.height, ColorUtil.multiplyAlpha(this.COL_BG, a));
-        gfx.fill(L.px, L.py, L.px + L.pw, L.py + L.ph, ColorUtil.multiplyAlpha(this.COL_PANEL, a));
-        this.border(gfx, L.px, L.py, L.pw, L.ph, 1, ColorUtil.multiplyAlpha(this.COL_BORDER, a));
+        Minecraft mc = Minecraft.getInstance();
+        RenderContext.enter2D(mc.gui, gfx, null);
+        try {
+            Render2DUtil.beginFrame();
 
-        gfx.fill(L.px, L.py, L.px + L.sidebarW, L.py + L.ph, ColorUtil.multiplyAlpha(this.COL_SIDEBAR, a));
-        gfx.fill(L.px, L.py + L.sidebarHeaderH - 1, L.px + L.sidebarW, L.py + L.sidebarHeaderH,
-                ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 255, 255, 12), a));
+            r(0, 0, this.width, this.height, ColorUtil.multiplyAlpha(this.COL_BG, a), 0.0F);
 
-        gfx.text(this.font, "VibeCoding", L.px + 14, L.py + (L.sidebarHeaderH - 9) / 2, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+            Render2DUtil.rect(L.px, L.py, L.pw, L.ph)
+                    .color(ColorUtil.multiplyAlpha(this.COL_PANEL, a))
+                    .radius(R_PANEL)
+                    .shadow(ColorUtil.rgba(0, 0, 0, Math.round(140.0F * a)), 24.0F)
+                    .draw();
+            rb(L.px, L.py, L.pw, L.ph, ColorUtil.multiplyAlpha(this.COL_BORDER, a), R_PANEL, 1.0F);
 
-        boolean newHover = L.hitNewSession(mouseX, mouseY);
-        gfx.fill(L.newSessionX, L.newSessionY, L.newSessionX + L.newSessionW, L.newSessionY + L.newSessionH,
-                newHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(8.0F * a)));
-        this.border(gfx, L.newSessionX, L.newSessionY, L.newSessionW, L.newSessionH, 1,
-                ColorUtil.multiplyAlpha(this.COL_BORDER, a));
-        gfx.text(this.font, "+  Новая сессия", L.newSessionX + 12, L.newSessionY + (L.newSessionH - 9) / 2,
-                ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 255, 255, 200), a));
+            r4(L.px, L.py, L.sidebarW, L.ph, ColorUtil.multiplyAlpha(this.COL_SIDEBAR, a),
+                    R_PANEL, 0.0F, 0.0F, R_PANEL);
+            r(L.px, L.py + L.sidebarHeaderH - 1, L.sidebarW, 1,
+                    ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 255, 255, 12), a), 0.0F);
 
-        this.renderSessionList(gfx, L, accent, a, mouseX, mouseY);
-        this.renderProviderList(gfx, L, accent, a, mouseX, mouseY);
-        this.renderSidebarButtons(gfx, L, accent, a, mouseX, mouseY);
-        this.renderMessages(gfx, L, accent, a);
+            tt(L.px + 14, L.py + (L.sidebarHeaderH - TS_TITLE) / 2.0F, "VibeCoding",
+                    ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS_TITLE, UiFontStyle.SEMIBOLD);
 
-        gfx.fill(L.chatX, L.py + L.chatH - L.inputH - this.pad() * 2, L.chatX + L.chatW, L.py + L.chatH - L.inputH - this.pad() * 2 + 1,
-                ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 255, 255, 8), a));
+            boolean newHover = L.hitNewSession(mouseX, mouseY);
+            r(L.newSessionX, L.newSessionY, L.newSessionW, L.newSessionH,
+                    newHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(8.0F * a)),
+                    R_CARD);
+            rb(L.newSessionX, L.newSessionY, L.newSessionW, L.newSessionH,
+                    ColorUtil.multiplyAlpha(this.COL_BORDER, a), R_CARD, 1.0F);
+            tt(L.newSessionX + 12, L.newSessionY + (L.newSessionH - TS) / 2.0F, "+  Новая сессия",
+                    ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 255, 255, 200), a), TS, UiFontStyle.MEDIUM);
 
-        gfx.fill(L.inputX, L.inputY, L.inputX + L.inputW, L.inputY + L.inputH,
-                this.focused ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)));
-        int inputBorder = this.focused ? ColorUtil.withAlpha(accent, Math.round(180.0F * a)) : ColorUtil.multiplyAlpha(this.COL_BORDER, a);
-        this.border(gfx, L.inputX, L.inputY, L.inputW, L.inputH, 1, inputBorder);
+            this.renderSessionList(L, accent, a, mouseX, mouseY);
+            this.renderProviderList(L, accent, a, mouseX, mouseY);
+            this.renderSidebarButtons(L, accent, a, mouseX, mouseY);
+            this.renderMessages(L, accent, a);
 
-        String shown = this.input;
-        int start = 0;
-        while (start < shown.length() && this.font.width(shown.substring(start)) > L.inputW - 20) {
-            start++;
-        }
-        String visible = shown.substring(start);
-        int iy = L.inputY + (L.inputH - 9) / 2;
-        if (visible.isEmpty()) {
-            gfx.text(this.font, "Напиши запрос...", L.inputX + 12, iy, ColorUtil.multiplyAlpha(this.COL_TEXT_DARK, a));
-        } else {
-            gfx.text(this.font, visible, L.inputX + 12, iy, ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 255, 255, 245), a));
-        }
-        if (this.focused && (System.currentTimeMillis() / 500L) % 2L == 0L) {
-            int ci = Math.max(start, Math.min(this.cursor, shown.length()));
-            int cx = L.inputX + 12 + this.font.width(shown.substring(start, ci));
-            gfx.fill(cx, L.inputY + 8, cx + 1, L.inputY + L.inputH - 8, ColorUtil.multiplyAlpha(ColorUtil.WHITE, a));
-        }
+            r(L.chatX, L.py + L.chatH - L.inputH - this.pad() * 2, L.chatW, 1,
+                    ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 255, 255, 8), a), 0.0F);
 
-        boolean sendHover = L.hitSend(mouseX, mouseY) && !this.waiting;
-        int sendColor = sendHover ? ColorUtil.withAlpha(ColorUtil.multiplyRgb(accent, 1.15F), Math.round(255.0F * a)) : ColorUtil.withAlpha(accent, Math.round(230.0F * a));
-        gfx.fill(L.sendX, L.sendY, L.sendX + L.sendW, L.sendY + L.sendH, sendColor);
-        String sendLabel = this.waiting ? "..." : "Отправить";
-        gfx.centeredText(this.font, sendLabel, L.sendX + L.sendW / 2, L.sendY + (L.sendH - 9) / 2, ColorUtil.WHITE);
+            r(L.inputX, L.inputY, L.inputW, L.inputH,
+                    this.focused ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)),
+                    R_FIELD);
+            int inputBorder = this.focused ? ColorUtil.withAlpha(accent, Math.round(180.0F * a)) : ColorUtil.multiplyAlpha(this.COL_BORDER, a);
+            rb(L.inputX, L.inputY, L.inputW, L.inputH, inputBorder, R_FIELD, 1.0F);
 
-        boolean closeHover = L.hitClose(mouseX, mouseY);
-        gfx.fill(L.closeX, L.closeY, L.closeX + L.closeW, L.closeY + L.closeH,
-                closeHover ? ColorUtil.rgba(255, 80, 80, Math.round(40.0F * a)) : ColorUtil.rgba(255, 255, 255, Math.round(8.0F * a)));
-        gfx.centeredText(this.font, "x", L.closeX + L.closeW / 2, L.closeY + (L.closeH - 8) / 2,
-                closeHover ? ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 120, 120, 255), a) : ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a));
+            String shown = this.input;
+            int start = 0;
+            while (start < shown.length() && tw(shown.substring(start), TS, UiFontStyle.MEDIUM) > L.inputW - 20) {
+                start++;
+            }
+            String visible = shown.substring(start);
+            float iy = L.inputY + (L.inputH - TS) / 2.0F;
+            if (visible.isEmpty()) {
+                tt(L.inputX + 12, iy, "Напиши запрос...", ColorUtil.multiplyAlpha(this.COL_TEXT_DARK, a), TS, UiFontStyle.MEDIUM);
+            } else {
+                tt(L.inputX + 12, iy, visible, ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 255, 255, 245), a), TS, UiFontStyle.MEDIUM);
+            }
+            if (this.focused && (System.currentTimeMillis() / 500L) % 2L == 0L) {
+                int ci = Math.max(start, Math.min(this.cursor, shown.length()));
+                float cx = L.inputX + 12 + tw(shown.substring(start, ci), TS, UiFontStyle.MEDIUM);
+                r(cx, L.inputY + 8, 1, L.inputH - 16, ColorUtil.multiplyAlpha(ColorUtil.WHITE, a), 0.0F);
+            }
 
-        if (this.showingColorPicker) {
-            this.dragColorPicker(mouseX, mouseY);
-            this.renderColorPicker(gfx, accent, a, mouseX, mouseY);
-        }
-        if (this.showingApiKeyInput) {
-            this.renderApiKeyInput(gfx, accent, a, mouseX, mouseY);
-        }
-        if (this.showingModelSelector) {
-            this.renderModelSelector(gfx, accent, a, mouseX, mouseY);
+            boolean sendHover = L.hitSend(mouseX, mouseY) && !this.waiting;
+            int sendColor = sendHover ? ColorUtil.withAlpha(ColorUtil.multiplyRgb(accent, 1.15F), Math.round(255.0F * a)) : ColorUtil.withAlpha(accent, Math.round(230.0F * a));
+            r(L.sendX, L.sendY, L.sendW, L.sendH, sendColor, R_CARD);
+            ttMid(L.sendX + L.sendW / 2.0F, L.sendY + L.sendH / 2.0F, this.waiting ? "..." : "Отправить",
+                    ColorUtil.WHITE, TS, UiFontStyle.SEMIBOLD);
+
+            boolean closeHover = L.hitClose(mouseX, mouseY);
+            r(L.closeX, L.closeY, L.closeW, L.closeH,
+                    closeHover ? ColorUtil.rgba(255, 80, 80, Math.round(40.0F * a)) : ColorUtil.rgba(255, 255, 255, Math.round(8.0F * a)),
+                    7.0F);
+            ttMid(L.closeX + L.closeW / 2.0F, L.closeY + L.closeH / 2.0F, "x",
+                    closeHover ? ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 120, 120, 255), a) : ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a),
+                    TS, UiFontStyle.SEMIBOLD);
+
+            if (this.showingColorPicker) {
+                this.dragColorPicker(mouseX, mouseY);
+                this.renderColorPicker(accent, a, mouseX, mouseY);
+            }
+            if (this.showingApiKeyInput) {
+                this.renderApiKeyInput(accent, a, mouseX, mouseY);
+            }
+            if (this.showingModelSelector) {
+                this.renderModelSelector(accent, a, mouseX, mouseY);
+            }
+
+            Render2DUtil.flush();
+        } finally {
+            RenderContext.exit2D();
         }
     }
 
-    private void renderSessionList(GuiGraphicsExtractor gfx, Layout L, int accent, float a, int mx, int my) {
+    private void renderSessionList(Layout L, int accent, float a, int mx, int my) {
         int y = L.newSessionY + L.newSessionH + 8;
         int itemH = 34;
         int itemW = L.sidebarW - 24;
@@ -273,28 +306,29 @@ public class VibeCodingScreen extends Screen {
             boolean hover = this.isInside(mx, my, x, y, itemW, itemH);
 
             if (isActive) {
-                gfx.fill(x, y, x + itemW, y + itemH, ColorUtil.withAlpha(accent, Math.round(25.0F * a)));
-                this.border(gfx, x, y, itemW, itemH, 1, ColorUtil.withAlpha(accent, Math.round(60.0F * a)));
+                r(x, y, itemW, itemH, ColorUtil.withAlpha(accent, Math.round(25.0F * a)), R_CARD);
+                rb(x, y, itemW, itemH, ColorUtil.withAlpha(accent, Math.round(60.0F * a)), R_CARD, 1.0F);
             } else if (hover) {
-                gfx.fill(x, y, x + itemW, y + itemH, ColorUtil.rgba(255, 255, 255, Math.round(8.0F * a)));
+                r(x, y, itemW, itemH, ColorUtil.rgba(255, 255, 255, Math.round(8.0F * a)), R_CARD);
             }
 
             String label = s.getShortLabel();
-            gfx.text(this.font, label, x + 10, y + 8, isActive ? ColorUtil.withAlpha(accent, Math.round(255.0F * a)) : ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+            tt(x + 10, y + 7, label, isActive ? ColorUtil.withAlpha(accent, Math.round(255.0F * a)) : ColorUtil.multiplyAlpha(this.COL_TEXT, a),
+                    TS, UiFontStyle.MEDIUM);
 
             String meta = s.history.size() + " msgs";
-            gfx.text(this.font, meta, x + 10, y + 17, ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a));
+            tt(x + 10, y + 17, meta, ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a), TS, UiFontStyle.MEDIUM);
 
             y += itemH + 3;
         }
     }
 
-    private void renderProviderList(GuiGraphicsExtractor gfx, Layout L, int accent, float a, int mx, int my) {
+    private void renderProviderList(Layout L, int accent, float a, int mx, int my) {
         int x = L.px + 12;
         int itemW = L.sidebarW - 24;
         int y = L.newSessionY + L.newSessionH + 8 + (VibeCodingScreen.SESSIONS.size() * 37) + 14;
 
-        gfx.text(this.font, "ПРОВАЙДЕРЫ", x + 2, y, ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a));
+        tt(x + 2, y, "ПРОВАЙДЕРЫ", ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a), TS, UiFontStyle.SEMIBOLD);
         y += 12;
 
         ZaiAi.Provider active = this.module.getActiveProvider();
@@ -306,43 +340,46 @@ public class VibeCodingScreen extends Screen {
             boolean hover = this.isInside(mx, my, x, y, itemW, 28);
 
             if (isActive) {
-                gfx.fill(x, y, x + itemW, y + 28, ColorUtil.withAlpha(accent, Math.round(25.0F * a)));
-                this.border(gfx, x, y, itemW, 28, 1, ColorUtil.withAlpha(accent, Math.round(50.0F * a)));
+                r(x, y, itemW, 28, ColorUtil.withAlpha(accent, Math.round(25.0F * a)), R_CARD);
+                rb(x, y, itemW, 28, ColorUtil.withAlpha(accent, Math.round(50.0F * a)), R_CARD, 1.0F);
             } else if (hover) {
-                gfx.fill(x, y, x + itemW, y + 28, ColorUtil.rgba(255, 255, 255, Math.round(8.0F * a)));
+                r(x, y, itemW, 28, ColorUtil.rgba(255, 255, 255, Math.round(8.0F * a)), R_CARD);
             }
 
-            gfx.text(this.font, prov.getDisplayName(), x + 10, y + 6,
-                    isActive ? ColorUtil.withAlpha(accent, Math.round(255.0F * a)) : ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+            tt(x + 10, y + 5, prov.getDisplayName(),
+                    isActive ? ColorUtil.withAlpha(accent, Math.round(255.0F * a)) : ColorUtil.multiplyAlpha(this.COL_TEXT, a),
+                    TS, UiFontStyle.MEDIUM);
 
             if (isActive) {
                 String status = hasKey ? "connected" : "no key";
-                gfx.text(this.font, status, x + 10, y + 17,
-                        hasKey ? ColorUtil.multiplyAlpha(ColorUtil.rgb(100, 220, 140), Math.max(0.1F, a)) : ColorUtil.multiplyAlpha(ColorUtil.rgb(255, 140, 100), Math.max(0.1F, a)));
+                tt(x + 10, y + 16, status,
+                        hasKey ? ColorUtil.multiplyAlpha(ColorUtil.rgb(100, 220, 140), Math.max(0.1F, a)) : ColorUtil.multiplyAlpha(ColorUtil.rgb(255, 140, 100), Math.max(0.1F, a)),
+                        TS, UiFontStyle.MEDIUM);
             }
 
             y += 30;
         }
 
         y += 6;
-        gfx.text(this.font, "МОДЕЛЬ", x + 2, y, ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a));
+        tt(x + 2, y, "МОДЕЛЬ", ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a), TS, UiFontStyle.SEMIBOLD);
         y += 12;
 
         String currentModel = this.module.getActiveModel();
         boolean modelHover = this.isInside(mx, my, x, y, itemW, 28);
 
-        gfx.fill(x, y, x + itemW, y + 28, modelHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)));
-        this.border(gfx, x, y, itemW, 28, 1, ColorUtil.multiplyAlpha(this.COL_BORDER, a));
+        r(x, y, itemW, 28, modelHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)), R_CARD);
+        rb(x, y, itemW, 28, ColorUtil.multiplyAlpha(this.COL_BORDER, a), R_CARD, 1.0F);
 
         String displayModel = currentModel.length() > 22 ? currentModel.substring(0, 22) + "..." : currentModel;
-        gfx.text(this.font, displayModel, x + 10, y + 6, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+        tt(x + 10, y + 5, displayModel, ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.MEDIUM);
 
-        gfx.text(this.font, "\u25bc", x + itemW - 13, y + 6, ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a));
+        ttMid(x + itemW - 12, y + 10, "\u25bc", ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a), TS, UiFontStyle.MEDIUM);
 
-        gfx.text(this.font, this.loadingModels ? "загрузка..." : "нажми для выбора", x + 10, y + 17, ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a));
+        tt(x + 10, y + 16, this.loadingModels ? "загрузка..." : "нажми для выбора",
+                ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a), TS, UiFontStyle.MEDIUM);
     }
 
-    private void renderSidebarButtons(GuiGraphicsExtractor gfx, Layout L, int accent, float a, int mx, int my) {
+    private void renderSidebarButtons(Layout L, int accent, float a, int mx, int my) {
         int x = L.px + 12;
         int itemW = L.sidebarW - 24;
         int y = L.py + L.ph - 140;
@@ -351,78 +388,95 @@ public class VibeCodingScreen extends Screen {
         int gap = 5;
 
         boolean keyHover = this.isInside(mx, my, x, y, itemW, btnH);
-        gfx.fill(x, y, x + itemW, y + btnH, keyHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)));
-        this.border(gfx, x, y, itemW, btnH, 1, ColorUtil.multiplyAlpha(this.COL_BORDER, a));
-        gfx.text(this.font, "API Key", x + 12, y + (btnH - 9) / 2, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+        r(x, y, itemW, btnH, keyHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)), R_CARD);
+        rb(x, y, itemW, btnH, ColorUtil.multiplyAlpha(this.COL_BORDER, a), R_CARD, 1.0F);
+        tt(x + 12, y + (btnH - TS) / 2.0F, "API Key", ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.MEDIUM);
 
         y += btnH + gap;
         boolean traceHover = this.isInside(mx, my, x, y, itemW, btnH) && !this.waiting;
-        gfx.fill(x, y, x + itemW, y + btnH, traceHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)));
-        this.border(gfx, x, y, itemW, btnH, 1, ColorUtil.multiplyAlpha(this.COL_BORDER, a));
-        gfx.text(this.font, "Stacktrace", x + 12, y + (btnH - 9) / 2, ColorUtil.multiplyAlpha(this.COL_TEXT, Math.max(0.05F, this.waiting ? 80.0F / 255.0F * a : a)));
+        r(x, y, itemW, btnH, traceHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)), R_CARD);
+        rb(x, y, itemW, btnH, ColorUtil.multiplyAlpha(this.COL_BORDER, a), R_CARD, 1.0F);
+        tt(x + 12, y + (btnH - TS) / 2.0F, "Stacktrace",
+                ColorUtil.multiplyAlpha(this.COL_TEXT, Math.max(0.05F, this.waiting ? 80.0F / 255.0F * a : a)), TS, UiFontStyle.MEDIUM);
 
         y += btnH + gap;
         boolean clearHover = this.isInside(mx, my, x, y, itemW, btnH);
-        gfx.fill(x, y, x + itemW, y + btnH, clearHover ? ColorUtil.rgba(255, 80, 80, Math.round(25.0F * a)) : ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)));
-        this.border(gfx, x, y, itemW, btnH, 1, ColorUtil.rgba(255, 100, 100, Math.round(80.0F * a)));
-        gfx.text(this.font, "Очистить", x + 12, y + (btnH - 9) / 2,
-                clearHover ? ColorUtil.multiplyAlpha(ColorUtil.rgb(255, 140, 140), a) : ColorUtil.multiplyAlpha(ColorUtil.rgb(255, 130, 130), a));
+        r(x, y, itemW, btnH, clearHover ? ColorUtil.rgba(255, 80, 80, Math.round(25.0F * a)) : ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)), R_CARD);
+        rb(x, y, itemW, btnH, ColorUtil.rgba(255, 100, 100, Math.round(80.0F * a)), R_CARD, 1.0F);
+        tt(x + 12, y + (btnH - TS) / 2.0F, "Очистить",
+                clearHover ? ColorUtil.multiplyAlpha(ColorUtil.rgb(255, 140, 140), a) : ColorUtil.multiplyAlpha(ColorUtil.rgb(255, 130, 130), a),
+                TS, UiFontStyle.MEDIUM);
 
         y += btnH + gap;
         boolean colorHover = this.isInside(mx, my, x, y, itemW, btnH);
-        gfx.fill(x, y, x + itemW, y + btnH, colorHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)));
-        this.border(gfx, x, y, itemW, btnH, 1, ColorUtil.multiplyAlpha(this.COL_BORDER, a));
-        gfx.fill(x + 12, y + 8, x + 26, y + 22, ColorUtil.withAlpha(accent, Math.round(255.0F * a)));
-        gfx.text(this.font, "Цвет темы", x + 32, y + (btnH - 9) / 2, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+        r(x, y, itemW, btnH, colorHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)), R_CARD);
+        rb(x, y, itemW, btnH, ColorUtil.multiplyAlpha(this.COL_BORDER, a), R_CARD, 1.0F);
+        r(x + 12, y + 8, 14, 14, ColorUtil.withAlpha(accent, Math.round(255.0F * a)), 4.0F);
+        tt(x + 32, y + (btnH - TS) / 2.0F, "Цвет темы", ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.MEDIUM);
     }
 
-    private void renderColorPicker(GuiGraphicsExtractor gfx, int accent, float a, int mx, int my) {
+    private void renderColorPicker(int accent, float a, int mx, int my) {
         int w = 260;
         int h = 220;
         int x = (this.width - w) / 2;
         int y = (this.height - h) / 2;
 
-        gfx.fill(0, 0, this.width, this.height, ColorUtil.rgba(0, 0, 0, Math.round(150.0F * a)));
-        gfx.fill(x, y, x + w, y + h, ColorUtil.multiplyAlpha(ColorUtil.rgb(22, 22, 32), a));
-        this.border(gfx, x, y, w, h, 1, ColorUtil.withAlpha(accent, Math.round(180.0F * a)));
+        r(0, 0, this.width, this.height, ColorUtil.rgba(0, 0, 0, Math.round(150.0F * a)), 0.0F);
+        Render2DUtil.rect(x, y, w, h)
+                .color(ColorUtil.multiplyAlpha(ColorUtil.rgb(22, 22, 32), a))
+                .radius(R_MODAL)
+                .shadow(ColorUtil.rgba(0, 0, 0, Math.round(120.0F * a)), 18.0F)
+                .draw();
+        rb(x, y, w, h, ColorUtil.withAlpha(accent, Math.round(180.0F * a)), R_MODAL, 1.0F);
 
-        gfx.text(this.font, "Выбери цвет темы", x + 16, y + 14, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+        tt(x + 16, y + 14, "Выбери цвет темы", ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.SEMIBOLD);
 
         int svX = x + 16;
         int svY = y + 36;
         int svW = 180;
         int svH = 140;
 
-        for (int py = 0; py < svH; py++) {
-            for (int px = 0; px < svW; px++) {
-                float s = px / (float) svW;
-                float v = 1.0F - py / (float) svH;
-                gfx.fill(svX + px, svY + py, svX + px + 1, svY + py + 1,
-                        ColorUtil.fromHsv(this.pickerHue, s, v, Math.round(255.0F * a)));
+        int cell = 2;
+        int cols = svW / cell;
+        int rows = svH / cell;
+        int[] svColors = new int[cols * rows];
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                float s = col / (cols - 1.0F);
+                float v = 1.0F - row / (rows - 1.0F);
+                svColors[row * cols + col] = ColorUtil.fromHsv(this.pickerHue, s, v, Math.round(255.0F * a));
             }
         }
-        this.border(gfx, svX, svY, svW, svH, 1, ColorUtil.multiplyAlpha(this.COL_BORDER, a));
+        Render2DUtil.colorGrid(svX, svY, cell, cols, svColors).radius(4.0F).draw();
+        rb(svX, svY, svW, svH, ColorUtil.multiplyAlpha(this.COL_BORDER, a), 4.0F, 1.0F);
 
         int cursorSX = svX + Math.round(this.pickerSat * svW);
         int cursorSY = svY + Math.round((1.0F - this.pickerVal) * svH);
-        gfx.fill(cursorSX - 4, cursorSY - 4, cursorSX + 4, cursorSY + 4, ColorUtil.WHITE);
-        this.border(gfx, cursorSX - 5, cursorSY - 5, 10, 10, 1, ColorUtil.rgba(0, 0, 0, Math.round(180.0F * a)));
+        r(cursorSX - 4, cursorSY - 4, 8, 8, ColorUtil.WHITE, 4.0F);
+        rb(cursorSX - 5, cursorSY - 5, 10, 10, ColorUtil.rgba(0, 0, 0, Math.round(180.0F * a)), 5.0F, 1.0F);
 
         int hueX = svX + svW + 10;
         int hueW = 16;
-
-        for (int hy = 0; hy < svH; hy++) {
-            float hue = hy / (float) svH;
-            gfx.fill(hueX, svY + hy, hueX + hueW, svY + hy + 1,
-                    ColorUtil.fromHsv(hue, 1.0F, 1.0F, Math.round(255.0F * a)));
+        int hueCell = 2;
+        int hueCols = hueW / hueCell;
+        int hueRows = svH / hueCell;
+        int[] hueColors = new int[hueCols * hueRows];
+        for (int row = 0; row < hueRows; row++) {
+            float hue = row / (hueRows - 1.0F);
+            int hueColor = ColorUtil.fromHsv(hue, 1.0F, 1.0F, Math.round(255.0F * a));
+            for (int col = 0; col < hueCols; col++) {
+                hueColors[row * hueCols + col] = hueColor;
+            }
         }
-        this.border(gfx, hueX, svY, hueW, svH, 1, ColorUtil.multiplyAlpha(this.COL_BORDER, a));
+        Render2DUtil.colorGrid(hueX, svY, hueCell, hueCols, hueColors).radius(3.0F).draw();
+        rb(hueX, svY, hueW, svH, ColorUtil.multiplyAlpha(this.COL_BORDER, a), 3.0F, 1.0F);
 
         int cursorHY = svY + Math.round(this.pickerHue * svH);
-        gfx.fill(hueX - 2, cursorHY - 1, hueX + hueW + 4, cursorHY + 2, ColorUtil.WHITE);
+        r(hueX - 2, cursorHY - 1, hueW + 4, 3, ColorUtil.WHITE, 1.5F);
 
-        gfx.fill(hueX + hueW + 12, svY, hueX + hueW + 42, svY + 28, ColorUtil.fromHsv(this.pickerHue, this.pickerSat, this.pickerVal, 255));
-        this.border(gfx, hueX + hueW + 12, svY, 30, 28, 1, ColorUtil.multiplyAlpha(this.COL_BORDER, a));
+        int swatchX = hueX + hueW + 12;
+        r(swatchX, svY, 30, 28, ColorUtil.fromHsv(this.pickerHue, this.pickerSat, this.pickerVal, 255), 4.0F);
+        rb(swatchX, svY, 30, 28, ColorUtil.multiplyAlpha(this.COL_BORDER, a), 4.0F, 1.0F);
 
         int applyY = svY + svH + 12;
         int applyW = 100;
@@ -430,51 +484,56 @@ public class VibeCodingScreen extends Screen {
         int applyX = x + w - applyW - 16;
         boolean applyHover = this.isInside(mx, my, applyX, applyY, applyW, applyH);
         int applyColor = applyHover ? ColorUtil.withAlpha(ColorUtil.multiplyRgb(accent, 1.12F), Math.round(255.0F * a)) : ColorUtil.withAlpha(accent, Math.round(220.0F * a));
-        gfx.fill(applyX, applyY, applyX + applyW, applyY + applyH, applyColor);
-        gfx.centeredText(this.font, "Применить", applyX + applyW / 2, applyY + (applyH - 9) / 2, ColorUtil.WHITE);
+        r(applyX, applyY, applyW, applyH, applyColor, R_CARD);
+        ttMid(applyX + applyW / 2.0F, applyY + applyH / 2.0F, "Применить", ColorUtil.WHITE, TS, UiFontStyle.SEMIBOLD);
 
         int cancelW = 80;
         int cancelX = applyX - cancelW - 8;
         boolean cancelHover = this.isInside(mx, my, cancelX, applyY, cancelW, applyH);
-        gfx.fill(cancelX, applyY, cancelX + cancelW, applyY + applyH,
-                cancelHover ? ColorUtil.rgba(255, 80, 80, Math.round(30.0F * a)) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)));
-        gfx.centeredText(this.font, "Отмена", cancelX + cancelW / 2, applyY + (applyH - 9) / 2, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+        r(cancelX, applyY, cancelW, applyH,
+                cancelHover ? ColorUtil.rgba(255, 80, 80, Math.round(30.0F * a)) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)), R_CARD);
+        ttMid(cancelX + cancelW / 2.0F, applyY + applyH / 2.0F, "Отмена", ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.MEDIUM);
     }
 
-    private void renderApiKeyInput(GuiGraphicsExtractor gfx, int accent, float a, int mx, int my) {
+    private void renderApiKeyInput(int accent, float a, int mx, int my) {
         int w = 420;
         int h = 160;
         int x = (this.width - w) / 2;
         int y = (this.height - h) / 2;
 
-        gfx.fill(0, 0, this.width, this.height, ColorUtil.rgba(0, 0, 0, Math.round(150.0F * a)));
-        gfx.fill(x, y, x + w, y + h, ColorUtil.multiplyAlpha(ColorUtil.rgb(22, 22, 32), a));
-        this.border(gfx, x, y, w, h, 1, ColorUtil.withAlpha(accent, Math.round(180.0F * a)));
+        r(0, 0, this.width, this.height, ColorUtil.rgba(0, 0, 0, Math.round(150.0F * a)), 0.0F);
+        Render2DUtil.rect(x, y, w, h)
+                .color(ColorUtil.multiplyAlpha(ColorUtil.rgb(22, 22, 32), a))
+                .radius(R_MODAL)
+                .shadow(ColorUtil.rgba(0, 0, 0, Math.round(120.0F * a)), 18.0F)
+                .draw();
+        rb(x, y, w, h, ColorUtil.withAlpha(accent, Math.round(180.0F * a)), R_MODAL, 1.0F);
 
         ZaiAi.Provider prov = this.module.getActiveProvider();
-        gfx.text(this.font, "API Key — " + prov.getDisplayName(), x + 18, y + 16, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+        tt(x + 18, y + 16, "API Key — " + prov.getDisplayName(), ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.SEMIBOLD);
 
         int fieldX = x + 18;
         int fieldY = y + 40;
         int fieldW = w - 36;
         int fieldH = 32;
-        gfx.fill(fieldX, fieldY, fieldX + fieldW, fieldY + fieldH, ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)));
-        this.border(gfx, fieldX, fieldY, fieldW, fieldH, 1, ColorUtil.withAlpha(accent, Math.round(160.0F * a)));
+        r(fieldX, fieldY, fieldW, fieldH, ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)), R_FIELD);
+        rb(fieldX, fieldY, fieldW, fieldH, ColorUtil.withAlpha(accent, Math.round(160.0F * a)), R_FIELD, 1.0F);
 
         String display = this.apiKeyInput.isEmpty() ? "" : "*".repeat(Math.min(this.apiKeyInput.length(), 50));
         String shown = display;
         int start = 0;
-        while (start < shown.length() && this.font.width(shown.substring(start)) > fieldW - 20) {
+        while (start < shown.length() && tw(shown.substring(start), TS, UiFontStyle.MEDIUM) > fieldW - 20) {
             start++;
         }
+        float fieldTextY = fieldY + (fieldH - TS) / 2.0F;
         if (display.isEmpty()) {
-            gfx.text(this.font, "Вставь API-ключ...", fieldX + 10, fieldY + (fieldH - 9) / 2, ColorUtil.multiplyAlpha(this.COL_TEXT_DARK, a));
+            tt(fieldX + 10, fieldTextY, "Вставь API-ключ...", ColorUtil.multiplyAlpha(this.COL_TEXT_DARK, a), TS, UiFontStyle.MEDIUM);
         } else {
-            gfx.text(this.font, shown.substring(start), fieldX + 10, fieldY + (fieldH - 9) / 2, ColorUtil.multiplyAlpha(ColorUtil.WHITE, a));
+            tt(fieldX + 10, fieldTextY, shown.substring(start), ColorUtil.multiplyAlpha(ColorUtil.WHITE, a), TS, UiFontStyle.MEDIUM);
         }
         if ((System.currentTimeMillis() / 500L) % 2L == 0L) {
-            int cx = fieldX + 10 + this.font.width(shown.substring(start, Math.min(start + this.apiKeyCursor, shown.length())));
-            gfx.fill(cx, fieldY + 8, cx + 1, fieldY + fieldH - 8, ColorUtil.multiplyAlpha(ColorUtil.WHITE, a));
+            float cx = fieldX + 10 + tw(shown.substring(start, Math.min(start + this.apiKeyCursor, shown.length())), TS, UiFontStyle.MEDIUM);
+            r(cx, fieldY + 8, 1, fieldH - 16, ColorUtil.multiplyAlpha(ColorUtil.WHITE, a), 0.0F);
         }
 
         int btnY = fieldY + fieldH + 12;
@@ -488,78 +547,86 @@ public class VibeCodingScreen extends Screen {
         int saveX = btnStartX;
         boolean saveHover = this.isInside(mx, my, saveX, btnY, saveW, btnH);
         int saveColor = saveHover ? ColorUtil.withAlpha(ColorUtil.multiplyRgb(accent, 1.12F), Math.round(255.0F * a)) : ColorUtil.withAlpha(accent, Math.round(220.0F * a));
-        gfx.fill(saveX, btnY, saveX + saveW, btnY + btnH, saveColor);
-        gfx.centeredText(this.font, "Сохранить", saveX + saveW / 2, btnY + (btnH - 9) / 2, ColorUtil.WHITE);
+        r(saveX, btnY, saveW, btnH, saveColor, R_CARD);
+        ttMid(saveX + saveW / 2.0F, btnY + btnH / 2.0F, "Сохранить", ColorUtil.WHITE, TS, UiFontStyle.SEMIBOLD);
 
         int pasteX = saveX + saveW + 8;
         boolean pasteHover = this.isInside(mx, my, pasteX, btnY, pasteW, btnH);
-        gfx.fill(pasteX, btnY, pasteX + pasteW, btnY + btnH, pasteHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)));
-        this.border(gfx, pasteX, btnY, pasteW, btnH, 1, ColorUtil.multiplyAlpha(this.COL_BORDER, a));
-        gfx.centeredText(this.font, "Вставить", pasteX + pasteW / 2, btnY + (btnH - 9) / 2, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+        r(pasteX, btnY, pasteW, btnH, pasteHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)), R_CARD);
+        rb(pasteX, btnY, pasteW, btnH, ColorUtil.multiplyAlpha(this.COL_BORDER, a), R_CARD, 1.0F);
+        ttMid(pasteX + pasteW / 2.0F, btnY + btnH / 2.0F, "Вставить", ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.MEDIUM);
 
         int cancelX = pasteX + pasteW + 8;
         boolean cancelHover = this.isInside(mx, my, cancelX, btnY, cancelW, btnH);
-        gfx.fill(cancelX, btnY, cancelX + cancelW, btnY + btnH,
-                cancelHover ? ColorUtil.rgba(255, 80, 80, Math.round(30.0F * a)) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)));
-        gfx.centeredText(this.font, "Отмена", cancelX + cancelW / 2, btnY + (btnH - 9) / 2, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+        r(cancelX, btnY, cancelW, btnH,
+                cancelHover ? ColorUtil.rgba(255, 80, 80, Math.round(30.0F * a)) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)), R_CARD);
+        ttMid(cancelX + cancelW / 2.0F, btnY + btnH / 2.0F, "Отмена", ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.MEDIUM);
     }
 
-    private void renderModelSelector(GuiGraphicsExtractor gfx, int accent, float a, int mx, int my) {
+    private void renderModelSelector(int accent, float a, int mx, int my) {
         int w = 420;
         int h = 380;
         int x = (this.width - w) / 2;
         int y = (this.height - h) / 2;
 
-        gfx.fill(0, 0, this.width, this.height, ColorUtil.rgba(0, 0, 0, Math.round(150.0F * a)));
-        gfx.fill(x, y, x + w, y + h, ColorUtil.multiplyAlpha(ColorUtil.rgb(22, 22, 32), a));
-        this.border(gfx, x, y, w, h, 1, ColorUtil.withAlpha(accent, Math.round(180.0F * a)));
+        r(0, 0, this.width, this.height, ColorUtil.rgba(0, 0, 0, Math.round(150.0F * a)), 0.0F);
+        Render2DUtil.rect(x, y, w, h)
+                .color(ColorUtil.multiplyAlpha(ColorUtil.rgb(22, 22, 32), a))
+                .radius(R_MODAL)
+                .shadow(ColorUtil.rgba(0, 0, 0, Math.round(120.0F * a)), 18.0F)
+                .draw();
+        rb(x, y, w, h, ColorUtil.withAlpha(accent, Math.round(180.0F * a)), R_MODAL, 1.0F);
 
         ZaiAi.Provider prov = this.module.getActiveProvider();
-        gfx.text(this.font, "Модели — " + prov.getDisplayName(), x + 18, y + 16, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+        tt(x + 18, y + 16, "Модели — " + prov.getDisplayName(), ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.SEMIBOLD);
 
         int listX = x + 18;
         int listY = y + 40;
         int listW = w - 36;
         int listH = h - 100;
 
-        gfx.fill(listX, listY, listX + listW, listY + listH, ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)));
-        this.border(gfx, listX, listY, listW, listH, 1, ColorUtil.multiplyAlpha(this.COL_BORDER, a));
+        r(listX, listY, listW, listH, ColorUtil.rgba(255, 255, 255, Math.round(6.0F * a)), R_CARD);
+        rb(listX, listY, listW, listH, ColorUtil.multiplyAlpha(this.COL_BORDER, a), R_CARD, 1.0F);
 
         if (this.loadingModels) {
-            gfx.centeredText(this.font, "Загрузка моделей...", listX + listW / 2, listY + listH / 2, ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a));
+            ttMid(listX + listW / 2.0F, listY + listH / 2.0F, "Загрузка моделей...",
+                    ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a), TS, UiFontStyle.MEDIUM);
         } else if (this.availableModels.isEmpty()) {
-            gfx.centeredText(this.font, "Нет моделей. Введи API-ключ.", listX + listW / 2, listY + listH / 2, ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a));
+            ttMid(listX + listW / 2.0F, listY + listH / 2.0F, "Нет моделей. Введи API-ключ.",
+                    ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a), TS, UiFontStyle.MEDIUM);
         } else {
             int itemH = 32;
             float totalH = this.availableModels.size() * itemH;
             float maxScroll = Math.max(0, totalH - listH);
             this.modelScroll = Math.max(0, Math.min(this.modelScroll, maxScroll));
 
-            gfx.enableScissor(listX, listY, listX + listW, listY + listH);
+            Render2DUtil.pushScissor(listX, listY, listW, listH);
+            try {
+                String currentModel = this.module.getActiveModel();
+                float iy = listY - this.modelScroll;
+                for (ZaiAi.ModelInfo model : this.availableModels) {
+                    if (iy + itemH >= listY && iy <= listY + listH) {
+                        int rowY = Math.round(iy);
+                        boolean isCurrent = model.id().equals(currentModel);
+                        boolean hover = this.isInside(mx, my, listX, rowY, listW, itemH);
 
-            String currentModel = this.module.getActiveModel();
-            float iy = listY - this.modelScroll;
-            for (ZaiAi.ModelInfo model : this.availableModels) {
-                if (iy + itemH >= listY && iy <= listY + listH) {
-                    int rowY = Math.round(iy);
-                    boolean isCurrent = model.id().equals(currentModel);
-                    boolean hover = this.isInside(mx, my, listX, rowY, listW, itemH);
+                        if (isCurrent) {
+                            r(listX + 2, rowY, listW - 4, itemH, ColorUtil.withAlpha(accent, Math.round(25.0F * a)), 4.0F);
+                        } else if (hover) {
+                            r(listX + 2, rowY, listW - 4, itemH, ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)), 4.0F);
+                        }
 
-                    if (isCurrent) {
-                        gfx.fill(listX + 2, rowY, listX + listW - 2, rowY + itemH, ColorUtil.withAlpha(accent, Math.round(25.0F * a)));
-                    } else if (hover) {
-                        gfx.fill(listX + 2, rowY, listX + listW - 2, rowY + itemH, ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)));
+                        String displayName = model.name().length() > 40 ? model.name().substring(0, 40) + "..." : model.name();
+                        tt(listX + 10, rowY + 5, displayName,
+                                isCurrent ? ColorUtil.withAlpha(accent, Math.round(255.0F * a)) : ColorUtil.multiplyAlpha(this.COL_TEXT, a),
+                                TS, UiFontStyle.MEDIUM);
+                        tt(listX + 10, rowY + 16, model.id(), ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a), TS, UiFontStyle.MEDIUM);
                     }
-
-                    String displayName = model.name().length() > 40 ? model.name().substring(0, 40) + "..." : model.name();
-                    gfx.text(this.font, displayName, listX + 10, rowY + 6,
-                            isCurrent ? ColorUtil.withAlpha(accent, Math.round(255.0F * a)) : ColorUtil.multiplyAlpha(this.COL_TEXT, a));
-                    gfx.text(this.font, model.id(), listX + 10, rowY + 16, ColorUtil.multiplyAlpha(this.COL_TEXT_DIM, a));
+                    iy += itemH;
                 }
-                iy += itemH;
+            } finally {
+                Render2DUtil.popScissor();
             }
-
-            gfx.disableScissor();
         }
 
         int btnY = y + h - 44;
@@ -568,29 +635,29 @@ public class VibeCodingScreen extends Screen {
         int closeW = 80;
         int refreshX = x + 18;
         boolean refreshHover = this.isInside(mx, my, refreshX, btnY, refreshW, btnH);
-        gfx.fill(refreshX, btnY, refreshX + refreshW, btnY + btnH, refreshHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)));
-        this.border(gfx, refreshX, btnY, refreshW, btnH, 1, ColorUtil.multiplyAlpha(this.COL_BORDER, a));
-        gfx.centeredText(this.font, "Обновить", refreshX + refreshW / 2, btnY + (btnH - 9) / 2, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+        r(refreshX, btnY, refreshW, btnH, refreshHover ? ColorUtil.multiplyAlpha(this.COL_SURFACE, a) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)), R_CARD);
+        rb(refreshX, btnY, refreshW, btnH, ColorUtil.multiplyAlpha(this.COL_BORDER, a), R_CARD, 1.0F);
+        ttMid(refreshX + refreshW / 2.0F, btnY + btnH / 2.0F, "Обновить", ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.MEDIUM);
 
         int closeX = x + w - closeW - 18;
         boolean closeHover = this.isInside(mx, my, closeX, btnY, closeW, btnH);
-        gfx.fill(closeX, btnY, closeX + closeW, btnY + btnH,
-                closeHover ? ColorUtil.rgba(255, 80, 80, Math.round(30.0F * a)) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)));
-        gfx.centeredText(this.font, "Закрыть", closeX + closeW / 2, btnY + (btnH - 9) / 2, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+        r(closeX, btnY, closeW, btnH,
+                closeHover ? ColorUtil.rgba(255, 80, 80, Math.round(30.0F * a)) : ColorUtil.rgba(255, 255, 255, Math.round(10.0F * a)), R_CARD);
+        ttMid(closeX + closeW / 2.0F, btnY + btnH / 2.0F, "Закрыть", ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.MEDIUM);
     }
 
-    private void renderMessages(GuiGraphicsExtractor gfx, Layout L, int accent, float a) {
+    private void renderMessages(Layout L, int accent, float a) {
         VibeSession session = this.activeSession();
         int lineH = 12;
         List<Bubble> bubbles = new ArrayList<>();
         for (VibeSession.Msg m : session.history) {
             List<String> lines = this.wrap(m.text(), L.maxTextW);
             int bh = lines.size() * lineH + 20;
-            int maxW = 0;
+            float maxW = 0;
             for (String line : lines) {
-                maxW = Math.max(maxW, this.font.width(line));
+                maxW = Math.max(maxW, tw(line, TS, UiFontStyle.MEDIUM));
             }
-            int bw = Math.min(L.maxTextW + 30, Math.max(80, maxW + 28));
+            int bw = Math.min(L.maxTextW + 30, Math.max(80, Math.round(maxW) + 28));
             bubbles.add(new Bubble(m.user(), bw, bh, lines));
         }
 
@@ -614,16 +681,16 @@ public class VibeCodingScreen extends Screen {
             int fill = b.user() ? ColorUtil.withAlpha(accent, Math.round(25.0F * a)) : ColorUtil.withAlpha(this.COL_SURFACE, Math.round(200.0F * a));
             int borderC = b.user() ? ColorUtil.withAlpha(accent, Math.round(80.0F * a)) : ColorUtil.withAlpha(this.COL_BORDER, Math.round(100.0F * a));
 
-            gfx.fill(bx, (int) y, bx + b.w, (int) (y + b.h), fill);
-            this.border(gfx, bx, (int) y, b.w, b.h, 1, borderC);
+            r(bx, y, b.w, b.h, fill, 8.0F);
+            rb(bx, y, b.w, b.h, borderC, 8.0F, 1.0F);
 
             String label = b.user ? "you" : this.module.getActiveProvider().getDisplayName();
             int labelColor = b.user ? ColorUtil.withAlpha(accent, Math.round(200.0F * a)) : ColorUtil.multiplyAlpha(ColorUtil.rgb(140, 180, 255), a);
-            gfx.text(this.font, label, bx + 10, (int) y + 6, labelColor);
+            tt(bx + 10, y + 6, label, labelColor, TS, UiFontStyle.SEMIBOLD);
 
             float ty = y + 18;
             for (String line : b.lines) {
-                gfx.text(this.font, line, bx + 10, (int) ty, ColorUtil.multiplyAlpha(this.COL_TEXT, a));
+                tt(bx + 10, ty, line, ColorUtil.multiplyAlpha(this.COL_TEXT, a), TS, UiFontStyle.MEDIUM);
                 ty += lineH;
             }
         }
@@ -631,8 +698,8 @@ public class VibeCodingScreen extends Screen {
         if (this.waiting) {
             int bx = L.chatX + this.pad();
             int by = L.msgBottom - 26;
-            gfx.fill(bx, by, bx + 120, by + 22, ColorUtil.withAlpha(this.COL_SURFACE, Math.round(200.0F * a)));
-            gfx.text(this.font, "нейросеть печатает...", bx + 12, by + 6, ColorUtil.multiplyAlpha(ColorUtil.rgb(140, 180, 255), a));
+            r(bx, by, 120, 22, ColorUtil.withAlpha(this.COL_SURFACE, Math.round(200.0F * a)), 6.0F);
+            tt(bx + 12, by + 5, "нейросеть печатает...", ColorUtil.multiplyAlpha(ColorUtil.rgb(140, 180, 255), a), TS, UiFontStyle.MEDIUM);
         }
     }
 
@@ -646,7 +713,7 @@ public class VibeCodingScreen extends Screen {
             StringBuilder line = new StringBuilder();
             for (String word : paragraph.split(" ")) {
                 String test = line.length() == 0 ? word : line + " " + word;
-                if (this.font.width(test) > maxW && line.length() > 0) {
+                if (tw(test, TS, UiFontStyle.MEDIUM) > maxW && line.length() > 0) {
                     out.add(line.toString());
                     line.setLength(0);
                     line.append(word);
@@ -1197,11 +1264,59 @@ public class VibeCodingScreen extends Screen {
         this.doRequest(session);
     }
 
-    private void border(GuiGraphicsExtractor gfx, int x, int y, int w, int h, int thickness, int color) {
-        gfx.fill(x, y, x + w, y + thickness, color);
-        gfx.fill(x, y, x + thickness, y + h, color);
-        gfx.fill(x + w - thickness, y, x + w, y + h, color);
-        gfx.fill(x, y + h - thickness, x + w, y + h, color);
+    private void r(float x, float y, float w, float h, int color, float radius) {
+        if (w <= 0.0F || h <= 0.0F) {
+            return;
+        }
+        Render2DUtil.rect(x, y, w, h).color(color).radius(radius).draw();
+    }
+
+    private void r4(float x, float y, float w, float h, int color, float topLeft, float topRight, float bottomRight, float bottomLeft) {
+        if (w <= 0.0F || h <= 0.0F) {
+            return;
+        }
+        Render2DUtil.rect(x, y, w, h).color(color).radius(topLeft, topRight, bottomRight, bottomLeft).draw();
+    }
+
+    private void rb(float x, float y, float w, float h, int color, float radius, float thickness) {
+        if (w <= 0.0F || h <= 0.0F) {
+            return;
+        }
+        Render2DUtil.rect(x, y, w, h)
+                .color(ColorUtil.TRANSPARENT)
+                .radius(radius)
+                .border(thickness, color)
+                .draw();
+    }
+
+    private float tw(String text, float size, UiFontStyle style) {
+        if (text == null || text.isEmpty()) {
+            return 0.0F;
+        }
+        return UiFonts.getFontForText(text, style.weight()).measureWidth(text, size, size * style.letterSpacingEm());
+    }
+
+    private float cy(String sample, float centerY, float size, UiFontStyle style) {
+        String value = sample == null || sample.isEmpty() ? " " : sample;
+        return UiFonts.getFontForText(value, style.weight()).centeredTextY(centerY, size);
+    }
+
+    private void tt(float x, float topY, String text, int color, float size, UiFontStyle style) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        Render2DUtil.text(x, topY, size, text).color(color).style(style).draw();
+    }
+
+    private void ttMid(float cx, float midY, String text, int color, float size, UiFontStyle style) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        Render2DUtil.text(cx, cy(text, midY, size, style), size, text)
+                .color(color)
+                .style(style)
+                .align(TextAlign.CENTER)
+                .draw();
     }
 
     private boolean isInside(int mouseX, int mouseY, int x, int y, int width, int height) {

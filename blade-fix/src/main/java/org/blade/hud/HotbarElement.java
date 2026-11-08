@@ -8,6 +8,7 @@ import net.minecraft.network.chat.TextColor;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.item.ItemStack;
 import org.blade.context.RenderContext;
+import org.blade.feature.impl.visual.HudFeature;
 import org.blade.utils.ColorUtil;
 import org.blade.utils.math.MathUtil;
 import org.blade.utils.render.Theme;
@@ -43,6 +44,7 @@ public final class HotbarElement extends HudElement {
 
     private static final float VANILLA_HOTBAR_HEIGHT = 22.0F;
     private static final float VANILLA_STATS_ROW_CENTER = 12.5F;
+    private static final String[] NUMBER_CACHE = new String[257];
     private static final float VANILLA_NAME_OFFSET = 49.0F;
     private static final float VANILLA_NAME_OFFSET_CREATIVE = 23.0F;
 
@@ -83,6 +85,7 @@ public final class HotbarElement extends HudElement {
 
     @Override
     protected void layout(Minecraft mc, float unit) {
+        setMini(HudFeature.miniHotbarEnabled());
         this.screenHeight = mc.getWindow().getGuiScaledHeight();
         LocalPlayer player = mc.player;
         if (player == null || player.isSpectator()) {
@@ -188,6 +191,18 @@ public final class HotbarElement extends HudElement {
                 + bandDrop(mc.player);
     }
 
+    private static String number(int value) {
+        if (value >= 0 && value < NUMBER_CACHE.length) {
+            String cached = NUMBER_CACHE[value];
+            if (cached == null) {
+                cached = Integer.toString(value);
+                NUMBER_CACHE[value] = cached;
+            }
+            return cached;
+        }
+        return Integer.toString(value);
+    }
+
     private static float bandDrop(LocalPlayer player) {
         boolean bandFree = player != null
                 && player.jumpableVehicle() == null
@@ -205,7 +220,7 @@ public final class HotbarElement extends HudElement {
         }
 
         MsdfFont font = UiFonts.sfProDisplay();
-        String level = Integer.toString(player.experienceLevel);
+        String level = number(player.experienceLevel);
         float textSize = XP_TEXT_SIZE * unit;
         float centerX = this.x + this.width / 2.0F;
         float centerY = this.y - VANILLA_STATS_ROW_CENTER + bandDrop(player);
@@ -303,7 +318,7 @@ public final class HotbarElement extends HudElement {
             return;
         }
 
-        String amount = Integer.toString(stack.getCount());
+        String amount = number(stack.getCount());
         MsdfFont font = UiFonts.sfProDisplay();
         float textY = ITEM_COUNT_BOTTOM - font.textHeight(ITEM_COUNT_TEXT_SIZE);
         Render2DUtil.text(ITEM_COUNT_RIGHT, textY, ITEM_COUNT_TEXT_SIZE, amount)

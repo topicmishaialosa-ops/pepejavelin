@@ -1,9 +1,7 @@
 package org.blade.utils.inventory;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.InventoryMenu;
 import org.blade.context.MinecraftContext;
 import org.blade.event.EventTarget;
@@ -18,21 +16,16 @@ import java.util.Deque;
 public final class DropAllInventoryController implements MinecraftContext {
     public static final DropAllInventoryController INSTANCE = new DropAllInventoryController();
 
-    private static final Component DROP_ALL = Component.literal("Выбросить всё");
-    private static final Component STOP = Component.literal("Остановить");
-
     private final Deque<Integer> slots = new ArrayDeque<>();
     private InventoryScreen screen;
     private InventoryMenu menu;
-    private Button button;
     private boolean running;
 
     private DropAllInventoryController() {
     }
 
-    public static void bindButton(Button button) {
-        INSTANCE.button = button;
-        INSTANCE.updateButton();
+    public static boolean isRunning() {
+        return INSTANCE.running;
     }
 
     public static void toggle(InventoryScreen screen) {
@@ -44,7 +37,7 @@ public final class DropAllInventoryController implements MinecraftContext {
     }
 
     public static boolean blocksInventoryOperations() {
-        return INSTANCE.running || InventoryMoveFeature.isClickPipelineBusy();
+        return INSTANCE.running || InventoryMoveFeature.isClickPipelineBusy() || InventoryButtonsOverlay.isBusy();
     }
 
     @EventTarget
@@ -89,7 +82,8 @@ public final class DropAllInventoryController implements MinecraftContext {
         Minecraft client = Minecraft.getInstance();
         if (client == null || client.player == null || screen == null
                 || client.player.containerMenu != screen.getMenu()
-                || InventoryUtil.hasCarriedItem() || InventorySwap.isBusy()) {
+                || InventoryUtil.hasCarriedItem() || InventorySwap.isBusy()
+                || InventoryButtonsOverlay.isBusy()) {
             return;
         }
 
@@ -102,25 +96,16 @@ public final class DropAllInventoryController implements MinecraftContext {
             }
         }
         this.running = !this.slots.isEmpty();
-        updateButton();
     }
 
     private void finish() {
         this.running = false;
         this.slots.clear();
-        updateButton();
     }
 
     private void cancel() {
         finish();
         this.screen = null;
         this.menu = null;
-        this.button = null;
-    }
-
-    private void updateButton() {
-        if (this.button != null) {
-            this.button.setMessage(this.running ? STOP : DROP_ALL);
-        }
     }
 }

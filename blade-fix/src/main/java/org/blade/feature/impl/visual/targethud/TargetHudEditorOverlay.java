@@ -153,6 +153,7 @@ public final class TargetHudEditorOverlay {
 
         Minecraft mc = MinecraftContext.mc;
         if (mc != null) {
+            ensureScreen(mc);
             if (MenuOverlay.blocksInput()) {
                 MenuOverlay.close(mc);
             }
@@ -163,15 +164,26 @@ public final class TargetHudEditorOverlay {
         }
     }
 
+    private static void ensureScreen(Minecraft mc) {
+        if (!(mc.gui.screen() instanceof TargetHudEditScreen)) {
+            mc.gui.setScreen(new TargetHudEditScreen());
+        }
+    }
+
     public static void close() {
         if (INSTANCE.open) {
             INSTANCE.open = false;
             EventManager.unsubscribe(INSTANCE);
         }
         Minecraft mc = MinecraftContext.mc;
-        if (mc != null && mc.level != null && mc.player != null && mc.gui.screen() == null
-                && !mc.mouseHandler.isMouseGrabbed()) {
-            mc.mouseHandler.grabMouse();
+        if (mc != null) {
+            if (mc.gui.screen() instanceof TargetHudEditScreen) {
+                mc.gui.setScreen(null);
+            }
+            if (mc.level != null && mc.player != null && mc.gui.screen() == null
+                    && !mc.mouseHandler.isMouseGrabbed()) {
+                mc.mouseHandler.grabMouse();
+            }
         }
     }
 
@@ -461,7 +473,7 @@ public final class TargetHudEditorOverlay {
                 continue;
             }
 
-            TargetHudPreset preset = presets.get(slot - templates.size() - mineHeaderAt);
+            TargetHudPreset preset = presets.get(slot - mineHeaderAt - 1);
             boolean applied = isAppliedPreset(preset);
             Render2DUtil.rect(cardX, ry, contentW, rowH)
                     .color(applied ? ColorUtil.rgba(61, 123, 255, 55) : ColorUtil.multiplyAlpha(COLOR_CARD, 0.55F))
@@ -534,6 +546,10 @@ public final class TargetHudEditorOverlay {
                 posY.target = this.feature.y;
                 addRow(panelX, posY, controlX);
 
+                Row scale = new Row("Величина", ROW_TYPE_NUMBER);
+                scale.target = this.feature.hudScale;
+                addRow(panelX, scale, controlX);
+
                 Row hover = new Row("Наведение", ROW_TYPE_TOGGLE);
                 hover.target = this.feature.hover;
                 addRow(panelX, hover, controlX);
@@ -588,6 +604,9 @@ public final class TargetHudEditorOverlay {
                     Row eyeSize = new Row("Размер глаз", ROW_TYPE_NUMBER);
                     eyeSize.target = this.feature.eyeSize;
                     addRow(panelX, eyeSize, controlX);
+
+                    addColorRow(panelX, "Цвет глаз", this.feature.eyeColor);
+                    addColorRow(panelX, "Цвет зрачка", this.feature.pupilColor);
                 }
             }
             case 3 -> {
@@ -690,7 +709,8 @@ public final class TargetHudEditorOverlay {
             }
             case ROW_TYPE_COLOR -> {
                 ColorSetting setting = (ColorSetting) row.target;
-                boolean enabled = this.feature.customColors.getValue();
+                boolean eyes = setting == this.feature.eyeColor || setting == this.feature.pupilColor;
+                boolean enabled = eyes || this.feature.customColors.getValue();
                 int color = enabled ? setting.getValue() : ColorUtil.multiplyAlpha(setting.getValue(), 0.18F);
                 Render2DUtil.rect(cx - 34.0F, row.y + 7.0F, 24.0F, 18.0F)
                         .color(color)
@@ -1051,6 +1071,8 @@ public final class TargetHudEditorOverlay {
             case 2 -> this.feature.bgColor;
             case 3 -> this.feature.borderColor;
             case 4 -> this.feature.textColor;
+            case 5 -> this.feature.eyeColor;
+            case 6 -> this.feature.pupilColor;
             default -> this.feature.barColor;
         };
     }
@@ -1061,6 +1083,8 @@ public final class TargetHudEditorOverlay {
             case 2 -> "Цвет фона";
             case 3 -> "Цвет рамки";
             case 4 -> "Цвет текста";
+            case 5 -> "Цвет глаз";
+            case 6 -> "Цвет зрачка";
             default -> "Цвет полоски";
         };
     }
@@ -1311,7 +1335,7 @@ public final class TargetHudEditorOverlay {
         this.feature.headPitch.setValue(preset.headPitch);
         this.feature.headAutoRotate.setValue(preset.headAutoRotate);
         this.feature.displayMode.setValue(isValidMode(this.feature.displayMode, preset.displayMode) ? preset.displayMode : DISPLAY_MODES[0]);
-        this.feature.customColors.setValue(preset.customColors);
+        this.feature.customColors.setValue(preset.customColors || hasCustomColors(preset));
         this.feature.barColor.setValue(preset.barColor);
         this.feature.barColorSecond.setValue(preset.barColorSecond);
         this.feature.bgColor.setValue(preset.bgColor);
@@ -1465,16 +1489,17 @@ public final class TargetHudEditorOverlay {
 
         if (slot < templates.size()) {
             TargetHudPreset template = templates.get(slot);
-            if (inside(mx, my, cardX + contentW - 148.0F, contentTop + (slot - this.presetsScroll) * (rowH + gap) + 10.0F, 66.0F, 24.0F)) {
+            float rowY = contentTop + (slot - this.presetsScroll) * (rowH + gap);
+            if (inside(mx, my, panelX + contentW - 148.0F, rowY + 10.0F, 66.0F, 24.0F)) {
                 copyTemplateToMine(template);
                 return true;
             }
-            if (inside(mx, my, cardX + contentW - 76.0F, contentTop + (slot - this.presetsScroll) * (rowH + gap) + 10.0F, 66.0F, 24.0F)) {
+            if (inside(mx, my, panelX + contentW - 76.0F, rowY + 10.0F, 66.0F, 24.0F)) {
                 applyPreset(template);
                 snapIntoView(Minecraft.getInstance());
                 return true;
             }
-            if (inside(mx, my, cardX, contentTop + (slot - this.presetsScroll) * (rowH + gap), contentW, rowH)) {
+            if (inside(mx, my, cardX, rowY, contentW, rowH)) {
                 applyPreset(template);
                 snapIntoView(Minecraft.getInstance());
                 return true;
@@ -1487,7 +1512,8 @@ public final class TargetHudEditorOverlay {
             return false;
         }
         TargetHudPreset preset = presets.get(mineSlot - 1);
-        if (inside(mx, my, cardX + contentW - 148.0F, contentTop + (slot - this.presetsScroll) * (rowH + gap) + 10.0F, 66.0F, 24.0F)) {
+        float rowY = contentTop + (slot - this.presetsScroll) * (rowH + gap);
+        if (inside(mx, my, panelX + contentW - 148.0F, rowY + 10.0F, 66.0F, 24.0F)) {
             TargetHudPresetManager.deletePreset(preset.name);
             if (isAppliedPreset(preset)) {
                 this.appliedPreset = null;
@@ -1495,12 +1521,12 @@ public final class TargetHudEditorOverlay {
             }
             return true;
         }
-        if (inside(mx, my, cardX + contentW - 76.0F, contentTop + (slot - this.presetsScroll) * (rowH + gap) + 10.0F, 66.0F, 24.0F)) {
+        if (inside(mx, my, panelX + contentW - 76.0F, rowY + 10.0F, 66.0F, 24.0F)) {
             applyPreset(preset);
             snapIntoView(Minecraft.getInstance());
             return true;
         }
-        if (inside(mx, my, cardX, contentTop + (slot - this.presetsScroll) * (rowH + gap), contentW, rowH)) {
+        if (inside(mx, my, cardX, rowY, contentW, rowH)) {
             applyPreset(preset);
             snapIntoView(Minecraft.getInstance());
             return true;
@@ -1559,6 +1585,14 @@ public final class TargetHudEditorOverlay {
         return this.appliedPreset != null && this.appliedPreset.name.equalsIgnoreCase(preset.name);
     }
 
+    private boolean hasCustomColors(TargetHudPreset preset) {
+        return preset.barColor != this.feature.barColor.getDefaultValue()
+                || preset.barColorSecond != this.feature.barColorSecond.getDefaultValue()
+                || preset.bgColor != this.feature.bgColor.getDefaultValue()
+                || preset.borderColor != this.feature.borderColor.getDefaultValue()
+                || preset.textColor != this.feature.textColor.getDefaultValue();
+    }
+
     private boolean isValidMode(ModeSetting setting, String value) {
         return value != null && setting.containsMode(value);
     }
@@ -1615,9 +1649,10 @@ public final class TargetHudEditorOverlay {
                 }
                 case ROW_TYPE_COLOR -> {
                     ColorSetting setting = (ColorSetting) row.target;
-                    int index = indexOfColor(setting);
-                    this.feature.customColors.setValue(true);
-                    initPicker(index);
+                    if (setting != this.feature.eyeColor && setting != this.feature.pupilColor) {
+                        this.feature.customColors.setValue(true);
+                    }
+                    initPicker(indexOfColor(setting));
                     return true;
                 }
                 case ROW_TYPE_TEXT -> {
@@ -1641,6 +1676,12 @@ public final class TargetHudEditorOverlay {
         }
         if (setting == this.feature.borderColor) {
             return 3;
+        }
+        if (setting == this.feature.eyeColor) {
+            return 5;
+        }
+        if (setting == this.feature.pupilColor) {
+            return 6;
         }
         return 4;
     }
@@ -1734,7 +1775,11 @@ public final class TargetHudEditorOverlay {
                 try {
                     int rgb = Integer.parseInt(value, 16);
                     int color = 0xFF000000 | rgb;
-                    pickerSetting().setValue(color);
+                    ColorSetting target = pickerSetting();
+                    if (target != this.feature.eyeColor && target != this.feature.pupilColor) {
+                        this.feature.customColors.setValue(true);
+                    }
+                    target.setValue(color);
                     float[] hsb = ColorUtil.hsv(color);
                     this.pickerHue = hsb[0];
                     this.pickerSat = hsb[1];

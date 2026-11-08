@@ -18,15 +18,20 @@ public abstract class ConnectionMixin {
             original.call(packet, listener, flush);
             return;
         }
+        Connection self = (Connection) (Object) this;
+        if (!PacketEventManager.isPrimaryConnection(self)) {
+            original.call(packet, listener, flush);
+            return;
+        }
 
-        PacketSendEvent event = PacketEventManager.callSendPre((Connection) (Object) this, packet);
+        PacketSendEvent event = PacketEventManager.callSendPre(self, packet);
         if (event.isCancelled()) {
             return;
         }
 
         Packet<?> dispatchedPacket = event.getPacket();
         original.call(dispatchedPacket, listener, flush);
-        PacketEventManager.callSendPost((Connection) (Object) this, dispatchedPacket);
+        PacketEventManager.callSendPost(self, dispatchedPacket);
     }
 
     @WrapMethod(method = "channelRead0(Lio/netty/channel/ChannelHandlerContext;Lnet/minecraft/network/protocol/Packet;)V")
@@ -35,10 +40,15 @@ public abstract class ConnectionMixin {
             original.call(context, packet);
             return;
         }
-        if (PacketEventManager.callReceivePre((Connection) (Object) this, packet)) {
+        Connection self = (Connection) (Object) this;
+        if (!PacketEventManager.isPrimaryConnection(self)) {
+            original.call(context, packet);
+            return;
+        }
+        if (PacketEventManager.callReceivePre(self, packet)) {
             return;
         }
         original.call(context, packet);
-        PacketEventManager.callReceivePost((Connection) (Object) this, packet);
+        PacketEventManager.callReceivePost(self, packet);
     }
 }

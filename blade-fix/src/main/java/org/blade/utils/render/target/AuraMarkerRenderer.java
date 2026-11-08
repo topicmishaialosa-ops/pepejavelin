@@ -169,7 +169,7 @@ public final class AuraMarkerRenderer {
                     Optional.empty()
             )) {
                 pass.setPipeline(PIPELINE);
-                pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
+                pass.setUniform("Projection", Render3DUtil.levelProjectionBuffer());
                 pass.setUniform("params", paramsBuffer);
                 pass.bindTexture("texSampler", textureView, sampler);
                 pass.setVertexBuffer(0, vertexBuffer.slice());

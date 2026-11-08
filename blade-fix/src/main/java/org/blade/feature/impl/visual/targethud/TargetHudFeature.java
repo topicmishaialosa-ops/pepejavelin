@@ -42,9 +42,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public final class TargetHudFeature extends Feature {
@@ -77,6 +75,7 @@ public final class TargetHudFeature extends Feature {
             .visibleWhen(() -> mode.is(MODE_HUIHUI)));
     public final NumberSetting x = register(new NumberSetting("X", 4.0, 0.0, 3840.0, 1.0, ""));
     public final NumberSetting y = register(new NumberSetting("Y", 4.0, 0.0, 2160.0, 1.0, ""));
+    public final NumberSetting hudScale = register(new NumberSetting("Величина", 1.0, 0.5, 2.0, 0.05, "x"));
     public final BooleanSetting hover = register(new BooleanSetting("Наведение", true));
     public final NumberSetting barThickness = register(new NumberSetting("Толщина полоски", 1.0, 0.5, 3.0, 0.05, "")
             .visibleWhen(() -> mode.is(MODE_HUIHUI)));
@@ -144,7 +143,7 @@ public final class TargetHudFeature extends Feature {
     private final Animation toggleMetanoise = new Animation(300L, Animation.Easing.EASE_OUT_QUAD);
     private float animatedHp;
     private float outdatedHealth;
-    private float goldenHealth;
+    private boolean previewMode;
     private long blinkElapsed;
     private long lastFrameNanos;
     private boolean animationTarget;
@@ -154,6 +153,14 @@ public final class TargetHudFeature extends Feature {
     private boolean dragging;
     private float dragOffsetX;
     private float dragOffsetY;
+
+    private String cachedName;
+    private String cachedHealthText;
+    private String cachedDisplayText;
+    private String cachedPercentText;
+    private String cachedSecondary;
+    private float cachedHealthValue = Float.NaN;
+    private int cachedPercentValue = -1;
 
     private static final class LoadedImage {
         final Identifier id;
@@ -220,7 +227,7 @@ public final class TargetHudFeature extends Feature {
             return;
         }
         boolean guiOpen = mc.gui.screen() instanceof ChatScreen || mc.gui.screen() instanceof InventoryScreen;
-        if (!guiOpen || this.mode.is(MODE_HUIHUI) && !this.hover.getValue()) {
+        if (!guiOpen) {
             return;
         }
         if (event.getAction() == GLFW.GLFW_RELEASE) {
@@ -258,9 +265,11 @@ public final class TargetHudFeature extends Feature {
         Matrix3x2fStack pose = extractor.pose();
         pose.pushMatrix();
         pose.translate(px - this.x.getValue().floatValue(), py - this.y.getValue().floatValue());
+        this.previewMode = true;
         try {
             render(mc, entity, true, 1.0F);
         } finally {
+            this.previewMode = false;
             pose.popMatrix();
         }
     }
@@ -268,28 +277,110 @@ public final class TargetHudFeature extends Feature {
     private void render(Minecraft mc, LivingEntity entity, boolean present, float alphaMultiplier) {
         updateAnimations(present);
         updateDisplayMath(present ? entity : null);
+        updateCachedStrings(entity);
         float alpha = (present ? 1.0F : this.attackAnimation.getValue()) * alphaMultiplier;
         if (alpha <= 0.01F) {
             return;
         }
-        Palette pal = palette(hpFraction(entity), alpha);
-        if (this.mode.is(MODE_BLADE)) {
-            renderBlade(mc, entity, alpha, pal);
+        Palette pal = palette(animFraction(entity), alpha);
+        float scale = this.hudScale.getValue().floatValue();
+        GuiGraphicsExtractor scaleExtractor = RenderContext.currentGuiGraphicsExtractor();
+        Matrix3x2fStack scalePose = scaleExtractor == null ? null : scaleExtractor.pose();
+        boolean scaled = scalePose != null && Math.abs(scale - 1.0F) > 0.001F;
+        if (scaled) {
+            scalePose.pushMatrix();
+            scalePose.translate(x0(), y0());
+            scalePose.scale(scale, scale);
+            scalePose.translate(-x0(), -y0());
+        }
+        try {
+            if (this.mode.is(MODE_BLADE)) {
+                renderBlade(mc, entity, alpha, pal);
+                return;
+            }
+            switch (this.type.getValue()) {
+                case TYPE_SMALL -> renderSmall(mc, entity, alpha, pal);
+                case TYPE_PERCENT -> renderPercent(mc, entity, alpha, pal);
+                case TYPE_BIG_BAR -> renderBigBar(mc, entity, alpha, pal);
+                case TYPE_VERTICAL -> renderVertical(mc, entity, alpha, pal);
+                case TYPE_METANOISE -> renderMetanoise(mc, entity, alpha, pal);
+                case TYPE_MINI -> renderMini(mc, entity, alpha, pal);
+                case TYPE_GRADIENT -> renderGradient(mc, entity, alpha, pal);
+                case TYPE_BOSS_BAR -> renderBossBar(mc, entity, alpha, pal);
+                case TYPE_MINIMAL -> renderMinimal(mc, entity, alpha, pal);
+                case TYPE_CIRCLE -> renderCircle(mc, entity, alpha, pal);
+                default -> renderLarge(mc, entity, alpha, pal);
+            }
+            float belowY = y0() + rawHeight() + 2.0F;
+            if (this.showArmor.getValue()) {
+                drawArmor(entity, x0() + 2.0F, belowY, alpha);
+                belowY += 12.0F;
+            }
+            if (this.showPing.getValue()) {
+                int ping = pingOf(mc, entity);
+                if (ping >= 0) {
+                    Render2DUtil.text(x0() + rawWidth() - 2.0F, belowY, 5.0F, ping + " ms")
+                            .weight(400)
+                            .color(pal.textSecond)
+                            .align(TextAlign.RIGHT)
+                            .draw();
+                }
+            }
+        } finally {
+            if (scaled) {
+                scalePose.popMatrix();
+            }
+        }
+    }
+
+    private float x0() {
+        return this.x.getValue().floatValue();
+    }
+
+    private float y0() {
+        return this.y.getValue().floatValue();
+    }
+
+    private static int pingOf(Minecraft mc, LivingEntity entity) {
+        if (!(entity instanceof AbstractClientPlayer player) || mc.getConnection() == null) {
+            return -1;
+        }
+        net.minecraft.client.multiplayer.PlayerInfo info = mc.getConnection().getPlayerInfo(player.getUUID());
+        return info == null ? -1 : info.getLatency();
+    }
+
+    private void updateCachedStrings(LivingEntity entity) {
+        if (entity == null || entity != this.target) {
             return;
         }
-        switch (this.type.getValue()) {
-            case TYPE_SMALL -> renderSmall(mc, entity, alpha, pal);
-            case TYPE_PERCENT -> renderPercent(mc, entity, alpha, pal);
-            case TYPE_BIG_BAR -> renderBigBar(mc, entity, alpha, pal);
-            case TYPE_VERTICAL -> renderVertical(mc, entity, alpha, pal);
-            case TYPE_METANOISE -> renderMetanoise(mc, entity, alpha, pal);
-            case TYPE_MINI -> renderMini(mc, entity, alpha, pal);
-            case TYPE_GRADIENT -> renderGradient(mc, entity, alpha, pal);
-            case TYPE_BOSS_BAR -> renderBossBar(mc, entity, alpha, pal);
-            case TYPE_MINIMAL -> renderMinimal(mc, entity, alpha, pal);
-            case TYPE_CIRCLE -> renderCircle(mc, entity, alpha, pal);
-            default -> renderLarge(mc, entity, alpha, pal);
+        String currentName = entity.getName().getString();
+        float health = animValue(entity);
+        int percent = (int) (animFraction(entity) * 100.0F);
+        if (currentName.equals(this.cachedName)
+                && this.cachedDisplayText != null
+                && this.cachedPercentValue == percent
+                && this.cachedHealthValue == health) {
+            return;
         }
+        this.cachedName = currentName;
+        this.cachedHealthValue = health;
+        this.cachedPercentValue = percent;
+        this.cachedHealthText = Integer.toString((int) Math.ceil(health));
+
+        String mode = this.displayMode.getValue();
+        if ("Проценты и HP".equals(mode)) {
+            this.cachedDisplayText = percent + "% " + (int) Math.ceil(health);
+            this.cachedSecondary = "HP " + (int) Math.ceil(animValue(entity)) + "/"
+                    + (int) Math.ceil(maxHealth(entity));
+        } else if ("Проценты".equals(mode)) {
+            this.cachedDisplayText = percent + "%";
+            this.cachedSecondary = this.cachedDisplayText;
+        } else {
+            this.cachedDisplayText = String.valueOf((int) Math.ceil(health));
+            this.cachedSecondary = this.cachedDisplayText;
+        }
+
+        this.cachedPercentText = percent + "%";
     }
 
     private void renderBlade(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
@@ -317,10 +408,11 @@ public final class TargetHudFeature extends Feature {
         drawHead(entity, headX, headY, headSize, alpha);
 
         float infoX = headX + headSize + 6.0F;
-        float health = entity.getHealth() + entity.getAbsorptionAmount();
-        String healthText = Integer.toString((int) Math.ceil(health));
+        String healthText = this.cachedHealthText != null && entity == this.lastMathEntity
+                ? this.cachedHealthText
+                : Integer.toString((int) Math.ceil(animValue(entity)));
         float healthWidth = measure(healthText, 400, 10.0F);
-        String name = ellipsize(entity.getName().getString(), 400, 10.0F,
+        String name = ellipsize(entityName(entity), 400, 10.0F,
                 x + width - 8.0F - infoX - healthWidth - 6.0F);
 
         float textTop = headY + headSize / 2.0F - 7.0F;
@@ -336,7 +428,7 @@ public final class TargetHudFeature extends Feature {
 
         float barY = y + height - 16.0F;
         float barWidth = x + width - 8.0F - infoX;
-        float fraction = hpFraction(entity);
+        float fraction = animFraction(entity);
         Render2DUtil.rect(infoX, barY, barWidth, 4.0F)
                 .color(pal.track)
                 .radius(2.0F)
@@ -350,7 +442,7 @@ public final class TargetHudFeature extends Feature {
         }
 
         if (this.showArmor.getValue()) {
-            drawArmor(entity, infoX, headY + headSize + 2.0F, alpha);
+            drawArmor(entity, infoX, Math.min(headY + headSize + 2.0F, y + height - 12.0F), alpha);
         }
     }
 
@@ -367,157 +459,187 @@ public final class TargetHudFeature extends Feature {
     }
 
     private void renderLarge(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
-        float x = this.x.getValue().floatValue();
-        float y = this.y.getValue().floatValue();
+        float x = x0();
+        float y = y0();
         float size = 28.0F * this.headSize.getValue().floatValue();
         float nameSize = Math.max(5.0F, size * 0.3F);
+        float bigSize = nameSize + 4.0F;
+        float barH = barHeight(4.0F);
         float width = Math.max(52.0F, size * 1.5F + 12.0F);
-        float height = size + 22.0F;
+
+        float headY = y + 3.0F;
+        float bigTop = headY + size + 3.0F;
+        float nameTop = bigTop + bigSize + 1.0F;
+        float barY = nameTop + nameSize + 4.0F;
+        float height = barY - y + barH + 4.0F;
 
         float corner = this.radius.getValue().floatValue() * 0.6F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
 
-        drawHead(entity, x + width / 2.0F - size / 2.0F, y + 4.0F, size, alpha);
+        drawHead(entity, x + width / 2.0F - size / 2.0F, headY, size, alpha);
 
         String big = displayText(entity);
-        float bigSize = nameSize + 4.0F;
         float bigWidth = measure(big, 600, bigSize);
-        float headRoom = size + 14.0F;
         if (bigWidth <= width * 0.92F) {
-            drawTextCenter(x + width / 2.0F, y + 15.0F, bigSize, big, 600, pal.text);
+            Render2DUtil.text(x + width / 2.0F, bigTop, bigSize, big)
+                    .weight(600)
+                    .color(pal.text)
+                    .align(TextAlign.CENTER)
+                    .draw();
         }
 
-        String name = entity.getName().getString();
-        float nameWidth = measure(name, 400, nameSize);
+        String name = entityName(entity);
         float avail = width - 8.0F;
-        if (nameWidth > avail) {
+        if (measure(name, 400, nameSize) > avail) {
             name = ellipsize(name, 400, nameSize, avail);
         }
-        drawTextCenter(x + width / 2.0F, y + 15.0F + bigWidth * 0.0F + nameSize + 7.0F, nameSize, name, 400,
-                ColorUtil.multiplyAlpha(pal.text, 0.85F));
+        Render2DUtil.text(x + width / 2.0F, nameTop, nameSize, name)
+                .weight(400)
+                .color(ColorUtil.multiplyAlpha(pal.text, 0.85F))
+                .align(TextAlign.CENTER)
+                .draw();
 
-        float barW = width - 8.0F;
-        float barY = y + 15.0F + bigSize + nameSize + 9.0F;
-        drawBars(entity, x + 4.0F, barY, barW, barHeight(4.0F), pal);
+        drawBars(entity, x + 4.0F, barY, width - 8.0F, barH, pal);
     }
 
     private void renderSmall(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
-        float x = this.x.getValue().floatValue();
-        float y = this.y.getValue().floatValue();
+        float x = x0();
+        float y = y0();
         float size = 18.0F * this.headSize.getValue().floatValue();
         float nameSize = 6.5F;
+        float barH = barHeight(3.5F);
         float width = Math.max(48.0F, size + 16.0F);
-        float height = size + 10.0F;
+
+        float headY = y + 3.0F;
+        float barY = headY + size + 4.0F;
+        float nameTop = barY + barH + 2.0F;
+        float height = nameTop - y + nameSize + 3.0F;
 
         float corner = this.radius.getValue().floatValue() * 0.5F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
 
-        drawHead(entity, x + 3.0F, y + 3.0F, size, alpha);
-        drawBars(entity, x + 3.0F, y + 3.0F + size + 4.0F, width - 6.0F, barHeight(3.5F), pal);
+        drawHead(entity, x + 3.0F, headY, size, alpha);
+        drawBars(entity, x + 3.0F, barY, width - 6.0F, barH, pal);
 
-        String name = entity.getName().getString();
-        drawTextCenter(x + width / 2.0F, y + 3.0F + size + 5.0F + barHeight(3.5F) + 1.0F, nameSize, name, 400, pal.text);
+        String name = ellipsize(entityName(entity), 400, nameSize, width - 6.0F);
+        Render2DUtil.text(x + width / 2.0F, nameTop, nameSize, name)
+                .weight(400)
+                .color(pal.text)
+                .align(TextAlign.CENTER)
+                .draw();
     }
 
     private void renderPercent(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
-        float x = this.x.getValue().floatValue();
-        float y = this.y.getValue().floatValue();
+        float x = x0();
+        float y = y0();
         float size = 22.0F * this.headSize.getValue().floatValue();
         float width = Math.max(56.0F, size + 4.0F);
-        float height = size + 28.0F;
+        float textSize = 5.5F;
+        float barH = barHeight(4.0F);
+
+        float headY = y + 2.0F;
+        float percentTop = headY + size + 4.0F;
+        float barY = percentTop + textSize + 2.0F + 4.0F;
+        float nameTop = barY + barH + 3.0F;
+        float nameSize = textSize - 0.5F;
+        float height = nameTop - y + nameSize + 3.0F;
 
         float corner = this.radius.getValue().floatValue() * 0.55F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
 
-        drawHead(entity, x + 2.0F, y + 2.0F, size, alpha);
+        drawHead(entity, x + 2.0F, headY, size, alpha);
 
-        float textSize = 5.5F;
-        drawTextCenter(x + width / 2.0F, y + 2.0F + size + 8.0F, textSize + 2.0F, displayPercent(entity), 600, pal.text);
-        drawBars(entity, x + 2.0F, y + 2.0F + size + 8.0F + textSize + 8.0F, width - 4.0F, barHeight(4.0F), pal);
-        drawTextCenter(x + width / 2.0F, y + 2.0F + size + 8.0F + textSize + barHeight(4.0F) + 16.0F, textSize - 0.5F,
-                ellipsize(entity.getName().getString(), 400, textSize - 0.5F, width - 4.0F), 400, pal.text);
+        Render2DUtil.text(x + width / 2.0F, percentTop, textSize + 2.0F, displayPercent(entity))
+                .weight(600)
+                .color(pal.text)
+                .align(TextAlign.CENTER)
+                .draw();
+        drawBars(entity, x + 2.0F, barY, width - 4.0F, barH, pal);
+        Render2DUtil.text(x + width / 2.0F, nameTop, nameSize,
+                        ellipsize(entityName(entity), 400, nameSize, width - 4.0F))
+                .weight(400)
+                .color(pal.text)
+                .align(TextAlign.CENTER)
+                .draw();
     }
 
     private void renderBigBar(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
-        float x = this.x.getValue().floatValue();
-        float y = this.y.getValue().floatValue();
+        float x = x0();
+        float y = y0();
         float size = 10.0F * this.headSize.getValue().floatValue();
         float nameSize = 6.0F;
-        String name = entity.getName().getString();
-        float width = Math.max(82.0F, 10.0F * this.headSize.getValue().floatValue() + measure(name, 400, nameSize + 4.0F) + 34.0F);
-        float height = 24.0F;
+        String name = entityName(entity);
+        float width = Math.max(82.0F, size + measure(name, 400, nameSize + 4.0F) + 34.0F);
+        float barH = barHeight(9.0F);
+        float barY = Math.max(16.0F, 3.0F + size + 3.0F);
+        float height = barY + barH + 3.0F;
 
         float corner = this.radius.getValue().floatValue() * 0.5F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
 
         drawHead(entity, x + 3.0F, y + 3.0F, size, alpha);
         float infoX = x + 3.0F + size + 5.0F;
-        drawText(infoX, y + 5.0F, nameSize + 4.0F, ellipsize(name, 400, nameSize + 4.0F,
-                width - infoX - x - 40.0F), 400, pal.text);
-        drawText(x + width - 3.0F, y + 5.0F, nameSize + 2.0F, displayText(entity), 400, pal.text);
+        float rightEdge = x + width - 3.0F;
+        float displayW = measure(displayText(entity), 400, nameSize + 2.0F);
+        float nameMax = rightEdge - infoX - displayW - 6.0F;
+        Render2DUtil.text(infoX, y + 3.0F, nameSize + 4.0F, ellipsize(name, 400, nameSize + 4.0F, nameMax))
+                .weight(400)
+                .color(pal.text)
+                .draw();
+        Render2DUtil.text(rightEdge, y + 4.0F, nameSize + 2.0F, displayText(entity))
+                .weight(400)
+                .color(pal.text)
+                .align(TextAlign.RIGHT)
+                .draw();
 
-        drawBars(entity, infoX, y + 13.0F, width - infoX + x - x - 6.0F, barHeight(9.0F), pal);
+        drawBars(entity, infoX, barY, rightEdge - 1.0F - infoX, barH, pal);
     }
 
     private void renderVertical(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
-        float x = this.x.getValue().floatValue();
-        float y = this.y.getValue().floatValue();
+        float x = x0();
+        float y = y0();
         float size = 20.0F * this.headSize.getValue().floatValue();
         float width = 36.0F;
-        float height = size + 18.0F;
+
+        float nameSize = 4.5F;
+        float textSize = 5.0F;
+        float headY = y + 4.0F;
+        float nameTop = headY + size + 6.0F;
+        float percentTop = nameTop + nameSize + 3.0F;
+        float height = percentTop - y + textSize + 4.0F;
 
         float corner = this.radius.getValue().floatValue() * 0.55F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
 
-        drawHead(entity, x + 4.0F, y + 4.0F, size, alpha);
+        drawHead(entity, x + 4.0F, headY, size, alpha);
 
         float totalH = size - 2.0F;
         float barW = 4.0F;
         float barX = x + width - 7.0F;
-        float barY = y + 4.0F;
-        float hpFrac = hpFraction(entity);
-        Render2DUtil.rect(barX, barY, barW, totalH)
+        float hpFrac = animFraction(entity);
+        Render2DUtil.rect(barX, headY, barW, totalH)
                 .color(pal.track)
                 .radius(2.0F)
                 .draw();
         float fillH = totalH * hpFrac;
         if (fillH > 0.0F) {
-            Render2DUtil.rect(barX, barY + totalH - fillH, barW, fillH)
+            Render2DUtil.rect(barX, headY + totalH - fillH, barW, fillH)
                     .color(pal.bar)
                     .radius(2.0F)
                     .draw();
         }
 
-        float nameSize = 4.5F;
-        String name = entity.getName().getString();
-        Render2DUtil.text(x + width / 2.0F, y + 4.0F + size + 6.0F, nameSize,
-                        ellipsize(name, 400, nameSize, width - 4.0F))
+        String name = ellipsize(entityName(entity), 400, nameSize, width - 4.0F);
+        Render2DUtil.text(x + width / 2.0F, nameTop, nameSize, name)
                 .weight(400)
                 .color(pal.text)
                 .align(TextAlign.CENTER)
                 .draw();
-
-        float textSize = 5.0F;
-        float textY = y + 4.0F + size + 6.0F + nameSize + 3.0F;
-        float percentWidth = measure(displayPercent(entity), 600, textSize);
-        Render2DUtil.text(x + width / 2.0F, textY, textSize, displayPercent(entity))
+        Render2DUtil.text(x + width / 2.0F, percentTop, textSize, displayPercent(entity))
                 .weight(600)
                 .color(pal.bar)
                 .align(TextAlign.CENTER)
                 .draw();
-        float nameWidth = measure(name, 400, nameSize);
-        if (nameWidth > percentWidth) {
-            Render2DUtil.rect(x + width / 2.0F - nameWidth / 2.0F - 2.0F, textY + textSize - nameSize,
-                    nameWidth + 4.0F, nameSize + 1.0F)
-                    .color(pal.bg)
-                    .radius(1.0F)
-                    .draw();
-            Render2DUtil.text(x + width / 2.0F, textY - nameSize + 1.0F, nameSize, name)
-                    .weight(400)
-                    .color(pal.text)
-                    .align(TextAlign.CENTER)
-                    .draw();
-        }
     }
 
     private void renderMini(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
@@ -535,13 +657,13 @@ public final class TargetHudFeature extends Feature {
         float nameSize = 5.5F;
         float infoX = x + 2.0F + size + 3.0F;
         float infoW = width - infoX + x - 2.0F;
-        String name = ellipsize(entity.getName().getString(), 400, nameSize, infoW);
+        String name = ellipsize(entityName(entity), 400, nameSize, infoW);
         Render2DUtil.text(infoX, y + 5.0F, nameSize, name)
                 .weight(400)
                 .color(pal.text)
                 .draw();
 
-        float hpFrac = hpFraction(entity);
+        float hpFrac = animFraction(entity);
         Render2DUtil.rect(infoX, y + 13.0F, infoW, 2.0F)
                 .color(pal.track)
                 .radius(1.0F)
@@ -562,24 +684,34 @@ public final class TargetHudFeature extends Feature {
     }
 
     private void renderGradient(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
-        float x = this.x.getValue().floatValue();
-        float y = this.y.getValue().floatValue();
+        float x = x0();
+        float y = y0();
         float size = 24.0F * this.headSize.getValue().floatValue();
         float width = Math.max(58.0F, size + 10.0F);
-        float height = size + 22.0F;
+        float nameSize = 5.5F;
+        float barH = barHeight(5.0F);
+
+        float headY = y + 4.0F;
+        float barTop = headY + size + 6.0F;
+        float nameTop = barTop + barH + 4.0F;
+        float height = nameTop - y + nameSize + 4.0F;
 
         float corner = this.radius.getValue().floatValue() * 0.55F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
 
-        drawHead(entity, x + 4.0F, y + 4.0F, size, alpha);
+        drawHead(entity, x + 4.0F, headY, size, alpha);
 
-        Render2DUtil.rect(x + 6.0F, y + 4.0F + size + 6.0F, width - 12.0F, barHeight(5.0F))
+        Render2DUtil.rect(x + 6.0F, barTop, width - 12.0F, barH)
                 .color(pal.bar, pal.barSecond, pal.bar, pal.barSecond)
-                .radius(barHeight(5.0F) / 2.0F)
+                .radius(barH / 2.0F)
                 .draw();
 
-        String name = entity.getName().getString();
-        drawTextCenter(x + width / 2.0F, y + 4.0F + size + 6.0F + barHeight(5.0F) + 9.0F, 5.5F, name, 400, pal.text);
+        String name = ellipsize(entityName(entity), 400, nameSize, width - 8.0F);
+        Render2DUtil.text(x + width / 2.0F, nameTop, nameSize, name)
+                .weight(400)
+                .color(pal.text)
+                .align(TextAlign.CENTER)
+                .draw();
     }
 
     private void renderMinimal(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
@@ -587,7 +719,7 @@ public final class TargetHudFeature extends Feature {
         float y = this.y.getValue().floatValue();
         float size = 14.0F * this.headSize.getValue().floatValue();
         float nameSize = 5.0F;
-        String name = entity.getName().getString();
+        String name = entityName(entity);
         float width = Math.max(52.0F, size + measure(name, 400, nameSize + 1.0F) + 26.0F);
         float height = 32.0F;
 
@@ -609,7 +741,7 @@ public final class TargetHudFeature extends Feature {
                 .color(pal.textSecond)
                 .draw();
 
-        float hpFrac = hpFraction(entity);
+        float hpFrac = animFraction(entity);
         Render2DUtil.rect(infoX, y + 19.0F, infoW, 3.0F)
                 .color(pal.track)
                 .radius(1.0F)
@@ -624,13 +756,19 @@ public final class TargetHudFeature extends Feature {
     }
 
     private void renderBossBar(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
-        float x = this.x.getValue().floatValue();
-        float y = this.y.getValue().floatValue();
+        float x = x0();
+        float y = y0();
         float size = 30.0F * this.headSize.getValue().floatValue();
         float nameSize = 7.0F;
-        String name = entity.getName().getString();
-        float width = Math.max(110.0F, size + measure(name, 600, nameSize + 4.0F) + 26.0F);
-        float height = size + 10.0F;
+        float textSize = nameSize + 4.0F;
+        String name = entityName(entity);
+        String hpText = displayText(entity);
+        float hpW = measure(hpText, 600, textSize);
+        float nameW = measure(name, 600, textSize);
+        float width = Math.max(110.0F, size + nameW + hpW + 34.0F);
+        float barH = barHeight(9.0F);
+        float barY = y + 5.0F + nameSize + 4.0F + 4.0F;
+        float height = Math.max(size + 10.0F, barY - y + barH + 4.0F);
 
         float corner = this.radius.getValue().floatValue() * 0.5F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
@@ -638,22 +776,30 @@ public final class TargetHudFeature extends Feature {
         drawHead(entity, x + 4.0F, y + 4.0F, size, alpha);
 
         float infoX = x + 4.0F + size + 5.0F;
-        Render2DUtil.text(infoX, y + 5.0F, nameSize + 4.0F, ellipsize(name, 600, nameSize + 4.0F,
-                        width - infoX + x - 4.0F))
+        float nameMax = x + width - 4.0F - hpW - 8.0F - infoX;
+        Render2DUtil.text(infoX, y + 5.0F, textSize, ellipsize(name, 600, textSize, Math.max(10.0F, nameMax)))
                 .weight(600)
                 .color(pal.text)
                 .draw();
-        float barY = y + 5.0F + nameSize + 4.0F + 4.0F;
-        drawBars(entity, infoX, barY, width - 4.0F - size - 9.0F, barHeight(9.0F), pal);
+        Render2DUtil.text(x + width - 4.0F, y + 5.0F, textSize, hpText)
+                .weight(600)
+                .color(pal.text)
+                .align(TextAlign.RIGHT)
+                .draw();
+        drawBars(entity, infoX, barY, width - 4.0F - size - 9.0F, barH, pal);
     }
 
     private void renderMetanoise(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
-        float x = this.x.getValue().floatValue();
-        float y = this.y.getValue().floatValue();
+        float x = x0();
+        float y = y0();
         float size = 28.0F * this.headSize.getValue().floatValue();
         float width = size + 20.0F;
-        float height = size + 22.0F;
         float nameSize = 5.5F;
+        float barH = barHeight(4.0F);
+
+        float percentTop = y + 2.0F + size + 4.0F;
+        float barY = percentTop + nameSize + 2.0F + 4.0F;
+        float height = barY - y + barH + 4.0F;
 
         int baseC = this.customColors.getValue()
                 ? pal.bg
@@ -671,6 +817,7 @@ public final class TargetHudFeature extends Feature {
                 .color(baseC)
                 .radius(3.0F)
                 .draw();
+        drawBgImage(x, y, width, height, 3.0F, alpha);
 
         float sheen = this.toggleMetanoise.getValue();
         float sheenX = x + (width - 36.0F) * sheen;
@@ -682,48 +829,53 @@ public final class TargetHudFeature extends Feature {
 
         drawHead(entity, x + 2.0F, y + 2.0F, size, alpha);
 
-        Render2DUtil.text(x + width / 2.0F, y + 4.0F + size + 6.0F, nameSize + 2.0F, displayPercent(entity))
+        Render2DUtil.text(x + width / 2.0F, percentTop, nameSize + 2.0F, displayPercent(entity))
                 .weight(600)
                 .color(pal.bar)
                 .align(TextAlign.CENTER)
                 .draw();
 
-        drawBars(entity, x + 5.0F, y + 4.0F + size + 6.0F + nameSize + 8.0F, width - 10.0F, barHeight(4.0F), pal);
+        drawBars(entity, x + 5.0F, barY, width - 10.0F, barH, pal);
     }
 
     private void renderCircle(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
-        float x = this.x.getValue().floatValue();
-        float y = this.y.getValue().floatValue();
+        float x = x0();
+        float y = y0();
         float size = 20.0F * this.headSize.getValue().floatValue();
         float ringOuter = size / 2.0F + 5.0F;
         float cx = x + ringOuter;
         float cy = y + ringOuter;
         float ringThickness = 4.0F;
+        float ringBottom = y + ringOuter * 2.0F;
 
-        float hpFrac = hpFraction(entity);
+        float hpFrac = animFraction(entity);
         drawRing(cx, cy, ringOuter - ringThickness / 2.0F, ringThickness, 0.0F, 1.0F,
                 ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 255, 255, 26), alpha));
         if (hpFrac > 0.0F) {
             drawRing(cx, cy, ringOuter - ringThickness / 2.0F, ringThickness, 0.0F, hpFrac, pal.bar);
         }
-        float absorption = entity.getAbsorptionAmount();
-        if (absorption > 0.0F) {
-            float start = hpFrac;
-            float end = Mth.clamp(start + absorption / maxHealth(entity), 0.0F, 1.0F);
-            drawRing(cx, cy, ringOuter - ringThickness / 2.0F, ringThickness * 0.7F, start, end, pal.barSecond);
+        if (this.showSecondBar.getValue()) {
+            float start = absorptionStart(hpFrac, entity);
+            if (hpFrac > start) {
+                drawRing(cx, cy, ringOuter - ringThickness / 2.0F, ringThickness * 0.7F, start, hpFrac, pal.barSecond);
+            }
         }
 
         float headSize = Math.min(size, ringOuter * 2.0F - 2.0F);
         drawHead(entity, cx - headSize / 2.0F, cy - headSize / 2.0F, headSize, alpha);
 
         float textSize = 4.0F;
-        Render2DUtil.text(cx, cy + 3.0F, textSize + 1.0F, displayPercent(entity))
+        float percentTop = ringBottom + 2.0F;
+        float nameTop = percentTop + textSize + 4.0F;
+        float nameSize = 4.0F;
+
+        Render2DUtil.text(cx, percentTop, textSize + 1.0F, displayPercent(entity))
                 .weight(600)
                 .color(pal.text)
                 .align(TextAlign.CENTER)
                 .draw();
-        Render2DUtil.text(cx, cy + 3.0F + textSize + 3.0F, 4.0F,
-                        ellipsize(entity.getName().getString(), 400, 4.0F, size + 6.0F))
+        Render2DUtil.text(cx, nameTop, nameSize,
+                        ellipsize(entityName(entity), 400, nameSize, ringOuter * 2.0F + 8.0F))
                 .weight(400)
                 .color(ColorUtil.multiplyAlpha(pal.text, 0.8F))
                 .align(TextAlign.CENTER)
@@ -747,7 +899,7 @@ public final class TargetHudFeature extends Feature {
     }
 
     private void drawBars(LivingEntity entity, float x, float y, float w, float h, Palette pal) {
-        float hpFrac = hpFraction(entity);
+        float hpFrac = animFraction(entity);
 
         Render2DUtil.rect(x, y, w, h)
                 .color(pal.track)
@@ -770,16 +922,15 @@ public final class TargetHudFeature extends Feature {
         }
 
         if (this.showSecondBar.getValue()) {
-            float goldFrac = Mth.clamp(this.goldenHealth / maxHealth(entity), 0.0F, 1.0F);
-            if (goldFrac > 0.0F && !this.matchBarThickness.getValue() && hpFrac + goldFrac > 1.0F) {
-                float goldH = barHeight(4.0F) * this.secondBarThickness.getValue().floatValue();
-                float goldW = Math.min(goldFrac, 1.0F - hpFrac) * w;
-                if (goldW > 0.0F) {
-                    Render2DUtil.rect(x + hpFrac * w, y + h - goldH - 2.0F, goldW, goldH)
-                            .color(pal.barSecond)
-                            .radius(this.barRadius.getValue().floatValue())
-                            .draw();
-                }
+            float start = absorptionStart(hpFrac, entity);
+            if (hpFrac > start) {
+                boolean match = this.matchBarThickness.getValue();
+                float goldH = match ? h : barHeight(4.0F) * this.secondBarThickness.getValue().floatValue();
+                float goldY = match ? y : y + h - goldH - 2.0F;
+                Render2DUtil.rect(x + start * w, goldY, (hpFrac - start) * w, goldH)
+                        .color(pal.barSecond)
+                        .radius(this.barRadius.getValue().floatValue())
+                        .draw();
             }
         }
     }
@@ -795,20 +946,49 @@ public final class TargetHudFeature extends Feature {
                     .radius(cornerRadius)
                     .draw();
         }
+        drawBgImage(x, y, w, h, cornerRadius, alpha);
         if (borderWidth > 0.0F && border != ColorUtil.TRANSPARENT) {
             Render2DUtil.rect(x, y, w, h)
+                    .color(ColorUtil.TRANSPARENT)
                     .border(borderWidth, border)
                     .radius(cornerRadius)
                     .draw();
         }
     }
 
+    private void drawBgImage(float x, float y, float w, float h, float radius, float alpha) {
+        String bgPath = this.bgImage.getValue();
+        if (bgPath == null || bgPath.isBlank()) {
+            return;
+        }
+        LoadedImage image = loadImage(bgPath);
+        if (image == null) {
+            return;
+        }
+        Render2DUtil.texture(x, y, w, h, image.id)
+                .managed()
+                .uv(0.0F, 0.0F, 1.0F, 1.0F)
+                .radius(radius)
+                .color(ColorUtil.multiplyAlpha(ColorUtil.WHITE, alpha))
+                .draw();
+    }
+    private float currentHeadYaw() {
+        if (this.headAutoRotate.getValue()) {
+            return (float) ((System.currentTimeMillis() / 8L) % 360L);
+        }
+        return this.headYaw.getValue().floatValue();
+    }
+
     private void drawHead(LivingEntity entity, float x, float y, float size, float alpha) {
+        float yaw = currentHeadYaw();
+        float pitch = this.headPitch.getValue().floatValue();
         String custom = this.headImage.getValue();
         if (custom != null && !custom.isBlank()) {
             LoadedImage image = loadImage(custom);
             if (image != null) {
-                Render2DUtil.texture(x, y, size, size, image.id)
+                float scaleY = PlayerHead.pitchScale(pitch);
+                float drawH = size * scaleY;
+                Render2DUtil.texture(x, y + (size - drawH) / 2.0F, size, drawH, image.id)
                         .managed()
                         .uv(0.0F, 0.0F, 1.0F, 1.0F)
                         .radius(size * 0.2F)
@@ -819,34 +999,52 @@ public final class TargetHudFeature extends Feature {
         }
         if (entity instanceof AbstractClientPlayer player) {
             PlayerHead.draw(x, y, size, player.getSkin().body().texturePath(), size * 0.2F,
-                    ColorUtil.multiplyAlpha(ColorUtil.WHITE, alpha));
+                    ColorUtil.multiplyAlpha(ColorUtil.WHITE, alpha), yaw, pitch);
             if (this.showEyes.getValue()) {
-                drawEyes(x, y, size, alpha);
+                drawEyes(x, y, size, alpha, yaw, pitch);
             }
         } else {
-            Render2DUtil.rect(x, y, size, size)
+            float scaleY = PlayerHead.pitchScale(pitch);
+            float drawH = size * scaleY;
+            Render2DUtil.rect(x, y + (size - drawH) / 2.0F, size, drawH)
                     .color(ColorUtil.multiplyAlpha(ColorUtil.rgba(60, 60, 70, 160), alpha))
                     .radius(size * 0.2F)
                     .draw();
         }
     }
 
-    private void drawEyes(float x, float y, float size, float alpha) {
+    private void drawEyes(float x, float y, float size, float alpha, float yaw, float pitch) {
+        float facing = PlayerHead.facing(yaw);
+        if (facing <= 0.15F) {
+            return;
+        }
+        float eyeAlpha = alpha * Math.min(1.0F, (facing - 0.15F) / 0.5F);
+        if (eyeAlpha <= 0.02F) {
+            return;
+        }
+
         long cycle = this.blinkElapsed % 4200L;
         float open = cycle > 3800L
                 ? Math.max(0.1F, 1.0F - (cycle - 3800L) / 400.0F)
                 : 1.0F;
 
-        float s = size * this.eyeSize.getValue().floatValue();
-        float eyeW = s * 0.22F;
-        float eH = s * 0.24F;
-        float eyeH = eH * open;
-        float eyeY = y + size * 0.24F + (eH - eyeH) / 2.0F;
-        int eyeC = ColorUtil.multiplyAlpha(this.eyeColor.getValue(), alpha);
-        int pupilC = ColorUtil.multiplyAlpha(this.pupilColor.getValue(), alpha);
+        float scaleY = PlayerHead.pitchScale(pitch);
+        float eyeScale = this.eyeSize.getValue().floatValue();
+        float eyeW = size * 0.25F * eyeScale * Math.max(0.35F, facing);
+        float eH = size * 0.25F * eyeScale;
+        float eyeH = eH * open * scaleY;
 
-        drawSingleEye(x + size * 0.16F, eyeY, eyeW, eyeH, eyeC, pupilC, alpha);
-        drawSingleEye(x + size * 0.62F, eyeY, eyeW, eyeH, eyeC, pupilC, alpha);
+        float headTop = y + (size - size * scaleY) / 2.0F;
+        float eyeY = headTop + size * scaleY * 0.5F - eyeH / 2.0F;
+        float centerX = x + size * 0.5F;
+        float eye1 = centerX + (x + size * 0.375F - centerX) * facing;
+        float eye2 = centerX + (x + size * 0.75F - centerX) * facing;
+
+        int eyeC = ColorUtil.multiplyAlpha(this.eyeColor.getValue(), eyeAlpha);
+        int pupilC = ColorUtil.multiplyAlpha(this.pupilColor.getValue(), eyeAlpha);
+
+        drawSingleEye(eye1 - eyeW / 2.0F, eyeY, eyeW, eyeH, eyeC, pupilC, eyeAlpha);
+        drawSingleEye(eye2 - eyeW / 2.0F, eyeY, eyeW, eyeH, eyeC, pupilC, eyeAlpha);
     }
 
     private void drawSingleEye(float ex, float ey, float eyeW, float eyeH, int eyeC, int pupilC, float alpha) {
@@ -871,14 +1069,15 @@ public final class TargetHudFeature extends Feature {
     }
 
     private void drawArmor(LivingEntity entity, float x, float y, float alpha) {
-        List<ItemStack> stacks = new ArrayList<>(5);
+        ItemStack[] stacks = new ItemStack[4];
+        int count = 0;
         for (EquipmentSlot slot : ARMOR_ORDER) {
             ItemStack stack = entity.getItemBySlot(slot);
             if (!stack.isEmpty()) {
-                stacks.add(stack);
+                stacks[count++] = stack;
             }
         }
-        if (stacks.isEmpty()) {
+        if (count == 0) {
             return;
         }
         GuiGraphicsExtractor extractor = RenderContext.currentGuiGraphicsExtractor();
@@ -887,14 +1086,16 @@ public final class TargetHudFeature extends Feature {
         }
         Render2DUtil.flush();
         Matrix3x2fStack pose = extractor.pose();
+        float icon = 10.0F;
+        float gap = 2.0F;
         float cursor = x;
-        for (ItemStack stack : stacks) {
+        for (int i = 0; i < count; i++) {
             pose.pushMatrix();
             pose.translate(cursor, y);
-            pose.scale(0.6F);
-            extractor.item(stack, 0, 0);
+            pose.scale(icon / 16.0F);
+            extractor.item(stacks[i], 0, 0);
             pose.popMatrix();
-            cursor += 9.6F;
+            cursor += icon + gap;
         }
         Render2DUtil.flush();
     }
@@ -915,8 +1116,9 @@ public final class TargetHudFeature extends Feature {
         boolean custom = this.customColors.getValue();
 
         int bgBase = custom ? this.bgColor.getValue() : 0xFF000000;
+        float colorAlpha = ColorUtil.alpha(bgBase) / 255.0F;
         int bg = ColorUtil.rgba(ColorUtil.red(bgBase), ColorUtil.green(bgBase), ColorUtil.blue(bgBase),
-                (int) (MathUtil.clamp(this.backgroundAlpha.getValue(), 0.0, 255.0) * alpha));
+                (int) (MathUtil.clamp(this.backgroundAlpha.getValue() * colorAlpha, 0.0, 255.0) * alpha));
 
         int border = ColorUtil.multiplyAlpha(
                 custom ? this.borderColor.getValue() : ColorUtil.rgba(100, 100, 115, 255), alpha);
@@ -924,7 +1126,9 @@ public final class TargetHudFeature extends Feature {
         int text = ColorUtil.multiplyAlpha(
                 custom ? this.textColor.getValue() : ColorUtil.WHITE, alpha);
 
-        int textSecond = ColorUtil.multiplyAlpha(ColorUtil.rgba(203, 203, 210, 255), alpha);
+        int textSecond = custom
+                ? ColorUtil.multiplyAlpha(ColorUtil.multiplyAlpha(this.textColor.getValue(), 0.75F), alpha)
+                : ColorUtil.multiplyAlpha(ColorUtil.rgba(203, 203, 210, 255), alpha);
 
         int track;
         if (custom) {
@@ -982,8 +1186,21 @@ public final class TargetHudFeature extends Feature {
                 (0.35F - progress) / 0.35F);
     }
 
-    private float hpFraction(LivingEntity entity) {
-        return Mth.clamp(totalHealth(entity) / maxHealth(entity), 0.0F, 1.0F);
+    private float animValue(LivingEntity entity) {
+        if (entity == null) {
+            return 0.0F;
+        }
+        if (entity != this.target || !this.animatedHpToggle.getValue()) {
+            return totalHealth(entity);
+        }
+        return this.animatedHp;
+    }
+
+    private float animFraction(LivingEntity entity) {
+        if (entity == null) {
+            return 0.0F;
+        }
+        return Mth.clamp(animValue(entity) / maxHealth(entity), 0.0F, 1.0F);
     }
 
     private float totalHealth(LivingEntity entity) {
@@ -994,25 +1211,62 @@ public final class TargetHudFeature extends Feature {
         return Math.max(1.0F, entity.getMaxHealth() + entity.getAbsorptionAmount());
     }
 
+    private float displayAbsorption(LivingEntity entity) {
+        float absorption = entity.getAbsorptionAmount();
+        if (absorption > 0.0F) {
+            return absorption;
+        }
+        if (this.previewMode && this.showSecondBar.getValue()) {
+            return Math.max(1.0F, entity.getMaxHealth() * 0.2F);
+        }
+        return 0.0F;
+    }
+
+    private float absorptionStart(float hpFrac, LivingEntity entity) {
+        float absorption = displayAbsorption(entity);
+        if (absorption <= 0.0F) {
+            return hpFrac;
+        }
+        float denom = Math.max(1.0F, entity.getMaxHealth() + absorption);
+        float absFrac = Mth.clamp(absorption / denom, 0.0F, 1.0F);
+        return Math.max(0.0F, hpFrac - absFrac);
+    }
+
     private String displayText(LivingEntity entity) {
+        if (entity == this.lastMathEntity && this.cachedDisplayText != null) {
+            return this.cachedDisplayText;
+        }
         String mode = this.displayMode.getValue();
         if ("Проценты и HP".equals(mode)) {
-            return (int) (hpFraction(entity) * 100.0F) + "% " + (int) Math.ceil(entity.getHealth());
+            return (int) (animFraction(entity) * 100.0F) + "% " + (int) Math.ceil(animValue(entity));
         }
         if ("Проценты".equals(mode)) {
-            return (int) (hpFraction(entity) * 100.0F) + "%";
+            return (int) (animFraction(entity) * 100.0F) + "%";
         }
-        return String.valueOf((int) Math.ceil(entity.getHealth()));
+        return String.valueOf((int) Math.ceil(animValue(entity)));
     }
 
     private String displayPercent(LivingEntity entity) {
-        return (int) (hpFraction(entity) * 100.0F) + "%";
+        if (entity == this.lastMathEntity && this.cachedPercentText != null) {
+            return this.cachedPercentText;
+        }
+        return (int) (animFraction(entity) * 100.0F) + "%";
+    }
+
+    private String entityName(LivingEntity entity) {
+        if (entity == this.lastMathEntity && this.cachedName != null) {
+            return this.cachedName;
+        }
+        return entity.getName().getString();
     }
 
     private String secondaryDisplay(LivingEntity entity) {
+        if (entity == this.lastMathEntity && this.cachedSecondary != null) {
+            return this.cachedSecondary;
+        }
         String mode = this.displayMode.getValue();
         if ("Проценты и HP".equals(mode)) {
-            return "HP " + (int) Math.ceil(entity.getHealth()) + "/" + (int) Math.ceil(maxHealth(entity));
+            return "HP " + (int) Math.ceil(animValue(entity)) + "/" + (int) Math.ceil(maxHealth(entity));
         }
         return displayText(entity);
     }
@@ -1034,7 +1288,11 @@ public final class TargetHudFeature extends Feature {
             this.lastMathEntity = entity;
             this.animatedHp = targetHp;
             this.outdatedHealth = targetHp;
-            this.goldenHealth = 0.0F;
+            this.cachedName = null;
+            this.cachedHealthText = null;
+            this.cachedDisplayText = null;
+            this.cachedPercentText = null;
+            this.cachedSecondary = null;
         } else if (entity != null) {
             if (!this.animatedHpToggle.getValue()) {
                 this.animatedHp = targetHp;
@@ -1049,13 +1307,20 @@ public final class TargetHudFeature extends Feature {
             this.outdatedHealth = this.animatedHp;
         }
 
-        this.goldenHealth = this.outdatedHealth;
         this.blinkElapsed += (long) (delta * 1000.0F);
         this.toggleMetanoise.animate(this.toggleMetanoise.getValue(), entity != null ? 1.0F : 0.0F,
                 300L, Animation.Easing.EASE_OUT_QUAD);
     }
 
     public float currentWidth() {
+        return rawWidth() * this.hudScale.getValue().floatValue();
+    }
+
+    public float currentHeight() {
+        return rawHeight() * this.hudScale.getValue().floatValue();
+    }
+
+    private float rawWidth() {
         if (this.mode.is(MODE_BLADE)) {
             return 154.0F + (22.0F * this.headSize.getValue().floatValue() - 22.0F);
         }
@@ -1075,47 +1340,33 @@ public final class TargetHudFeature extends Feature {
         };
     }
 
-    public float currentHeight() {
+    private float rawHeight() {
         float size = this.headSize.getValue().floatValue();
+        float thickness = this.barThickness.getValue().floatValue();
         if (this.mode.is(MODE_BLADE)) {
             return 46.0F;
         }
         return switch (this.type.getValue()) {
-            case TYPE_SMALL -> 18.0F * size + 10.0F;
-            case TYPE_PERCENT -> 22.0F * size + 28.0F;
-            case TYPE_BIG_BAR -> 12.0F * size + 24.0F;
-            case TYPE_VERTICAL -> 20.0F * size + 18.0F;
-            case TYPE_METANOISE -> 28.0F * size + 22.0F;
+            case TYPE_SMALL -> 18.0F * size + 18.5F + 3.5F * thickness;
+            case TYPE_PERCENT -> 22.0F * size + 24.5F + 4.0F * thickness;
+            case TYPE_BIG_BAR -> Math.max(16.0F, 6.0F + 10.0F * size) + 9.0F * thickness + 3.0F;
+            case TYPE_VERTICAL -> 20.0F * size + 26.5F;
+            case TYPE_METANOISE -> 28.0F * size + 21.5F + 4.0F * thickness;
             case TYPE_MINI -> 32.0F;
-            case TYPE_GRADIENT -> 24.0F * size + 22.0F;
-            case TYPE_BOSS_BAR -> 30.0F * size + 10.0F;
-            case TYPE_MINIMAL -> 22.0F;
-            case TYPE_CIRCLE -> 20.0F * size + 10.0F;
-            default -> 28.0F * size + 22.0F;
+            case TYPE_GRADIENT -> 24.0F * size + 23.5F + 5.0F * thickness;
+            case TYPE_BOSS_BAR -> Math.max(30.0F * size + 10.0F, 24.0F + 9.0F * thickness);
+            case TYPE_MINIMAL -> 32.0F;
+            case TYPE_CIRCLE -> 20.0F * size + 28.0F;
+            default -> {
+                float base = 28.0F * size;
+                float nameSize = Math.max(5.0F, base * 0.3F);
+                yield base + 19.0F + 2.0F * nameSize + 4.0F * thickness;
+            }
         };
     }
 
     public boolean isDragsWhileHovering() {
         return this.hover.getValue();
-    }
-
-    private void drawText(float x, float baseline, float size, String text, int weight, int color) {
-        Render2DUtil.text(x, baselineToTop(text, weight, baseline, size), size, text)
-                .weight(weight)
-                .color(color)
-                .draw();
-    }
-
-    private void drawTextCenter(float x, float baseline, float size, String text, int weight, int color) {
-        Render2DUtil.text(x, baselineToTop(text, weight, baseline, size), size, text)
-                .weight(weight)
-                .color(color)
-                .align(TextAlign.CENTER)
-                .draw();
-    }
-
-    private float baselineToTop(String text, int weight, float baseline, float size) {
-        return baseline - size * 0.8F;
     }
 
     private float measure(String text, int weight, float size) {
@@ -1165,19 +1416,18 @@ public final class TargetHudFeature extends Feature {
     }
 
     private LivingEntity resolveTarget(Minecraft mc) {
-        LivingEntity current = null;
-        if (this.mode.is(MODE_BLADE)) {
-            AuraFeature aura = AuraFeature.getMarkerFeature();
-            if (aura != null) {
-                current = aura.getCurrentTarget();
-            }
-            if (current == null) {
-                TriggerBotFeature triggerBot = TriggerBotFeature.getEnabled();
-                if (triggerBot != null) {
-                    current = triggerBot.getCurrentTarget();
-                }
+        LivingEntity combat = null;
+        AuraFeature aura = AuraFeature.getMarkerFeature();
+        if (aura != null) {
+            combat = aura.getCurrentTarget();
+        }
+        if (combat == null) {
+            TriggerBotFeature triggerBot = TriggerBotFeature.getEnabled();
+            if (triggerBot != null) {
+                combat = triggerBot.getCurrentTarget();
             }
         }
+        LivingEntity current = this.mode.is(MODE_BLADE) ? combat : null;
         boolean inChat = mc.gui.screen() instanceof ChatScreen || mc.gui.screen() instanceof InventoryScreen;
         if (inChat) {
             current = mc.player;
@@ -1187,6 +1437,9 @@ public final class TargetHudFeature extends Feature {
                 && entityHit.getEntity() instanceof LivingEntity living
                 && living.isAlive()) {
             current = living;
+        }
+        if (current == null) {
+            current = combat;
         }
         if (current != null && !current.isAlive()) {
             return null;

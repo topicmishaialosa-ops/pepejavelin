@@ -5,6 +5,9 @@ import net.minecraft.client.gui.screens.inventory.ContainerScreen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
@@ -30,6 +33,7 @@ import org.blade.feature.setting.BindSetting;
 import org.blade.feature.setting.BooleanSetting;
 import org.blade.feature.setting.ModeSetting;
 import org.blade.feature.setting.NumberSetting;
+import org.blade.pve.navigation.BaritoneNavigator;
 import org.blade.utils.inventory.InventoryUtil;
 import org.blade.utils.math.BladeTimer;
 import org.blade.utils.text.ChatUtil;
@@ -39,6 +43,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class ZarabotokReallyWorld extends Feature {
     public static final ZarabotokReallyWorld INSTANCE = new ZarabotokReallyWorld();
@@ -54,6 +60,11 @@ public final class ZarabotokReallyWorld extends Feature {
     private final NumberSetting rtpCooldownSeconds = register(new NumberSetting("Кулдаун /rtpdefault (сек)", 30.0D, 5.0D, 300.0D, 5.0D, ""));
     private final BooleanSetting rtpOnDamage = register(new BooleanSetting("Телепорт при уроне", false));
     private final BooleanSetting detectHostiles = register(new BooleanSetting("Детект враждебных мобов", false));
+    private final NumberSetting mineRetrySeconds = register(new NumberSetting("Повтор #mine при ошибке (сек)", 5.0D, 1.0D, 60.0D, 1.0D, ""));
+
+    private static final Pattern COOLDOWN_SECONDS = Pattern.compile("(\\d+)\\s*(?:сек|sec)");
+    private static final Pattern COOLDOWN_MINUTES = Pattern.compile("(\\d+)\\s*(?:мин|min)");
+    private static final Pattern COOLDOWN_AFTER_WAIT = Pattern.compile("подожд\\w*\\s+(\\d+)");
 
     private enum Stage {
         SHEARS,
@@ -101,6 +112,13 @@ public final class ZarabotokReallyWorld extends Feature {
     private final BladeTimer hostileTpTimer = new BladeTimer();
     private Vec3 walkTarget;
     private int collectedCount;
+    private volatile boolean pendingProtectedArea;
+    private volatile boolean pendingRtpCooldown;
+    private volatile long pendingRtpCooldownSec = -1L;
+    private volatile boolean pendingMineRetry;
+    private final BladeTimer mineRetryTimer = new BladeTimer();
+    private int mineRetryCount;
+    private long rtpCooldownMs;
 
     private ZarabotokReallyWorld() {
         super("ZarabotokReallyWorld", "Авто-фарм ресурсов и продажа на маркете (ReallyWorld)", FeatureCategory.MISC, BindSetting.UNBOUND);
@@ -134,6 +152,13 @@ public final class ZarabotokReallyWorld extends Feature {
         this.shearsStep = 0;
         this.walkTarget = null;
         this.collectedCount = 0;
+        this.pendingProtectedArea = false;
+        this.pendingRtpCooldown = false;
+        this.pendingRtpCooldownSec = -1L;
+        this.pendingMineRetry = false;
+        this.mineRetryCount = 0;
+        this.mineRetryTimer.reset();
+        this.rtpCooldownMs = 0L;
         this.timer.reset();
         this.lastHealth = -1.0F;
         this.damageTpTimer.reset();
@@ -142,11 +167,11 @@ public final class ZarabotokReallyWorld extends Feature {
 
     @Override
     public void onDisable() {
-        Minecraft mc = Minecraft.getInstance();
-        if (this.baritoneStarted && mc.player != null && mc.player.connection != null) {
-            mc.player.connection.sendChat("#stop");
-        }
-        this.baritoneStarted = false;
+        this.stopBaritone();
+        this.pendingProtectedArea = false;
+        this.pendingRtpCooldown = false;
+        this.pendingRtpCooldownSec = -1L;
+        this.pendingMineRetry = false;
         super.onDisable();
     }
 
@@ -156,6 +181,7 @@ public final class ZarabotokReallyWorld extends Feature {
         if (mc.player == null || mc.level == null || mc.player.connection == null) {
             return;
         }
+        this.applyPendingChatTriggers();
         this.checkDamageTeleport();
         this.checkHostileMobs();
         switch (this.stage) {
@@ -180,32 +206,97 @@ public final class ZarabotokReallyWorld extends Feature {
 
     @EventTarget
     public void onPacket(PacketReceiveEvent event) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) {
+        String text = incomingText(event.getPacket());
+        if (text == null) {
             return;
         }
-        Object packet = event.getPacket();
-        if (!(packet instanceof ClientboundSystemChatPacket messagePacket)) {
-            return;
+        String lower = text.toLowerCase(Locale.ROOT);
+        if (this.isRtpCooldown(lower)) {
+            this.pendingRtpCooldown = true;
+            this.pendingRtpCooldownSec = parseCooldownSeconds(lower);
         }
-        String lower = messagePacket.content().getString().toLowerCase(Locale.ROOT);
-        if (this.stage == Stage.RTP && this.cmdSent && this.isRtpCooldown(lower)) {
-            this.rtpCooldown = true;
-            this.rtpCooldownTimer.reset();
+        if (this.isMineNoPath(lower)) {
+            this.pendingMineRetry = true;
         }
-        if (this.stage == Stage.MINE && this.baritoneStarted && this.isProtectedArea(lower)) {
-            this.baritoneStarted = false;
-            this.protectedSpots.add(mc.player.blockPosition());
-            this.rtpAttempts = 0;
-            this.cmdSent = false;
-            this.send("#stop");
-            ChatUtil.info("Регион защищён — телепортируюсь (/rtpdefault)");
-            this.stage = this.isAncientDebris() ? Stage.NETHER_WALK : Stage.RTP;
+        if (this.isProtectedArea(lower)) {
+            this.pendingProtectedArea = true;
         }
     }
 
+    private static String incomingText(Object packet) {
+        if (packet instanceof ClientboundSystemChatPacket systemChat) {
+            return systemChat.content().getString();
+        }
+        if (packet instanceof ClientboundSetActionBarTextPacket actionBar) {
+            return actionBar.text().getString();
+        }
+        if (packet instanceof ClientboundSetTitleTextPacket title) {
+            return title.text().getString();
+        }
+        if (packet instanceof ClientboundSetSubtitleTextPacket subtitle) {
+            return subtitle.text().getString();
+        }
+        return null;
+    }
+
+    private void applyPendingChatTriggers() {
+        Minecraft mc = Minecraft.getInstance();
+        if (this.pendingRtpCooldown) {
+            this.pendingRtpCooldown = false;
+            long parsed = this.pendingRtpCooldownSec;
+            this.pendingRtpCooldownSec = -1L;
+            if (this.stage == Stage.RTP || this.stage == Stage.WAIT_TP) {
+                long seconds = parsed > 0L ? parsed : this.rtpCooldownSeconds.getValue().longValue();
+                this.rtpCooldownMs = seconds * 1000L;
+                this.rtpCooldown = true;
+                this.rtpCooldownTimer.reset();
+                this.cmdSent = false;
+                this.stage = Stage.RTP;
+                ChatUtil.info("Задержка /rtpdefault: ждём " + seconds + " сек");
+            }
+        }
+        if (this.pendingMineRetry) {
+            if (this.stage != Stage.MINE || !this.baritoneStarted) {
+                this.pendingMineRetry = false;
+            } else if (this.mineRetryTimer.finished(this.mineRetrySeconds.getValue().longValue() * 1000L)) {
+                this.mineRetryTimer.reset();
+                this.pendingMineRetry = false;
+                if (this.mineRetryCount == 0) {
+                    this.mineRetryCount = 1;
+                    ChatUtil.info("Baritone не нашёл путь — повторяю #mine");
+                    this.send("#mine " + this.profile().block);
+                } else {
+                    ChatUtil.info("Путь не найден повторно — телепортируюсь (/rtpdefault)");
+                    this.mineRetryCount = 0;
+                    this.stopBaritone();
+                    this.pendingProtectedArea = false;
+                    this.rtpAttempts = 0;
+                    this.cmdSent = false;
+                    this.stage = this.isAncientDebris() ? Stage.NETHER_WALK : Stage.RTP;
+                }
+            }
+        }
+        if (!this.pendingProtectedArea) {
+            return;
+        }
+        this.pendingProtectedArea = false;
+        if (this.stage != Stage.MINE) {
+            return;
+        }
+        this.stopBaritone();
+        this.protectedSpots.add(mc.player.blockPosition());
+        this.rtpAttempts = 0;
+        this.cmdSent = false;
+        ChatUtil.info("Регион защищён — телепортируюсь (/rtpdefault)");
+        this.stage = this.isAncientDebris() ? Stage.NETHER_WALK : Stage.RTP;
+    }
+
     private boolean isProtectedArea(String lower) {
-        return lower.contains("не можете сломать")
+        return lower.contains("sorry, but you cant break")
+                || lower.contains("sorry, but you can't break")
+                || lower.contains("you cant break that block")
+                || lower.contains("you can't break that block")
+                || lower.contains("не можете сломать")
                 || lower.contains("не можете ломать")
                 || lower.contains("нельзя сломать")
                 || lower.contains("нельзя ломать")
@@ -268,8 +359,7 @@ public final class ZarabotokReallyWorld extends Feature {
             return;
         }
         if (this.baritoneStarted) {
-            this.baritoneStarted = false;
-            this.send("#stop");
+            this.stopBaritone();
         }
         this.rtpCooldown = false;
         this.rtpAttempts = 0;
@@ -385,13 +475,13 @@ public final class ZarabotokReallyWorld extends Feature {
             this.timer.reset();
         }
         if (mc.player.distanceToSqr(this.walkTarget) < 25.0) {
-            this.baritoneStarted = false;
+            this.stopBaritone();
             this.walkStarted = false;
             this.walkTarget = null;
             this.stage = Stage.MINE;
             ChatUtil.info("Дошёл до точки — начинаю копать обломки");
         } else if (this.timer.finished(180000L)) {
-            this.baritoneStarted = false;
+            this.stopBaritone();
             this.walkStarted = false;
             this.walkTarget = null;
             this.stage = Stage.MINE;
@@ -602,7 +692,10 @@ public final class ZarabotokReallyWorld extends Feature {
     private void stageRtp() {
         Minecraft mc = Minecraft.getInstance();
         if (this.rtpCooldown) {
-            if (this.rtpCooldownTimer.finished(this.rtpCooldownSeconds.getValue().longValue() * 1000L)) {
+            long delayMs = this.rtpCooldownMs > 0L
+                    ? this.rtpCooldownMs
+                    : this.rtpCooldownSeconds.getValue().longValue() * 1000L;
+            if (this.rtpCooldownTimer.finished(delayMs)) {
                 this.rtpCooldown = false;
                 this.rtpAttempts = 0;
                 this.cmdSent = false;
@@ -654,9 +747,32 @@ public final class ZarabotokReallyWorld extends Feature {
         return lower.contains("cooldown")
                 || lower.contains("кулдаун")
                 || lower.contains("куплдаун")
+                || lower.contains("задержк")
                 || lower.contains("подожд")
                 || lower.contains("погод")
                 || lower.contains("позже");
+    }
+
+    private boolean isMineNoPath(String lower) {
+        return lower.contains("unable to find any path")
+                || lower.contains("не удалось найти путь")
+                || lower.contains("не найден путь");
+    }
+
+    private static long parseCooldownSeconds(String lower) {
+        Matcher matcher = COOLDOWN_SECONDS.matcher(lower);
+        if (matcher.find()) {
+            return Long.parseLong(matcher.group(1));
+        }
+        matcher = COOLDOWN_MINUTES.matcher(lower);
+        if (matcher.find()) {
+            return Long.parseLong(matcher.group(1)) * 60L;
+        }
+        matcher = COOLDOWN_AFTER_WAIT.matcher(lower);
+        if (matcher.find()) {
+            return Long.parseLong(matcher.group(1));
+        }
+        return -1L;
     }
 
     private void stageMine() {
@@ -669,6 +785,8 @@ public final class ZarabotokReallyWorld extends Feature {
                 return;
             }
             this.baritoneStarted = true;
+            this.mineRetryCount = 0;
+            this.mineRetryTimer.reset();
             this.send("#mine " + profile.block);
             return;
         }
@@ -678,15 +796,13 @@ public final class ZarabotokReallyWorld extends Feature {
             if (count < this.stackTarget.getValue().intValue()) {
                 return;
             }
-            this.baritoneStarted = false;
-            this.send("#stop");
+            this.stopBaritone();
             this.stage = Stage.MARKET_OPEN;
         } else if (depositOnly || this.depositToggle.getValue()) {
             if (count < this.depositStacks.getValue().intValue() * 64) {
                 return;
             }
-            this.baritoneStarted = false;
-            this.send("#stop");
+            this.stopBaritone();
             this.collectedCount = count;
             this.triedChests.clear();
             this.currentChest = null;
@@ -1035,6 +1151,20 @@ public final class ZarabotokReallyWorld extends Feature {
             }
         }
         return count;
+    }
+
+    private void stopBaritone() {
+        if (!this.baritoneStarted) {
+            return;
+        }
+        this.baritoneStarted = false;
+        try {
+            BaritoneNavigator.INSTANCE.cancel();
+        } catch (LinkageError | RuntimeException ignored) {
+            if (this.isBaritonePresent()) {
+                this.send("#stop");
+            }
+        }
     }
 
     private void send(String command) {

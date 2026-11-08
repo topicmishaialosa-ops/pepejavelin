@@ -1,7 +1,6 @@
 package org.blade.pve.mining;
 
 import java.text.Normalizer;
-import java.util.Locale;
 
 public record MineTimer(String nextType, int initialSeconds, long startedAtMillis) {
     public MineTimer {
@@ -21,7 +20,10 @@ public record MineTimer(String nextType, int initialSeconds, long startedAtMilli
 
     public String formattedTime(long nowMillis) {
         int seconds = secondsLeft(nowMillis);
-        return String.format(Locale.ROOT, "%02d:%02d", seconds / 60, seconds % 60);
+        int minutes = seconds / 60;
+        int remainder = seconds % 60;
+        return (minutes < 10 ? "0" + minutes : Integer.toString(minutes))
+                + ":" + (remainder < 10 ? "0" + remainder : Integer.toString(remainder));
     }
 
     static String sanitizeDisplayText(String value) {

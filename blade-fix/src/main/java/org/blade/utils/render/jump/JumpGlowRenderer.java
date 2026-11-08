@@ -103,7 +103,7 @@ public final class JumpGlowRenderer {
                     () -> "Blade Jump Glow Pass", colorView, Optional.empty());
             try {
                 pass.setPipeline(PIPELINE);
-                pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
+                pass.setUniform("Projection", Render3DUtil.levelProjectionBuffer());
                 pass.setUniform("JumpGlowUniforms", uniformBuffer);
                 pass.bindTexture("SceneSampler", sceneCopy.getColorTextureView(), sampler);
                 pass.setVertexBuffer(0, vertexBuffer.slice());

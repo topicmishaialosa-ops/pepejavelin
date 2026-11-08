@@ -322,7 +322,7 @@ public final class DeadheadTargetRenderer {
                     () -> "Blade 3D Deadhead Pass", colorView, Optional.empty());
             try {
                 pass.setPipeline(ALPHA_THROUGH_WALLS);
-                pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
+                pass.setUniform("Projection", Render3DUtil.levelProjectionBuffer());
                 pass.setUniform("WorldParticleUniforms", uniformBuffer);
                 pass.bindTexture("BloomSampler", bloomView, sampler);
                 pass.setVertexBuffer(0, vertexBuffer.slice());

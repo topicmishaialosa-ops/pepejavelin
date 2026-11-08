@@ -2,10 +2,12 @@ package org.blade.mixin.render;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.ProjectionMatrixBuffer;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
@@ -24,7 +26,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GameRenderer.class)
@@ -34,16 +35,17 @@ public abstract class GameRendererMixin {
     @Final
     private Minecraft minecraft;
 
-    @ModifyArg(
+    @WrapOperation(
             method = "renderLevel",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/client/renderer/ProjectionMatrixBuffer;getBuffer(Lorg/joml/Matrix4f;)Lcom/mojang/blaze3d/buffers/GpuBufferSlice;"
             )
     )
-    private Matrix4f captureLevelProjection(Matrix4f projectionMatrix) {
-        Render3DUtil.captureLevelProjection(projectionMatrix);
-        return projectionMatrix;
+    private GpuBufferSlice captureLevelProjection(ProjectionMatrixBuffer instance, Matrix4f projectionMatrix, Operation<GpuBufferSlice> original) {
+        GpuBufferSlice buffer = original.call(instance, projectionMatrix);
+        Render3DUtil.captureLevelProjection(projectionMatrix, buffer);
+        return buffer;
     }
 
     @Inject(method = "bobHurt", at = @At("HEAD"), cancellable = true)

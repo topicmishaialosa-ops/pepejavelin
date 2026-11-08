@@ -17,7 +17,6 @@ import org.blade.utils.render.gui.UiFonts;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public final class PveStatusElement extends HudElement {
     private static final float PADDING = 8.0F;
@@ -31,6 +30,9 @@ public final class PveStatusElement extends HudElement {
     }
 
     private final List<Row> rows = new ArrayList<>();
+    private long rowsSignature = Long.MIN_VALUE;
+    private long layoutSignature = Long.MIN_VALUE;
+    private float cachedContentWidth;
 
     public PveStatusElement() {
         super("pve_status", "PvE State");
@@ -49,19 +51,24 @@ public final class PveStatusElement extends HudElement {
     @Override
     protected void layout(Minecraft mc, float unit) {
         rebuildRows();
-        MsdfFont font = UiFonts.sfProDisplay();
-        float rowSize = ROW_SIZE * unit;
-        float spacing = rowSize * UiFontStyle.MEDIUM.letterSpacingEm();
-        float contentWidth = MIN_WIDTH * unit;
-        for (Row row : this.rows) {
-            float measured = font.measureWidth(
-                    row.label() + "  " + row.value(),
-                    rowSize,
-                    spacing
-            );
-            contentWidth = Math.max(contentWidth, measured + PADDING * 2.0F * unit);
+        long signature = this.rowsSignature * 31L + Float.floatToIntBits(unit);
+        if (signature != this.layoutSignature) {
+            MsdfFont font = UiFonts.sfProDisplay();
+            float rowSize = ROW_SIZE * unit;
+            float spacing = rowSize * UiFontStyle.MEDIUM.letterSpacingEm();
+            float contentWidth = MIN_WIDTH * unit;
+            for (Row row : this.rows) {
+                float measured = font.measureWidth(
+                        row.label() + "  " + row.value(),
+                        rowSize,
+                        spacing
+                );
+                contentWidth = Math.max(contentWidth, measured + PADDING * 2.0F * unit);
+            }
+            this.cachedContentWidth = contentWidth;
+            this.layoutSignature = signature;
         }
-        this.width = contentWidth;
+        this.width = this.cachedContentWidth;
         this.height = (PADDING * 2.0F + 18.0F
                 + this.rows.size() * ROW_HEIGHT) * unit;
     }
@@ -132,13 +139,38 @@ public final class PveStatusElement extends HudElement {
     }
 
     private void rebuildRows() {
-        this.rows.clear();
         AutoMineFeature autoMine =
                 FeatureManager.INSTANCE.getFeature(AutoMineFeature.class);
-        if (autoMine == null) {
+        AutoMineFeature.Status status = autoMine == null ? null : autoMine.currentStatus();
+
+        long signature = 1125899906842597L;
+        if (status == null) {
+            signature = signature * 31L + 1L;
+        } else {
+            signature = signature * 31L + (status.active() ? 1 : 0);
+            signature = signature * 31L + hashCode(status.phase());
+            signature = signature * 31L + status.minedOres();
+            signature = signature * 31L + status.knownTargets();
+            signature = signature * 31L + status.elapsedMillis() / 1_000L;
+            signature = signature * 31L + hashCode(status.profile());
+            signature = signature * 31L + hashCode(status.toolProfile());
+        }
+        for (Feature feature : FeatureManager.INSTANCE.getFeatures(FeatureCategory.PVE)) {
+            if (feature != autoMine
+                    && feature != PveManagerFeature.INSTANCE
+                    && feature.isEnabled()) {
+                signature = signature * 31L + feature.getName().hashCode();
+            }
+        }
+        if (signature == this.rowsSignature) {
+            return;
+        }
+        this.rowsSignature = signature;
+
+        this.rows.clear();
+        if (status == null) {
             this.rows.add(new Row("AutoMine", MenuText.ui("In development"), false));
         } else {
-            AutoMineFeature.Status status = autoMine.currentStatus();
             this.rows.add(new Row(
                     "AutoMine",
                     status.active()
@@ -188,21 +220,23 @@ public final class PveStatusElement extends HudElement {
         }
     }
 
+    private static int hashCode(String value) {
+        return value == null ? 0 : value.hashCode();
+    }
+
     private static String formatDuration(long millis) {
         long totalSeconds = Math.max(0L, millis / 1_000L);
         long hours = totalSeconds / 3_600L;
         long minutes = totalSeconds % 3_600L / 60L;
         long seconds = totalSeconds % 60L;
         if (hours > 0L) {
-            return String.format(
-                    Locale.ROOT,
-                    "%02d:%02d:%02d",
-                    hours,
-                    minutes,
-                    seconds
-            );
+            return pad2(hours) + ":" + pad2(minutes) + ":" + pad2(seconds);
         }
-        return String.format(Locale.ROOT, "%02d:%02d", minutes, seconds);
+        return pad2(minutes) + ":" + pad2(seconds);
+    }
+
+    private static String pad2(long value) {
+        return value < 10L ? "0" + value : Long.toString(value);
     }
 
     private static String displayPhase(String phase) {

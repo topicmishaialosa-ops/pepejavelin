@@ -36,21 +36,21 @@ import java.util.Locale;
 import java.util.Map;
 
 public final class DropdownModulePage extends Component {
-    private static final float SEARCH_Y = 62.0F;
-    private static final float SEARCH_HEIGHT = 30.0F;
-    private static final float SEARCH_RADIUS = 9.0F;
+    private static final float SEARCH_Y = 66.0F;
+    private static final float SEARCH_HEIGHT = 42.0F;
+    private static final float SEARCH_RADIUS = 10.0F;
     private static final float PANEL_TOP = 102.0F;
-    private static final float HEADER_HEIGHT = 32.0F;
-    private static final float TAB_BAR_HEIGHT = 34.0F;
-    private static final float ROW_HEIGHT = 24.0F;
-    private static final float ROW_GAP = 4.0F;
-    private static final float SETTING_GAP = 5.0F;
+    private static final float HEADER_HEIGHT = 44.0F;
+    private static final float TAB_BAR_HEIGHT = 42.0F;
+    private static final float ROW_HEIGHT = 30.0F;
+    private static final float ROW_GAP = 7.0F;
+    private static final float SETTING_GAP = 8.0F;
     private static final float CONTENT_X = 14.0F;
-    private static final float PICKER_H = 50.0F;
-    private static final float BOTTOM_MARGIN = 18.0F;
-    private static final float CHIP_HEIGHT = 14.0F;
-    private static final float CHIP_GAP = 3.0F;
-    private static final int SEARCH_MAX_LEN = 40;
+    private static final float PICKER_H = 60.0F;
+    private static final float BOTTOM_MARGIN = 22.0F;
+    private static final float CHIP_HEIGHT = 18.0F;
+    private static final float CHIP_GAP = 5.0F;
+    private static final int SEARCH_MAX_LEN = 60;
 
     private static final Identifier[] CATEGORY_ICONS = {
             Textures.Icons.SWORDS,
@@ -120,6 +120,19 @@ public final class DropdownModulePage extends Component {
             return true;
         }
 
+        if (button == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT && isTabs()
+                && dy >= PANEL_TOP && dy <= PANEL_TOP + TAB_BAR_HEIGHT
+                && dx >= panelX(0) && dx <= panelX(0) + panelWidth()) {
+            float tabW = panelWidth() / (float) categoryCount();
+            int tab = MathUtil.clamp((int) ((dx - panelX(0)) / tabW), 0, categoryCount() - 1);
+            this.selectedCategory = categoryAt(tab);
+            this.scrollTarget.put(this.selectedCategory, 0.0F);
+            this.searchFocused = false;
+            this.editingText = null;
+            this.capturingBind = null;
+            return true;
+        }
+
         if (button == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT) {
             if (hoveringSearch(dx, dy)) {
                 this.searchFocused = true;
@@ -136,17 +149,7 @@ public final class DropdownModulePage extends Component {
                 FeatureCategory category = categoryOf(panelIndex);
                 float panelX = panelX(panelIndex);
                 float panelW = panelWidth();
-                if (isTabs()) {
-                    if (button == org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT && dy >= PANEL_TOP && dy <= PANEL_TOP + TAB_BAR_HEIGHT) {
-                        int tab = MathUtil.clamp((int) ((dx - panelX) / (panelW / (float) categoryCount())), 0, categoryCount() - 1);
-                        this.selectedCategory = categoryAt(tab);
-                        this.scrollTarget.put(this.selectedCategory, 0.0F);
-                        this.searchFocused = false;
-                        this.editingText = null;
-                        this.capturingBind = null;
-                        return true;
-                    }
-                } else if (dy < PANEL_TOP + HEADER_HEIGHT) {
+                if (!isTabs() && dy < PANEL_TOP + HEADER_HEIGHT) {
                     return true;
                 }
 
@@ -317,6 +320,11 @@ public final class DropdownModulePage extends Component {
         }
         updateFrameDelta();
 
+        Render2DUtil.rect(x(), y(), width(), height())
+                .color(ColorUtil.withAlpha(Theme.Colors.PANEL,
+                        Math.round(255.0F * this.transitionProgress)))
+                .draw();
+
         if (this.displayedPage == MenuPage.SEARCH && this.transitionProgress > 0.001F) {
             Render2DUtil.rect(x(), y() + px(Theme.Sizes.HEADER_HEIGHT), width(), height() - px(Theme.Sizes.HEADER_HEIGHT))
                     .color(ColorUtil.withAlpha(Theme.Colors.OVERLAY, Math.round(218.0F * this.transitionProgress)))
@@ -356,14 +364,14 @@ public final class DropdownModulePage extends Component {
 
         float textX = x + 8.0F + iconSize + 2.0F;
         if (this.searchQuery.isEmpty() && !active) {
-            text(textX, centeredTextY(y + SEARCH_HEIGHT / 2.0F, 10.0F), 10.0F,
+            text(textX, centeredTextY(y + SEARCH_HEIGHT / 2.0F, 13.5F), 13.5F,
                     "Search modules...", Theme.Colors.SECONDARY_DARK, UiFontStyle.REGULAR);
         } else {
             String value = this.searchQuery.toString();
             if (active && System.currentTimeMillis() % 900L < 450L) {
                 value += "|";
             }
-            text(textX, centeredTextY(y + SEARCH_HEIGHT / 2.0F, 10.0F), 10.0F,
+            text(textX, centeredTextY(y + SEARCH_HEIGHT / 2.0F, 13.5F), 13.5F,
                     value, Theme.Colors.TEXT, UiFontStyle.REGULAR);
         }
     }
@@ -502,13 +510,13 @@ public final class DropdownModulePage extends Component {
             rect(x + 3.0F, y + 5.0F, 2.0F, rowH - 10.0F, ColorUtil.withAlpha(drawAccent(), 230), 1.0F, 1.0F);
         }
 
-        text(x + 10.0F, centeredTextY(y + rowH / 2.0F, 8.0F), 8.0F, feature.getName(),
+        text(x + 10.0F, centeredTextY(y + rowH / 2.0F, 14.0F), 14.0F, feature.getName(),
                 Theme.Colors.TEXT, 1.0F, UiFontStyle.MEDIUM);
 
         boolean binding = this.bindingModule == feature;
         if (binding || !feature.getBinds().isEmpty()) {
             String bindLabel = binding ? "..." : describeBinds(feature);
-            textRight(x + w - 10.0F, centeredTextY(y + rowH / 2.0F, 7.0F), 7.0F, bindLabel,
+            textRight(x + w - 20.0F, centeredTextY(y + rowH / 2.0F, 7.0F), 7.0F, bindLabel,
                     binding ? ColorUtil.withAlpha(drawAccent(), 220) : Theme.Colors.SECONDARY_DARK, 1.0F);
         }
 
@@ -546,18 +554,18 @@ public final class DropdownModulePage extends Component {
         } else if (setting instanceof NumberSetting number) {
             drawSlider(extractor, setting, contentX, contentW, y);
         } else if (setting instanceof ModeSetting mode) {
-            text(contentX, centeredTextY(y + 8.0F, 7.5F), 7.5F,
+            text(contentX, centeredTextY(y + 8.0F, 13.5F), 13.5F,
                     setting.getName() + ": " + mode.getValue(), Theme.Colors.TEXT_TEXT, 1.0F, UiFontStyle.MEDIUM);
             drawChoices(extractor, contentX, contentW, y + 15.0F, mode.getModes(),
                     mode.getValue(), null);
         } else if (setting instanceof MultiSelectSetting multi) {
-            text(contentX, centeredTextY(y + 8.0F, 7.5F), 7.5F,
+            text(contentX, centeredTextY(y + 8.0F, 13.5F), 13.5F,
                     setting.getName(), Theme.Colors.TEXT_TEXT, 1.0F, UiFontStyle.MEDIUM);
             drawChoices(extractor, contentX, contentW, y + 15.0F, multi.getOptions(),
                     null, multi);
         } else if (setting instanceof ColorSetting color) {
             boolean open = this.pickers.containsKey(color);
-            text(contentX, centeredTextY(y + 8.5F, 7.5F), 7.5F,
+            text(contentX, centeredTextY(y + 8.5F, 13.5F), 13.5F,
                     setting.getName(), Theme.Colors.TEXT_TEXT, 1.0F, UiFontStyle.MEDIUM);
             rect(contentX + contentW - 22.0F, y + 2.0F, 18.0F, 11.0F, color.getValue(), 3.5F, 1.0F);
             outline(contentX + contentW - 22.0F, y + 2.0F, 18.0F, 11.0F,
@@ -566,26 +574,26 @@ public final class DropdownModulePage extends Component {
                 renderColorPicker(extractor, color, contentX, contentW, y + 17.0F);
             }
         } else if (setting instanceof InputBindSetting inputBind) {
-            text(contentX, centeredTextY(y + 8.5F, 7.5F), 7.5F,
+            text(contentX, centeredTextY(y + 8.5F, 13.5F), 13.5F,
                     setting.getName(), Theme.Colors.TEXT_TEXT, 1.0F, UiFontStyle.MEDIUM);
             String label = this.capturingBind == inputBind ? "..." : inputBind.getDisplayValue();
             drawChip(contentX + contentW, y + 3.0F, label,
-                    this.capturingBind == inputBind, 11.0F, 8.0F);
+                    this.capturingBind == inputBind, 11.0F, 10.0F);
         } else if (setting instanceof TextSetting text) {
-            text(contentX, centeredTextY(y + 8.5F, 7.5F), 7.5F,
+            text(contentX, centeredTextY(y + 8.5F, 13.5F), 13.5F,
                     setting.getName(), Theme.Colors.TEXT_TEXT, 1.0F, UiFontStyle.MEDIUM);
             boolean editing = this.editingText == text;
             String value = editing ? this.textBuffer.toString() : text.getValue();
             if (editing && System.currentTimeMillis() % 900L < 450L) {
                 value += "|";
             }
-            drawChip(contentX + contentW, y + 3.0F, value, editing, 11.0F, 8.0F);
+            drawChip(contentX + contentW, y + 3.0F, value, editing, 11.0F, 10.0F);
         } else if (setting instanceof ButtonSetting button) {
-            rect(contentX, y + 1.0F, contentW, 12.0F, ColorUtil.withAlpha(drawAccent(), 110), 3.0F, 1.0F);
-            textCentered(contentX + contentW / 2.0F, centeredTextY(y + 7.0F, 7.5F), 7.5F,
+            rect(contentX, y + 1.0F, contentW, 14.0F, ColorUtil.withAlpha(drawAccent(), 110), 3.0F, 1.0F);
+            textCentered(contentX + contentW / 2.0F, centeredTextY(y + 8.0F, 13.5F), 13.5F,
                     button.getButtonLabel(), Theme.Colors.TEXT_TITLE, 1.0F, UiFontStyle.SEMIBOLD);
         } else {
-            text(contentX, centeredTextY(y + 8.5F, 7.5F), 7.5F,
+            text(contentX, centeredTextY(y + 8.5F, 13.5F), 13.5F,
                     setting.getName(), Theme.Colors.TEXT, 1.0F, UiFontStyle.REGULAR);
         }
     }
@@ -696,7 +704,7 @@ public final class DropdownModulePage extends Component {
     }
 
     private float chipWidth(String choice) {
-        return Math.max(24.0F, textWidth(choice, 7.0F) + 10.0F);
+        return Math.max(24.0F, textWidth(choice, 13.5F) + 14.0F);
     }
 
     private void drawChip(float right, float y, String label, boolean active, float height, float fontSize) {
@@ -750,9 +758,9 @@ public final class DropdownModulePage extends Component {
     private boolean handleSettingAt(Feature feature, Setting<?> setting, float contentX, float contentW, float y,
                                     float dx, float dy) {
         if (setting instanceof BooleanSetting bool) {
-            float tw = 26.0F;
+            float tw = 30.0F;
             float tx = contentX + contentW - tw;
-            if (dy >= y && dy <= y + 14.0F && dx >= tx && dx <= tx + tw) {
+            if (dy >= y && dy <= y + 16.0F && dx >= tx && dx <= tx + tw) {
                 bool.setValue(!bool.getValue());
                 return true;
             }
@@ -996,7 +1004,8 @@ public final class DropdownModulePage extends Component {
         return next;
     }
 
-    private float settingsHeight(Feature feature, float contentW) {
+    private float settingsHeight(Feature feature, float panelW) {
+        float contentW = panelW - 14.0F - 2.0F * CONTENT_X;
         float total = 3.0F;
         for (Setting<?> setting : feature.getSettings()) {
             if (!setting.isVisible()) {
@@ -1009,18 +1018,18 @@ public final class DropdownModulePage extends Component {
 
     private float settingHeight(Setting<?> setting, float contentW) {
         if (setting instanceof NumberSetting) {
-            return 24.0F;
+            return 26.0F;
         }
         if (setting instanceof ModeSetting mode) {
-            return 16.0F + choiceRowsHeight(mode.getModes(), contentW) + SETTING_GAP;
+            return 18.0F + choiceRowsHeight(mode.getModes(), contentW) + SETTING_GAP;
         }
         if (setting instanceof MultiSelectSetting multi) {
-            return 16.0F + choiceRowsHeight(multi.getOptions(), contentW) + SETTING_GAP;
+            return 18.0F + choiceRowsHeight(multi.getOptions(), contentW) + SETTING_GAP;
         }
         if (setting instanceof ColorSetting color) {
-            return 17.0F + (this.pickers.containsKey(color) ? PICKER_H + 6.0F : 0.0F);
+            return 19.0F + (this.pickers.containsKey(color) ? PICKER_H + 6.0F : 0.0F);
         }
-        return 17.0F;
+        return 19.0F;
     }
 
     private float choiceRowsHeight(List<String> choices, float contentW) {
@@ -1117,7 +1126,9 @@ public final class DropdownModulePage extends Component {
 
     private float panelHeight() {
         float requested = EditClickGUI.INSTANCE.panelHeight.getValue().floatValue();
-        return Math.min(requested, 640.0F - PANEL_TOP - BOTTOM_MARGIN);
+        float scale = Math.max(0.0001F, px(1.0F));
+        float available = height() / scale - PANEL_TOP - BOTTOM_MARGIN;
+        return Math.min(requested, Math.max(160.0F, available));
     }
 
     private float panelGap() {
@@ -1174,31 +1185,37 @@ public final class DropdownModulePage extends Component {
 
     private void drawChevron(GuiGraphicsExtractor extractor, float cx, float cy, float size, float thickness,
                              boolean up, int color) {
-        float k = size * 0.5F;
+        float halfWidth = size;
+        float halfHeight = size * 0.65F;
         if (up) {
-            rotatedSegment(extractor, cx - size, cy + k, cx, cy - k, thickness, color);
-            rotatedSegment(extractor, cx + size, cy + k, cx, cy - k, thickness, color);
+            rotatedSegment(extractor, cx - halfWidth, cy + halfHeight, cx, cy - halfHeight, thickness, color);
+            rotatedSegment(extractor, cx + halfWidth, cy + halfHeight, cx, cy - halfHeight, thickness, color);
         } else {
-            rotatedSegment(extractor, cx - size, cy - k, cx, cy + k, thickness, color);
-            rotatedSegment(extractor, cx + size, cy - k, cx, cy + k, thickness, color);
+            rotatedSegment(extractor, cx - halfWidth, cy - halfHeight, cx, cy + halfHeight, thickness, color);
+            rotatedSegment(extractor, cx + halfWidth, cy - halfHeight, cx, cy + halfHeight, thickness, color);
         }
     }
 
     private void rotatedSegment(GuiGraphicsExtractor extractor, float x1, float y1, float x2, float y2,
                                 float thickness, int color) {
-        float dx = x2 - x1;
-        float dy = y2 - y1;
+        float screenX1 = sx(x1);
+        float screenY1 = sy(y1);
+        float screenX2 = sx(x2);
+        float screenY2 = sy(y2);
+        float dx = screenX2 - screenX1;
+        float dy = screenY2 - screenY1;
         float length = (float) Math.sqrt(dx * dx + dy * dy);
+        float screenThickness = px(thickness);
         if (length <= 0.0F) {
             return;
         }
         var pose = extractor.pose();
         pose.pushMatrix();
-        pose.translate((x1 + x2) / 2.0F, (y1 + y2) / 2.0F);
+        pose.translate((screenX1 + screenX2) / 2.0F, (screenY1 + screenY2) / 2.0F);
         pose.rotate((float) Math.atan2(dy, dx));
-        Render2DUtil.rect(-length / 2.0F, -thickness / 2.0F, length, thickness)
+        Render2DUtil.rect(-length / 2.0F, -screenThickness / 2.0F, length, screenThickness)
                 .color(color)
-                .radius(thickness / 2.0F)
+                .radius(screenThickness / 2.0F)
                 .draw();
         pose.popMatrix();
     }

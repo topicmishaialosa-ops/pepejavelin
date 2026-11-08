@@ -15,10 +15,14 @@ import org.blade.event.events.render.Render2DEvent;
 import org.blade.feature.Feature;
 import org.blade.feature.FeatureCategory;
 import org.blade.feature.FeatureManager;
+import org.blade.feature.impl.combat.AntiBotFeature;
 import org.blade.feature.setting.BindSetting;
 import org.blade.feature.setting.BooleanSetting;
+import org.blade.feature.setting.ColorSetting;
+import org.blade.feature.setting.ModeSetting;
 import org.blade.feature.setting.NumberSetting;
 import org.blade.utils.ColorUtil;
+import org.blade.utils.FriendManager;
 import org.blade.utils.render.Render3DUtil;
 import org.blade.utils.render.Theme;
 import org.blade.utils.render.gui.MsdfFont;
@@ -54,11 +58,30 @@ public final class NameTagsFeature extends Feature {
     private record Privilege(String name, int color) {
     }
 
+    public final ModeSetting style = register(new ModeSetting("Style", "nametags", "nametags", "nametags2"));
     public final NumberSetting scale = register(new NumberSetting("Scale", 1.0, 0.95, 1.2, 0.05, "x"));
-    public final BooleanSetting privilege = register(new BooleanSetting("Privilege", true));
+    public final BooleanSetting privilege = register(new BooleanSetting("Privilege", true)
+            .visibleWhen(() -> this.style.is("nametags")));
     public final BooleanSetting health = register(new BooleanSetting("Health", true));
     public final BooleanSetting items = register(new BooleanSetting("Items", true));
     public final NumberSetting distance = register(new NumberSetting("Distance", 64, 16, 128, 8, " blocks"));
+
+    public final BooleanSetting head = register(new BooleanSetting("Head", true)
+            .visibleWhen(() -> this.style.is("nametags2")));
+    public final BooleanSetting friendTag = register(new BooleanSetting("Friend tag", true)
+            .visibleWhen(() -> this.style.is("nametags2")));
+    public final BooleanSetting botTag = register(new BooleanSetting("Bot tag", true)
+            .visibleWhen(() -> this.style.is("nametags2")));
+    public final NumberSetting textSize = register(new NumberSetting("Text size", 6.0, 3.0, 100.0, 0.5, "")
+            .visibleWhen(() -> this.style.is("nametags2")));
+    public final ColorSetting nameColor = register(new ColorSetting("Name color", 0xFFFFFFFF)
+            .visibleWhen(() -> this.style.is("nametags2")));
+    public final ColorSetting hpColor = register(new ColorSetting("HP color", 0xFFFFFFFF)
+            .visibleWhen(() -> this.style.is("nametags2")));
+    public final ColorSetting bgColor = register(new ColorSetting("Background color", 0xFF000000)
+            .visibleWhen(() -> this.style.is("nametags2")));
+    public final ColorSetting friendTagColor = register(new ColorSetting("Friend tag color", 0xFF00FF00)
+            .visibleWhen(() -> this.style.is("nametags2")));
 
     public NameTagsFeature() {
         super("NameTags", "Draws styled nametags above players", FeatureCategory.VISUAL, BindSetting.UNBOUND);
@@ -89,7 +112,11 @@ public final class NameTagsFeature extends Feature {
             if (mc.player.distanceToSqr(player) > maxDistanceSqr) {
                 continue;
             }
-            drawTag(event, player, tickDelta, unit);
+            if (this.style.is("nametags2")) {
+                drawTag2(event, player, tickDelta, unit);
+            } else {
+                drawTag(event, player, tickDelta, unit);
+            }
         }
     }
 
@@ -205,6 +232,132 @@ public final class NameTagsFeature extends Feature {
                 pose.popMatrix();
                 cursor += itemSize + gap;
             }
+        }
+    }
+
+    private void drawTag2(Render2DEvent event, AbstractClientPlayer player, float tickDelta, float unit) {
+        Minecraft mc = event.getClient();
+        Vec3 position = Render3DUtil.interpolatedPosition(player, tickDelta)
+                .add(0.0D, player.getBbHeight() + HEAD_OFFSET, 0.0D);
+        Render3DUtil.ScreenPoint anchor = Render3DUtil.projectToScreen(mc, position);
+        if (anchor == null) {
+            return;
+        }
+
+        MsdfFont font = UiFonts.sfProDisplay();
+        float size = this.textSize.getValue().floatValue() * unit;
+        float letterSpacing = size * UiFontStyle.MEDIUM.letterSpacingEm();
+        float textHeight = font.textHeight(size);
+        float padX = 4.0F * unit;
+        float padY = 1.5F * unit;
+        float gap = 2.0F * unit;
+        float radius = 3.0F * unit;
+        int background = 0x80000000 | (this.bgColor.getValue() & 0xFFFFFF);
+
+        String name = player.getGameProfile().name();
+        boolean friend = this.friendTag.getValue() && FriendManager.INSTANCE.isFriend(name);
+        boolean bot = this.botTag.getValue()
+                && AntiBotFeature.INSTANCE.isEnabled()
+                && AntiBotFeature.INSTANCE.isBot(player);
+        String friendText = friend ? "F " : "";
+        String botText = bot ? "[BOT] " : "";
+        String hpText = this.health.getValue()
+                ? " [" + (int) Math.ceil(player.getHealth() + player.getAbsorptionAmount()) + "]"
+                : "";
+
+        float headSize = this.head.getValue() ? textHeight : 0.0F;
+        float friendWidth = friendText.isEmpty() ? 0.0F : font.measureWidth(friendText, size, letterSpacing);
+        float botWidth = botText.isEmpty() ? 0.0F : font.measureWidth(botText, size, letterSpacing);
+        float nameWidth = font.measureWidth(name, size, letterSpacing);
+        float hpWidth = hpText.isEmpty() ? 0.0F : font.measureWidth(hpText, size, letterSpacing);
+
+        float textWidth = (headSize > 0.0F ? headSize + gap : 0.0F)
+                + friendWidth + botWidth + nameWidth + hpWidth;
+        float tagWidth = textWidth + padX * 2.0F;
+        float tagHeight = textHeight + padY * 2.0F;
+
+        List<ItemStack> equipment = this.items.getValue() ? equipment(player) : List.of();
+        float itemSize = 10.0F * unit;
+        float itemGap = 1.5F * unit;
+        float armorWidth = 0.0F;
+        float armorHeight = 0.0F;
+        if (!equipment.isEmpty()) {
+            armorWidth = equipment.size() * itemSize + (equipment.size() - 1) * itemGap + padX * 2.0F;
+            armorHeight = itemSize + padY * 2.0F;
+        }
+
+        float centerX = anchor.x();
+        float yCursor = anchor.y() - 2.0F * unit;
+
+        if (!equipment.isEmpty()) {
+            float armorX = centerX - armorWidth / 2.0F;
+            float armorY = yCursor - armorHeight;
+            Render2DUtil.rect(armorX, armorY, armorWidth, armorHeight)
+                    .color(background)
+                    .radius(radius)
+                    .blur(6.0F * unit)
+                    .draw();
+
+            Render2DUtil.flush();
+
+            Matrix3x2fStack pose = event.getGuiGraphicsExtractor().pose();
+            float guiScale = (float) mc.getWindow().getGuiScale();
+            float scale = itemSize / 16.0F;
+            float itemY = Math.round((armorY + (armorHeight - itemSize) / 2.0F) * guiScale) / guiScale;
+            float cursor = centerX - (armorWidth - padX * 2.0F) / 2.0F;
+            for (ItemStack stack : equipment) {
+                float itemX = Math.round(cursor * guiScale) / guiScale;
+                pose.pushMatrix();
+                pose.translate(itemX, itemY);
+                pose.scale(scale);
+                event.getGuiGraphicsExtractor().item(stack, 0, 0);
+                pose.popMatrix();
+                cursor += itemSize + itemGap;
+            }
+
+            yCursor = armorY - 1.0F * unit;
+        }
+
+        float tagX = centerX - tagWidth / 2.0F;
+        float tagY = yCursor - tagHeight;
+        Render2DUtil.rect(tagX, tagY, tagWidth, tagHeight)
+                .color(background)
+                .radius(radius)
+                .blur(6.0F * unit)
+                .draw();
+
+        float centerY = tagY + tagHeight / 2.0F;
+        float textY = font.centeredTextY(centerY, size);
+        float cursor = tagX + padX;
+
+        if (headSize > 0.0F) {
+            drawHead(player, cursor, centerY - headSize / 2.0F, headSize);
+            cursor += headSize + gap;
+        }
+        if (!friendText.isEmpty()) {
+            Render2DUtil.text(cursor, textY, size, friendText)
+                    .style(UiFontStyle.MEDIUM)
+                    .color(this.friendTagColor.getValue())
+                    .draw();
+            cursor += friendWidth;
+        }
+        if (!botText.isEmpty()) {
+            Render2DUtil.text(cursor, textY, size, botText)
+                    .style(UiFontStyle.MEDIUM)
+                    .color(0xFFFF5555)
+                    .draw();
+            cursor += botWidth;
+        }
+        Render2DUtil.text(cursor, textY, size, name)
+                .style(UiFontStyle.MEDIUM)
+                .color(this.nameColor.getValue())
+                .draw();
+        cursor += nameWidth;
+        if (!hpText.isEmpty()) {
+            Render2DUtil.text(cursor, textY, size, hpText)
+                    .style(UiFontStyle.MEDIUM)
+                    .color(this.hpColor.getValue())
+                    .draw();
         }
     }
 

@@ -1,5 +1,7 @@
 package org.blade.event;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import org.blade.event.events.packet.PacketReceiveEvent;
@@ -7,6 +9,15 @@ import org.blade.event.events.packet.PacketSendEvent;
 
 public final class PacketEventManager {
     private PacketEventManager() {
+    }
+
+    /**
+     * События пакетов рассылаются только для главного соединения игрока.
+     * Headless-сессии ботов (InstanceBotSession) в события не попадают.
+     */
+    public static boolean isPrimaryConnection(Connection connection) {
+        ClientPacketListener listener = Minecraft.getInstance().getConnection();
+        return listener != null && listener.getConnection() == connection;
     }
 
     public static boolean hasSendListeners() {

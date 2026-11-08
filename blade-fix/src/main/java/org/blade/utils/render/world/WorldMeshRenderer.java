@@ -94,7 +94,7 @@ public final class WorldMeshRenderer {
                     () -> "Blade World Mesh Pass", colorView, Optional.empty());
             try {
                 pass.setPipeline(throughWalls ? THROUGH_WALLS : DEPTH_TESTED);
-                pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
+                pass.setUniform("Projection", Render3DUtil.levelProjectionBuffer());
                 pass.setVertexBuffer(0, vertexBuffer.slice(0, byteSize));
                 pass.draw(built.vertexCount(), 1, 0, 0);
             } finally {
@@ -141,14 +141,8 @@ public final class WorldMeshRenderer {
         );
         int vertexCount = 0;
 
-        for (Line line : mesh.lines()) {
-            addThickLine(
-                    builder,
-                    Render3DUtil.toViewSpace(line.start(), cameraPos, pose),
-                    Render3DUtil.toViewSpace(line.end(), cameraPos, pose),
-                    line.startColor(),
-                    line.endColor()
-            );
+        for (PlaneRect rect : mesh.planeRects()) {
+            addPlaneRect(builder, rect, cameraPos, pose);
             vertexCount += 6;
         }
 
@@ -157,8 +151,15 @@ public final class WorldMeshRenderer {
             vertexCount += ring.segments() * 6;
         }
 
-        for (PlaneRect rect : mesh.planeRects()) {
-            addPlaneRect(builder, rect, cameraPos, pose);
+        for (Line line : mesh.lines()) {
+            addThickLine(
+                    builder,
+                    Render3DUtil.toViewSpace(line.start(), cameraPos, pose),
+                    Render3DUtil.toViewSpace(line.end(), cameraPos, pose),
+                    line.startColor(),
+                    line.endColor(),
+                    line.widthScale()
+            );
             vertexCount += 6;
         }
 
@@ -169,17 +170,20 @@ public final class WorldMeshRenderer {
         return new BuiltMesh(meshData, vertexCount);
     }
 
-    private static void addThickLine(BufferBuilder builder, Vector4f start, Vector4f end, int startColor, int endColor) {
+    private static void addThickLine(BufferBuilder builder, Vector4f start, Vector4f end, int startColor, int endColor, float widthScale) {
         float dx = end.x - start.x;
         float dy = end.y - start.y;
         float length = (float) Math.sqrt(dx * dx + dy * dy);
+        float midDepth = Math.abs((start.z + end.z) * 0.5F);
+        float halfWidth = LINE_HALF_WIDTH * Math.max(0.2F, widthScale)
+                * Math.max(1.0F, midDepth / 6.0F);
         float normalX;
         float normalY;
         if (length > 0.05F) {
-            normalX = -dy / length * LINE_HALF_WIDTH;
-            normalY = dx / length * LINE_HALF_WIDTH;
+            normalX = -dy / length * halfWidth;
+            normalY = dx / length * halfWidth;
         } else {
-            normalX = LINE_HALF_WIDTH;
+            normalX = halfWidth;
             normalY = 0.0F;
         }
 
@@ -252,9 +256,13 @@ public final class WorldMeshRenderer {
         }
     }
 
-    public record Line(Vec3 start, Vec3 end, int startColor, int endColor) {
+    public record Line(Vec3 start, Vec3 end, int startColor, int endColor, float widthScale) {
         public Line(Vec3 start, Vec3 end, int color) {
-            this(start, end, color, color);
+            this(start, end, color, color, 1.0F);
+        }
+
+        public Line(Vec3 start, Vec3 end, int startColor, int endColor) {
+            this(start, end, startColor, endColor, 1.0F);
         }
     }
 

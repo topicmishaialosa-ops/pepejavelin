@@ -46,6 +46,8 @@ public final class PotionsElement extends HudElement {
 
     private final List<Card> cards = new ArrayList<>();
     private final Map<Identifier, Integer> maxDurations = new HashMap<>();
+    private final Map<Identifier, Integer> seenDurations = new HashMap<>();
+    private final Map<Identifier, Identifier> effectIcons = new HashMap<>();
     private final Style style = MINI;
 
     public PotionsElement() {
@@ -145,10 +147,11 @@ public final class PotionsElement extends HudElement {
 
     private void collectCards(Minecraft mc) {
         this.cards.clear();
-        Map<Identifier, Integer> seen = new HashMap<>();
+        this.seenDurations.clear();
         for (MobEffectInstance effect : mc.player.getActiveEffects()) {
             Identifier effectId = effect.getEffect().unwrapKey().orElseThrow().identifier();
-            Identifier icon = effectId.withPath(path -> "textures/mob_effect/" + path + ".png");
+            Identifier icon = this.effectIcons.computeIfAbsent(effectId,
+                    id -> id.withPath(path -> "textures/mob_effect/" + path + ".png"));
             boolean harmful = effect.getEffect().value().getCategory() == MobEffectCategory.HARMFUL;
 
             float fraction;
@@ -159,16 +162,18 @@ public final class PotionsElement extends HudElement {
             } else {
                 int duration = effect.getDuration();
                 int max = Math.max(duration, this.maxDurations.getOrDefault(effectId, 0));
-                seen.put(effectId, max);
+                this.seenDurations.put(effectId, max);
                 fraction = max > 0 ? (float) duration / max : 0.0F;
                 int seconds = duration / 20;
-                time = seconds / 60 + ":" + String.format("%02d", seconds % 60);
+                int minutes = seconds / 60;
+                int remainder = seconds % 60;
+                time = minutes + ":" + (remainder < 10 ? "0" : "") + remainder;
             }
             this.cards.add(new Card(icon, time, harmful, fraction));
         }
 
         this.maxDurations.clear();
-        this.maxDurations.putAll(seen);
+        this.maxDurations.putAll(this.seenDurations);
 
         if (this.cards.isEmpty() && showcase(mc)) {
             this.cards.add(new Card(effectIcon("fire_resistance"), "1:52", false, 0.9F));

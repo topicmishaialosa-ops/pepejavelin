@@ -28,7 +28,10 @@ import org.blade.utils.render.gui.UiFonts;
 import org.joml.Matrix3x2fStack;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 public final class TargetElement extends HudElement {
     private static final int BAR_TRACK_COLOR = Theme.Colors.OUTLINES_MEDIUM;
@@ -70,6 +73,7 @@ public final class TargetElement extends HudElement {
     private LivingEntity fadeEntity;
     private float fadeAlpha;
     private long lastFadeTime;
+    private final Map<Identifier, Optional<FaceIcon>> faceIcons = new HashMap<>();
 
     public TargetElement() {
         super("target", "Target");
@@ -196,6 +200,11 @@ public final class TargetElement extends HudElement {
         }
 
         Identifier texture = livingRenderer.getTextureLocation(livingState);
+        Optional<FaceIcon> cached = this.faceIcons.get(texture);
+        if (cached != null) {
+            return cached.orElse(null);
+        }
+
         Model<?> model = livingRenderer.getModel();
         ModelPart root = model.root();
         var lookup = root.createPartLookup();
@@ -208,7 +217,11 @@ public final class TargetElement extends HudElement {
         }
 
         FaceIcon icon = findLargestFrontFace(texture, iconPart);
-        return icon != null || iconPart == root ? icon : findLargestFrontFace(texture, root);
+        if (icon == null && iconPart != root) {
+            icon = findLargestFrontFace(texture, root);
+        }
+        this.faceIcons.put(texture, Optional.ofNullable(icon));
+        return icon;
     }
 
     private static FaceIcon findLargestFrontFace(Identifier texture, ModelPart part) {

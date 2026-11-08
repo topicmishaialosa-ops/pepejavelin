@@ -69,6 +69,7 @@ import org.blade.feature.impl.player.NoJumpBoostFeature;
 import org.blade.feature.impl.pve.*;
 import org.blade.feature.impl.pve.autowarden.AutoWardenFeature;
 import org.blade.feature.impl.visual.ArrowsFeature;
+import org.blade.feature.impl.visual.BlockESPFeature;
 import org.blade.feature.impl.visual.BlockOutlineFeature;
 import org.blade.feature.impl.visual.ChamsFeature;
 import org.blade.feature.impl.visual.CrosshairFeature;
@@ -79,9 +80,11 @@ import org.blade.feature.impl.visual.HoldMyItemsFeature;
 import org.blade.feature.impl.visual.HudFeature;
 import org.blade.feature.impl.visual.ItemPhysicsFeature;
 import org.blade.feature.impl.visual.JumpCirclesFeature;
+import org.blade.feature.impl.visual.KeybindsFeature;
 import org.blade.feature.impl.visual.NameTagsFeature;
 import org.blade.feature.impl.visual.PopChamsFeature;
 import org.blade.feature.impl.visual.RemovalsFeature;
+import org.blade.feature.impl.visual.ScoreboardFeature;
 import org.blade.feature.impl.visual.ShaderHandsFeature;
 import org.blade.feature.impl.visual.SupplyHologramsFeature;
 import org.blade.feature.impl.visual.SwingAnimationFeature;
@@ -161,7 +164,10 @@ public final class FeatureManager {
                 TargetPearlFeature.INSTANCE,
                 TpInflFeature.INSTANCE,
                 new HudFeature(),
+                new KeybindsFeature(),
+                BlockESPFeature.INSTANCE,
                 new TargetHudFeature(),
+                new ScoreboardFeature(),
                 new ArrowsFeature(),
                 new EntityEspFeature(),
                 new NameTagsFeature(),

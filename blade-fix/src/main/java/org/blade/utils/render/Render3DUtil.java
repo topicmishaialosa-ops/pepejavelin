@@ -1,5 +1,7 @@
 package org.blade.utils.render;
 
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.client.Camera;
@@ -15,6 +17,7 @@ import org.joml.Vector4f;
 public final class Render3DUtil {
     private static final Matrix4f LEVEL_PROJECTION = new Matrix4f();
     private static boolean levelProjectionCaptured;
+    private static GpuBufferSlice capturedLevelProjectionBuffer;
 
     private Render3DUtil() {
     }
@@ -58,13 +61,19 @@ public final class Render3DUtil {
         ).mul(pose);
     }
 
-    public static void captureLevelProjection(Matrix4fc projection) {
+    public static void captureLevelProjection(Matrix4fc projection, GpuBufferSlice buffer) {
         LEVEL_PROJECTION.set(projection);
         levelProjectionCaptured = true;
+        capturedLevelProjectionBuffer = buffer;
     }
 
     public static Matrix4f levelProjectionCopy() {
         return levelProjectionCaptured ? new Matrix4f(LEVEL_PROJECTION) : null;
+    }
+
+    public static GpuBufferSlice levelProjectionBuffer() {
+        GpuBufferSlice buffer = capturedLevelProjectionBuffer;
+        return buffer != null ? buffer : RenderSystem.getProjectionMatrixBuffer();
     }
 
     public static ScreenPoint projectToScreen(Minecraft mc, Vec3 pos) {

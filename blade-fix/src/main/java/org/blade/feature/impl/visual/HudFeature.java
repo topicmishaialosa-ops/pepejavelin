@@ -1,5 +1,8 @@
 package org.blade.feature.impl.visual;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.resources.Identifier;
@@ -10,13 +13,13 @@ import org.blade.event.events.render.Render2DEvent;
 import org.blade.feature.Feature;
 import org.blade.feature.FeatureCategory;
 import org.blade.feature.setting.BindSetting;
+import org.blade.feature.setting.ModeSetting;
 import org.blade.feature.setting.MultiSelectSetting;
 import org.blade.feature.setting.NumberSetting;
 import org.blade.hud.ArmorHudElement;
 import org.blade.hud.CoordsElement;
 import org.blade.hud.HotbarElement;
 import org.blade.hud.HudElement;
-import org.blade.hud.KeybindsElement;
 import org.blade.hud.MineTimerElement;
 import org.blade.hud.NotificationsElement;
 import org.blade.hud.PotionsElement;
@@ -28,6 +31,7 @@ import org.blade.feature.impl.pve.MineHelperFeature;
 import org.blade.feature.impl.pve.PveManagerFeature;
 import org.blade.menu.core.MenuConfigStore;
 import org.blade.utils.ColorUtil;
+import org.blade.utils.ConfigIO;
 import org.blade.utils.render.Theme;
 import org.blade.utils.render.gui.MsdfFont;
 import org.blade.utils.render.gui.Render2DUtil;
@@ -35,6 +39,7 @@ import org.blade.utils.render.gui.UiFontStyle;
 import org.blade.utils.render.gui.UiFonts;
 import org.lwjgl.glfw.GLFW;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,6 +47,7 @@ public final class HudFeature extends Feature {
 
     private static final float HUD_SCALE = 1.4F;
     private static final String SIZE_MIGRATION_KEY = "hudScale100Migrated";
+    private static final String KEYBINDS_MIGRATION_KEY = "hudKeybindsElementMigrated";
     private static final double LEGACY_DEFAULT_SIZE = 70.0;
     private static final Identifier RESET_ICON = Identifier.parse("blade:textures/menu/icons/refresh_ccw.svg");
     private static final int RESET_DIVIDER_COLOR = ColorUtil.rgba(255, 255, 255, 25);
@@ -52,7 +58,6 @@ public final class HudFeature extends Feature {
 
     private static final String WATERMARK = "Watermark";
     private static final String COORDINATES = "Coordinates";
-    private static final String KEYBINDS = "Keybinds";
     private static final String POTIONS = "Potions";
     private static final String TARGET = "Target";
     private static final String NOTIFICATIONS = "Notifications";
@@ -62,15 +67,17 @@ public final class HudFeature extends Feature {
 
     public final MultiSelectSetting elements = register(new MultiSelectSetting(
             "Elements",
-            List.of(WATERMARK, COORDINATES, KEYBINDS, POTIONS, TARGET, NOTIFICATIONS, HOTBAR, ARMOR_HUD, QUICK_USE),
-            WATERMARK, COORDINATES, KEYBINDS, POTIONS, TARGET, NOTIFICATIONS, HOTBAR, ARMOR_HUD, QUICK_USE
+            List.of(WATERMARK, COORDINATES, POTIONS, TARGET, NOTIFICATIONS, HOTBAR, ARMOR_HUD, QUICK_USE),
+            WATERMARK, COORDINATES, POTIONS, TARGET, NOTIFICATIONS, HOTBAR, ARMOR_HUD, QUICK_USE
     ));
     public final NumberSetting size = register(new NumberSetting("Size", 100.0, 50.0, 200.0, 1.0, "%"));
+    public final ModeSetting watermarkStyle = register(new ModeSetting("Watermark Style", "New", "New", "Old", "Bar"));
+    public final ModeSetting coordsStyle = register(new ModeSetting("Coordinates Style", "New", "New", "Old"));
+    public final ModeSetting hotbarStyle = register(new ModeSetting("Hotbar Style", "Mini", "Mini", "Classic"));
 
     private static HudFeature instance;
     private final WatermarkElement watermarkElement = new WatermarkElement();
     private final CoordsElement coordsElement = new CoordsElement();
-    private final KeybindsElement keybindsElement = new KeybindsElement();
     private final PotionsElement potionsElement = new PotionsElement();
     private final NotificationsElement notificationsElement = new NotificationsElement();
     private final HotbarElement hotbarElement = new HotbarElement();
@@ -81,7 +88,6 @@ public final class HudFeature extends Feature {
     private final List<HudElement> allElements = List.of(
             this.watermarkElement,
             this.coordsElement,
-            this.keybindsElement,
             this.potionsElement,
             this.notificationsElement,
             this.hotbarElement,
@@ -90,6 +96,7 @@ public final class HudFeature extends Feature {
             this.pveStatusElement,
             this.mineTimerElement
     );
+    private final List<HudElement> visibleCache = new ArrayList<>(9);
     private HudElement draggedElement;
     private boolean sizeMigrationChecked;
     private float resetButtonX;
@@ -104,11 +111,28 @@ public final class HudFeature extends Feature {
 
     public HudFeature() {
         super("HUD", "HUD customization settings", FeatureCategory.VISUAL, BindSetting.UNBOUND);
+        migrateKeybindElementConfig();
         instance = this;
     }
 
     public static boolean customHotbarActive() {
         return instance != null && instance.isEnabled() && instance.elements.isSelected(HOTBAR);
+    }
+
+    public static boolean newWatermarkEnabled() {
+        return instance != null && instance.watermarkStyle.is("New");
+    }
+
+    public static boolean barWatermarkEnabled() {
+        return instance != null && instance.watermarkStyle.is("Bar");
+    }
+
+    public static boolean newCoordsEnabled() {
+        return instance != null && instance.coordsStyle.is("New");
+    }
+
+    public static boolean miniHotbarEnabled() {
+        return instance == null || instance.hotbarStyle.is("Mini");
     }
 
     public static float hotbarDecorationOffset(Minecraft mc) {
@@ -469,15 +493,13 @@ public final class HudFeature extends Feature {
     }
 
     private List<HudElement> visibleElements() {
-        List<HudElement> visible = new ArrayList<>(4);
+        List<HudElement> visible = this.visibleCache;
+        visible.clear();
         if (this.elements.isSelected(WATERMARK)) {
             visible.add(this.watermarkElement);
         }
         if (this.elements.isSelected(COORDINATES)) {
             visible.add(this.coordsElement);
-        }
-        if (this.elements.isSelected(KEYBINDS)) {
-            visible.add(this.keybindsElement);
         }
         if (this.elements.isSelected(POTIONS)) {
             visible.add(this.potionsElement);
@@ -541,5 +563,32 @@ public final class HudFeature extends Feature {
             this.size.setValue(100.0);
         }
         MenuConfigStore.save(data -> data.addProperty(SIZE_MIGRATION_KEY, true));
+    }
+
+    private void migrateKeybindElementConfig() {
+        if (MenuConfigStore.getBoolean(KEYBINDS_MIGRATION_KEY, false)) {
+            return;
+        }
+        Path path = ConfigIO.resolve("features.json");
+        JsonObject root = ConfigIO.read(path);
+        if (root != null && root.has("features")) {
+            JsonObject features = root.getAsJsonObject("features");
+            JsonObject hud = features.getAsJsonObject("HUD");
+            if (hud != null) {
+                JsonObject settings = hud.getAsJsonObject("settings");
+                JsonElement elements = settings != null ? settings.get("Elements") : null;
+                if (elements != null && elements.isJsonArray()) {
+                    JsonArray cleaned = new JsonArray();
+                    for (JsonElement element : elements.getAsJsonArray()) {
+                        if (!element.isJsonPrimitive() || !"Keybinds".equalsIgnoreCase(element.getAsString())) {
+                            cleaned.add(element);
+                        }
+                    }
+                    settings.add("Elements", cleaned);
+                    ConfigIO.write(path, root);
+                }
+            }
+        }
+        MenuConfigStore.save(data -> data.addProperty(KEYBINDS_MIGRATION_KEY, true));
     }
 }

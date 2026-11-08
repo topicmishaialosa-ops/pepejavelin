@@ -30,31 +30,31 @@ public final class EditClickGUI extends Feature {
             .visibleWhen(() -> isDropdown()));
     public final NumberSetting panelWidth = register(new NumberSetting(
             "Panel Width",
-            175.0D,
-            90.0D,
-            320.0D,
-            1.0D,
+            1024.0D,
+            800.0D,
+            1200.0D,
+            10.0D,
             "px"
     ).configKey("menu.clickgui.panelWidth").visibleWhen(() -> isDropdown()));
     public final NumberSetting panelHeight = register(new NumberSetting(
             "Panel Height",
-            480.0D,
-            160.0D,
-            560.0D,
-            1.0D,
+            800.0D,
+            400.0D,
+            1200.0D,
+            10.0D,
             "px"
     ).configKey("menu.clickgui.panelHeight").visibleWhen(() -> isDropdown()));
     public final NumberSetting panelGap = register(new NumberSetting(
             "Panel Gap",
-            10.0D,
-            2.0D,
-            40.0D,
+            5.0D,
+            0.0D,
+            50.0D,
             1.0D,
             "px"
     ).configKey("menu.clickgui.panelGap").visibleWhen(() -> isDropdown()));
     public final NumberSetting panelOpacity = register(new NumberSetting(
             "Panel Opacity",
-            210.0D,
+            180.0D,
             40.0D,
             255.0D,
             1.0D,
@@ -76,11 +76,11 @@ public final class EditClickGUI extends Feature {
             "Smooth Scroll",
             true
     ).configKey("menu.clickgui.smoothScroll").visibleWhen(() -> isDropdown()));
-    public final NumberSetting scrollSpeed = register(new NumberSetting(
+public final NumberSetting scrollSpeed = register(new NumberSetting(
             "Scroll Speed",
-            12.0D,
+            40.0D,
             1.0D,
-            60.0D,
+            100.0D,
             1.0D,
             ""
     ).configKey("menu.clickgui.scrollSpeed").visibleWhen(() -> isDropdown()));

@@ -31,7 +31,6 @@
     "gui.GuiRendererMixin",
     "gui.HudMixin",
     "gui.IconSetMixin",
-    "gui.InventoryScreenMixin",
     "gui.LoadingOverlayMixin",
     "gui.ScreenMixin",
     "input.KeyboardHandlerMixin",

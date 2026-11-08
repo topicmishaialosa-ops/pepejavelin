@@ -19,6 +19,7 @@ import org.blade.utils.combat.ServerSprintTracker;
 import org.blade.utils.combat.ServerTickSync;
 import org.blade.utils.ScreenNbtParser;
 import org.blade.utils.inventory.DropAllInventoryController;
+import org.blade.utils.inventory.InventoryButtonsOverlay;
 import org.blade.utils.inventory.InventorySwap;
 import org.blade.utils.render.EntityEspStateCache;
 import org.blade.utils.render.Textures;
@@ -44,6 +45,7 @@ public class Blade implements ModInitializer {
         EventManager.subscribe(menuOverlayRenderHandler);
         EventManager.subscribe(InventorySwap.INSTANCE);
         EventManager.subscribe(DropAllInventoryController.INSTANCE);
+        EventManager.subscribe(InventoryButtonsOverlay.INSTANCE);
         EventManager.subscribe(ServerTickSync.INSTANCE);
         EventManager.subscribe(ServerSprintTracker.INSTANCE);
         EventManager.subscribe(PveAutomationCoordinator.INSTANCE);

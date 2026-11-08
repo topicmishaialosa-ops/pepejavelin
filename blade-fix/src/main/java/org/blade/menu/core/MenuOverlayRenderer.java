@@ -29,10 +29,14 @@ public final class MenuOverlayRenderer extends Component {
     public void layout(Minecraft minecraft, MenuOverlayState state, int screenWidth, int screenHeight, int mouseX, int mouseY) {
         this.dimensions = MenuDimensions.resolve(minecraft, state);
         ensurePosition(state, screenWidth, screenHeight);
-
-        float slideY = (1.0F - state.openProgress()) * Math.max(0.0F, screenHeight - state.panelY());
-        configureFrame(state.panelX(), state.panelY() + slideY, this.dimensions.panelWidth(), this.dimensions.panelHeight());
         this.displayPage = state.displayPage();
+
+        if (isStandaloneDropdown()) {
+            configureFrame(0.0F, 0.0F, screenWidth, screenHeight);
+        } else {
+            float slideY = (1.0F - state.openProgress()) * Math.max(0.0F, screenHeight - state.panelY());
+            configureFrame(state.panelX(), state.panelY() + slideY, this.dimensions.panelWidth(), this.dimensions.panelHeight());
+        }
         this.header.place(this, state, minecraft, mouseX, mouseY);
         this.modules.layout(this, state, mouseX, mouseY);
         this.dropdown.layout(this, state, mouseX, mouseY);
@@ -154,6 +158,9 @@ public final class MenuOverlayRenderer extends Component {
         if (this.displayPage == MenuPage.ACCOUNT_SWITCHER) {
             return this.accounts.handleKey(key);
         }
+        if (this.displayPage == MenuPage.CONFIGURATIONS) {
+            return this.configs.handleKey(key);
+        }
         if (this.displayPage != MenuPage.NONE && this.displayPage != MenuPage.SEARCH) {
             return false;
         }
@@ -168,6 +175,9 @@ public final class MenuOverlayRenderer extends Component {
         }
         if (this.displayPage == MenuPage.ACCOUNT_SWITCHER) {
             return this.accounts.handleCharacter(codePoint);
+        }
+        if (this.displayPage == MenuPage.CONFIGURATIONS) {
+            return this.configs.handleCharacter(codePoint);
         }
         if (this.displayPage != MenuPage.NONE && this.displayPage != MenuPage.SEARCH) {
             return false;
@@ -210,7 +220,9 @@ public final class MenuOverlayRenderer extends Component {
 
     @Override
     public void render(Minecraft minecraft, GuiGraphicsExtractor guiGraphicsExtractor) {
-        drawBackground();
+        if (!isStandaloneDropdown()) {
+            drawBackground();
+        }
         switch (this.displayPage) {
             case SETTINGS -> this.settings.render(minecraft, guiGraphicsExtractor);
             case FRIENDS -> this.friends.render(minecraft, guiGraphicsExtractor);
@@ -225,6 +237,11 @@ public final class MenuOverlayRenderer extends Component {
             }
         }
         this.header.render(minecraft, guiGraphicsExtractor);
+    }
+
+    private boolean isStandaloneDropdown() {
+        return EditClickGUI.INSTANCE.isDropdown()
+                && (this.displayPage == MenuPage.NONE || this.displayPage == MenuPage.SEARCH);
     }
 
     private void ensurePosition(MenuOverlayState state, int screenWidth, int screenHeight) {

@@ -4,15 +4,23 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import net.minecraft.util.Util;
 import org.blade.command.ClientCommand;
 import org.blade.feature.FeatureManager;
+import org.blade.utils.ConfigIO;
 import org.blade.utils.text.ChatUtil;
 
+import java.io.File;
 import java.util.List;
 
 public final class ConfigCommand extends ClientCommand {
     public ConfigCommand() {
         super("config", "Manages named configs: save/load/remove/list", ":gear:");
+    }
+
+    @Override
+    public List<String> aliases() {
+        return List.of("cfg");
     }
 
     @Override
@@ -34,6 +42,32 @@ public final class ConfigCommand extends ClientCommand {
             }
             return 1;
         }));
+        builder.then(LiteralArgumentBuilder.literal("dir").executes(context -> {
+            openConfigDir();
+            return 1;
+        }));
+    }
+
+    private void openConfigDir() {
+        File dir = ConfigIO.configDir().toFile();
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+        try {
+            Util.OS os = Util.getPlatform();
+            String[] cmd;
+            if (os == Util.OS.WINDOWS) {
+                cmd = new String[]{"explorer.exe", dir.getAbsolutePath()};
+            } else if (os == Util.OS.OSX) {
+                cmd = new String[]{"open", dir.getAbsolutePath()};
+            } else {
+                cmd = new String[]{"xdg-open", dir.getAbsolutePath()};
+            }
+            new ProcessBuilder(cmd).start();
+            ChatUtil.success("Opened config directory  •  " + dir.getAbsolutePath());
+        } catch (Exception e) {
+            ChatUtil.error("Failed to open config directory  •  " + e.getMessage());
+        }
     }
 
     private LiteralArgumentBuilder<Object> named(String literal, java.util.function.Function<String, Integer> action) {

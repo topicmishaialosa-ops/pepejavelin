@@ -102,14 +102,14 @@ public final class SpeedFeature extends Feature {
     private void velocityToward(LocalPlayer player, LivingEntity target) {
         double deltaX = target.getX() - player.getX();
         double deltaZ = target.getZ() - player.getZ();
-        double targetYaw = Math.toDegrees(Math.atan2(deltaZ, deltaX)) - 90.0D;
+        double targetYaw = Math.toDegrees(Math.atan2(deltaZ, deltaX));
         double radYaw = Math.toRadians(targetYaw);
         double force = 0.07200000107288361D;
         Vec3 velocity = player.getDeltaMovement();
         player.setDeltaMovement(
-                velocity.x - Math.sin(radYaw) * force,
+                velocity.x + Math.sin(radYaw) * force,
                 velocity.y,
-                velocity.z + Math.cos(radYaw) * force
+                velocity.z - Math.cos(radYaw) * force
         );
     }
 }

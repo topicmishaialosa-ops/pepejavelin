@@ -20,6 +20,10 @@ public final class MineTimerElement extends HudElement {
 
     private String mineText;
     private String timeText;
+    private String measuredMineText;
+    private String measuredTimeText;
+    private float measuredUnit = Float.NaN;
+    private float measuredWidth;
 
     public MineTimerElement() {
         super("mine_timer", "Mine Timer");
@@ -54,20 +58,34 @@ public final class MineTimerElement extends HudElement {
             return;
         }
 
-        this.mineText = MenuText.ui("Next mine") + ": "
+        String nextMine = MenuText.ui("Next mine") + ": "
                 + (timer == null ? MenuText.ui("Diamond") : timer.nextType());
-        this.timeText = MenuText.ui("Time left") + ": "
+        String nextTime = MenuText.ui("Time left") + ": "
                 + (timer == null
                 ? "01:30"
                 : timer.formattedTime(System.currentTimeMillis()));
+        this.mineText = nextMine;
+        this.timeText = nextTime;
+
+        if (unit == this.measuredUnit
+                && nextMine.equals(this.measuredMineText)
+                && nextTime.equals(this.measuredTimeText)) {
+            this.width = this.measuredWidth;
+            this.height = (PADDING_Y * 2.0F + LINE_HEIGHT * 2.0F) * unit;
+            return;
+        }
 
         MsdfFont font = UiFonts.sfProDisplay();
         float textSize = TEXT_SIZE * unit;
         float spacing = textSize * UiFontStyle.MEDIUM.letterSpacingEm();
-        this.width = Math.max(
-                font.measureWidth(this.mineText, textSize, spacing),
-                font.measureWidth(this.timeText, textSize, spacing)
+        this.measuredWidth = Math.max(
+                font.measureWidth(nextMine, textSize, spacing),
+                font.measureWidth(nextTime, textSize, spacing)
         ) + PADDING_X * 2.0F * unit;
+        this.measuredMineText = nextMine;
+        this.measuredTimeText = nextTime;
+        this.measuredUnit = unit;
+        this.width = this.measuredWidth;
         this.height = (PADDING_Y * 2.0F + LINE_HEIGHT * 2.0F) * unit;
     }
 

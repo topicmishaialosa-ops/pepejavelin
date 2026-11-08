@@ -99,7 +99,7 @@ public final class JumpWaveRenderer {
                     () -> "Blade Jump Wave Pass", colorView, Optional.empty());
             try {
                 pass.setPipeline(PIPELINE);
-                pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
+                pass.setUniform("Projection", Render3DUtil.levelProjectionBuffer());
                 pass.setUniform("JumpWaveUniforms", uniformBuffer);
                 pass.bindTexture("SceneSampler", sceneCopy.getColorTextureView(), sampler);
                 pass.setVertexBuffer(0, vertexBuffer.slice());

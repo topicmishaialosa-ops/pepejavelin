@@ -160,7 +160,7 @@ public final class TargetHudPresetManager {
 
     public static List<TargetHudPreset> getTemplates() {
         List<TargetHudPreset> list = new ArrayList<>();
-        list.add(template("Классика", "Крупный", 0xFF2862FF, 0xFF646473, 0xFF08080A, 0xFF8A8A96, 0xFFFFFFFF,
+        list.add(template("Классика", "Крупный", 0xFF3898FF, 0xFF646473, 0xFF000000, 0xFF646473, 0xFFFFFFFF,
                 false, 5.0, 1.0, 120.0, 1.0, 4.0, 4.0, false, true, 1.0));
         list.add(template("Неон", "Большая полоса", 0xFF00CFFF, 0xFF0077B6, 0xFF002233, 0xFF00CFFF, 0xFFFFFFFF,
                 true, 6.0, 1.5, 170.0, 1.3, 4.0, 4.0, true, true, 0.8));
@@ -180,6 +180,26 @@ public final class TargetHudPresetManager {
                 true, 3.0, 0.5, 90.0, 1.0, 4.0, 4.0, false, true, 1.0));
         list.add(template("Лаванда", "Мини", 0xFFB39DFB, 0xFF7E57C2, 0xFF120C24, 0xFF7E57C2, 0xFFFFFFFF,
                 true, 5.0, 1.0, 150.0, 1.0, 4.0, 4.0, false, true, 1.0));
+        list.add(template("Малютка", "Маленький", 0xFFFF6B9D, 0xFFC44569, 0xFF1A0A12, 0xFFFF6B9D, 0xFFFFD6E8,
+                true, 4.0, 1.0, 150.0, 0.8, 4.0, 4.0, false, true, 1.0));
+        list.add(template("Корона", "Боссбар", 0xFFFFD700, 0xFFB8860B, 0xFF0D0D0F, 0xFFFFD700, 0xFFFFF8DC,
+                true, 2.0, 1.0, 160.0, 1.0, 4.0, 4.0, true, true, 0.7));
+        list.add(template("Матрица", "Проценты", 0xFF00FF41, 0xFF00B832, 0xFF001204, 0xFF00FF41, 0xFFB9FFC9,
+                true, 4.0, 1.0, 130.0, 1.0, 4.0, 4.0, false, true, 1.0));
+        list.add(template("Арктика", "Метал", 0xFF7FDBFF, 0xFF39A0ED, 0xFF0A1622, 0xFF39A0ED, 0xFFFFFFFF,
+                true, 3.0, 1.0, 190.0, 1.1, 4.0, 4.0, true, true, 1.0));
+        list.add(template("Огонь", "Градиент", 0xFFFF5722, 0xFFFF9800, 0xFF1A0A00, 0xFFFF5722, 0xFFFFE0B2,
+                true, 6.0, 1.0, 150.0, 1.0, 4.0, 4.0, false, true, 1.0));
+        list.add(template("Кислота", "Вертикальный", 0xFFC6FF00, 0xFF8BC34A, 0xFF0C1400, 0xFFC6FF00, 0xFFF4FFB0,
+                true, 5.0, 1.0, 140.0, 1.2, 4.0, 4.0, false, true, 1.0));
+        list.add(template("Ночь", "Крупный", 0xFF9C27B0, 0xFF6A1B9A, 0xFF0C0614, 0xFF6A1B9A, 0xFFE1BEE7,
+                true, 7.0, 1.5, 170.0, 1.0, 4.0, 4.0, true, false, 0.6));
+        list.add(template("Кровь", "Большая полоса", 0xFFF44336, 0xFFB71C1C, 0xFF170000, 0xFFF44336, 0xFFFFCDD2,
+                true, 6.0, 1.5, 180.0, 1.3, 4.0, 4.0, true, true, 0.9));
+        list.add(template("Пузырь", "Кружок", 0xFF00E5FF, 0xFF00B8D4, 0xFF001418, 0xFF00E5FF, 0xFFFFFFFF,
+                true, 8.0, 0.0, 130.0, 1.0, 4.0, 4.0, false, true, 1.0));
+        list.add(template("Уголёк", "Мини", 0xFFFF7043, 0xFFD84315, 0xFF140800, 0xFFD84315, 0xFFFFCCBC,
+                true, 4.0, 1.0, 150.0, 1.0, 4.0, 4.0, false, true, 1.0));
         return list;
     }
 

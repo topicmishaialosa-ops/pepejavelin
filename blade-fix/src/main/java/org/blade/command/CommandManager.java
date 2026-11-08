@@ -5,6 +5,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.client.Minecraft;
 import org.blade.command.impl.BindCommand;
+import org.blade.command.impl.BlockEspCommand;
 import org.blade.command.impl.ConfigCommand;
 import org.blade.command.impl.FriendCommand;
 import org.blade.command.impl.GpsCommand;
@@ -58,7 +59,8 @@ public final class CommandManager {
                 new GpsCommand(),
                 new ConfigCommand(),
                 new NbtParserCommand(),
-                new RctCommand()
+                new RctCommand(),
+                new BlockEspCommand()
         ).forEach(this::register);
 
         store.load(this);

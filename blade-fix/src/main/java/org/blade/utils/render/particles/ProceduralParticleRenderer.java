@@ -203,7 +203,7 @@ public final class ProceduralParticleRenderer {
                     OptionalDouble.empty()
             )) {
                 pass.setPipeline(PIPELINE);
-                pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
+                pass.setUniform("Projection", Render3DUtil.levelProjectionBuffer());
                 pass.setUniform("ProceduralParticleUniforms", uniforms);
                 pass.bindTexture(
                         "DepthSampler",

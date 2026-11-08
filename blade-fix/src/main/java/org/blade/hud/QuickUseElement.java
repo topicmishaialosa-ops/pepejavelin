@@ -16,7 +16,9 @@ import org.blade.utils.render.gui.UiFontStyle;
 import org.blade.utils.render.gui.UiFonts;
 import org.joml.Matrix3x2fStack;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class QuickUseElement extends HudElement {
     private static final int MAX_COLUMNS = 6;
@@ -28,6 +30,7 @@ public final class QuickUseElement extends HudElement {
     private static final float CELL_RADIUS = 5.0F;
     private static final float KEY_TEXT_SIZE = 7.5F;
     private static final float COUNT_TEXT_SIZE = 8.0F;
+    private static final Map<String, String> COMPACT_BINDS = new HashMap<>();
 
     private List<ServerHelperFeature.QuickUseEntry> entries = List.of();
     private int columns;
@@ -157,13 +160,22 @@ public final class QuickUseElement extends HudElement {
     }
 
     private static String compactBind(String label) {
-        return switch (label) {
+        if (label == null) {
+            return null;
+        }
+        String cached = COMPACT_BINDS.get(label);
+        if (cached != null) {
+            return cached;
+        }
+        String compact = switch (label) {
             case "Mouse Left" -> "M1";
             case "Mouse Right" -> "M2";
             case "Mouse Middle" -> "M3";
-            default -> label != null && label.startsWith("Mouse ")
+            default -> label.startsWith("Mouse ")
                     ? "M" + label.substring("Mouse ".length())
                     : label;
         };
+        COMPACT_BINDS.put(label, compact);
+        return compact;
     }
 }

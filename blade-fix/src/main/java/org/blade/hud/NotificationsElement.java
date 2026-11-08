@@ -20,6 +20,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,8 @@ public final class NotificationsElement extends HudElement {
 
     private final Map<Identifier, EffectState> trackedEffects = new HashMap<>();
     private final List<Note> visible = new ArrayList<>();
+    private final Map<Note, Float> pillWidths = new IdentityHashMap<>();
+    private final Map<Note, float[]> segmentWidths = new IdentityHashMap<>();
     private final Style style = MINI;
 
     public NotificationsElement() {
@@ -135,8 +138,14 @@ public final class NotificationsElement extends HudElement {
         MsdfFont font = UiFonts.sfPro(UiFontStyle.MEDIUM.weight());
         float maxWidth = 0.0F;
         float stackHeight = 0.0F;
+        this.pillWidths.clear();
+        this.segmentWidths.clear();
         for (Note note : this.visible) {
-            maxWidth = Math.max(maxWidth, pillWidth(font, note, unit));
+            float[] widths = new float[note.segments().size()];
+            float noteWidth = pillWidth(font, note, unit, widths);
+            this.pillWidths.put(note, noteWidth);
+            this.segmentWidths.put(note, widths);
+            maxWidth = Math.max(maxWidth, noteWidth);
             stackHeight += (this.style.height() + STACK_GAP) * unit * envelope(note, now);
         }
         this.width = maxWidth;
@@ -169,7 +178,10 @@ public final class NotificationsElement extends HudElement {
 
     private void drawPill(MsdfFont font, Note note, float guiWidth, float pillY, float unit, long now, float alpha) {
         float pillHeight = this.style.height() * unit;
-        float pillWidth = pillWidth(font, note, unit);
+        Float cachedWidth = this.pillWidths.get(note);
+        float pillWidth = cachedWidth != null
+                ? cachedWidth
+                : pillWidth(font, note, unit, new float[note.segments().size()]);
 
         float pillX = (guiWidth - pillWidth) / 2.0F;
         long age = now - note.createdAt();
@@ -205,6 +217,7 @@ public final class NotificationsElement extends HudElement {
         cursor += Math.max(0.5F, 0.5F * unit) + gap;
 
         float textY = font.centeredTextY(centerY, textSize);
+        float[] widths = this.segmentWidths.get(note);
         for (int index = 0; index < note.segments().size(); index++) {
             Segment segment = note.segments().get(index);
             if (index > 0) {
@@ -214,18 +227,25 @@ public final class NotificationsElement extends HudElement {
                     .style(UiFontStyle.MEDIUM)
                     .color(ColorUtil.multiplyAlpha(segment.color(), alpha))
                     .draw();
-            cursor += font.measureWidth(segment.text(), textSize, letterSpacing);
+            cursor += widths != null && index < widths.length
+                    ? widths[index]
+                    : font.measureWidth(segment.text(), textSize, letterSpacing);
         }
     }
 
-    private float pillWidth(MsdfFont font, Note note, float unit) {
+    private float pillWidth(MsdfFont font, Note note, float unit, float[] outWidths) {
         float textSize = TEXT_SIZE * unit;
         float letterSpacing = textSize * UiFontStyle.MEDIUM.letterSpacingEm();
         float textWidth = 0.0F;
-        for (Segment segment : note.segments()) {
-            textWidth += font.measureWidth(segment.text(), textSize, letterSpacing);
+        List<Segment> segments = note.segments();
+        for (int index = 0; index < segments.size(); index++) {
+            float width = font.measureWidth(segments.get(index).text(), textSize, letterSpacing);
+            if (index < outWidths.length) {
+                outWidths[index] = width;
+            }
+            textWidth += width;
         }
-        textWidth += Math.max(0, note.segments().size() - 1) * TEXT_SEGMENT_GAP * unit;
+        textWidth += Math.max(0, segments.size() - 1) * TEXT_SEGMENT_GAP * unit;
         return (this.style.padding() * 2.0F + this.style.iconSize() + this.style.gap() * 2.0F) * unit
                 + Math.max(0.5F, 0.5F * unit)
                 + textWidth;
@@ -287,7 +307,8 @@ public final class NotificationsElement extends HudElement {
 
     private static String formatTicks(int ticks) {
         int seconds = ticks / 20;
-        return seconds / 60 + ":" + String.format("%02d", seconds % 60);
+        int remainder = seconds % 60;
+        return seconds / 60 + ":" + (remainder < 10 ? "0" + remainder : Integer.toString(remainder));
     }
 
     private Note exampleNote(long now) {

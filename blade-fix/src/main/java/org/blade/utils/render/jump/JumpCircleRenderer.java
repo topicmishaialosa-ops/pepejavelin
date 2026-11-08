@@ -99,7 +99,7 @@ public final class JumpCircleRenderer {
                     () -> "Blade Jump Circle Pass", colorView, Optional.empty());
             try {
                 pass.setPipeline(PIPELINE);
-                pass.setUniform("Projection", RenderSystem.getProjectionMatrixBuffer());
+                pass.setUniform("Projection", Render3DUtil.levelProjectionBuffer());
                 pass.setUniform("JumpCircleUniforms", uniformBuffer);
                 pass.bindTexture("iChannel0", frequencyView, sampler);
                 pass.setVertexBuffer(0, vertexBuffer.slice());

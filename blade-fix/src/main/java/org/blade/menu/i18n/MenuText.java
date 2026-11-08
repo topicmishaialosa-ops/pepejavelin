@@ -121,6 +121,17 @@ public final class MenuText {
             ,Map.entry("pickaxe durability", "прочность кирки")
             ,Map.entry("nearby player", "игрок рядом")
             ,Map.entry("unexpected screen", "открыт посторонний экран")
+            ,Map.entry("Configurations", "Конфигурации")
+            ,Map.entry("Load, save, and manage your client presets.",
+                    "Загружайте, сохраняйте и управляйте пресетами клиента.")
+            ,Map.entry("Active", "Активен")
+            ,Map.entry("Click to load", "Нажмите, чтобы загрузить")
+            ,Map.entry("No saved configs", "Нет сохранённых конфигов")
+            ,Map.entry("Save your current settings with + or use .cfg save <name>",
+                    "Сохраните настройки кнопкой + или командой .cfg save <имя>")
+            ,Map.entry("Save Config", "Сохранить конфиг")
+            ,Map.entry("Enter a name for the preset.", "Введите имя пресета.")
+            ,Map.entry("Config name", "Имя конфига")
     );
 
     private static final Map<String, String> SETTING_RU = Map.ofEntries(
@@ -133,8 +144,10 @@ public final class MenuText {
             Map.entry("Armor Filter", "Фильтр брони"),
             Map.entry("Attack Range", "Поправка к дальности атаки"),
             Map.entry("Aura", "Aura"),
+            Map.entry("Background color", "Цвет фона"),
             Map.entry("Block Break", "Разрушение блоков"),
             Map.entry("Blocks", "Блоки"),
+            Map.entry("Bot tag", "Тег бота"),
             Map.entry("Boost", "Ускорение"),
             Map.entry("Both Hands", "Обе руки"),
             Map.entry("Box", "Рамка"),
@@ -151,6 +164,7 @@ public final class MenuText {
             Map.entry("Color", "Цвет"),
             Map.entry("Color Mode", "Режим цвета"),
             Map.entry("Command", "Команда"),
+            Map.entry("Coordinates Style", "Стиль координат"),
             Map.entry("Conditions", "Условия"),
             Map.entry("Cooldown", "Задержка"),
             Map.entry("Cooldown Animation", "Анимация перезарядки атаки"),
@@ -180,18 +194,23 @@ public final class MenuText {
             Map.entry("Fog Color", "Цвет тумана"),
             Map.entry("Fog Distance", "Дистанция тумана"),
             Map.entry("FOV", "Угол обзора"),
+            Map.entry("Friend tag", "Тег друга"),
+            Map.entry("Friend tag color", "Цвет тега F"),
             Map.entry("Full Effect Duration", "Максимальная длительность эффектов"),
             Map.entry("Gap", "Отступ"),
             Map.entry("Glass Blur", "Размытие стекла"),
             Map.entry("Glow", "Свечение"),
             Map.entry("Glow Radius", "Радиус свечения"),
             Map.entry("Glow Strength", "Сила свечения"),
+            Map.entry("Head", "Голова"),
             Map.entry("Health", "Здоровье"),
             Map.entry("Health Bar", "Полоса здоровья"),
             Map.entry("Highlight Don Items", "Подсвечивать донат-предметы"),
             Map.entry("Highlight Expired", "Подсвечивать просроченные лоты"),
             Map.entry("Highlight Potions", "Подсвечивать зелья"),
             Map.entry("Hit Amount", "Частиц за удар"),
+            Map.entry("HP color", "Цвет HP"),
+            Map.entry("Hotbar Style", "Стиль хотбара"),
             Map.entry("Ignore Depth", "Рисовать сквозь стены"),
             Map.entry("Ignore Naked", "Игнорировать игроков без брони"),
             Map.entry("Intensity", "Интенсивность эффекта"),
@@ -225,6 +244,7 @@ public final class MenuText {
             Map.entry("Mode", "Режим"),
             Map.entry("Move Correction", "Коррекция движения"),
             Map.entry("Name", "Подменное имя"),
+            Map.entry("Name color", "Цвет имени"),
             Map.entry("Negative Effects", "Негативные эффекты"),
             Map.entry("No Knockback", "Без Отдачи"),
             Map.entry("No Thorns", "Без Шипов"),
@@ -285,6 +305,7 @@ public final class MenuText {
             Map.entry("Target ESP", "Подсветка цели"),
             Map.entry("Target ESP Color", "Цвет подсветки цели"),
             Map.entry("Targets", "Цели"),
+            Map.entry("Text size", "Размер текста"),
             Map.entry("Textured", "С текстурой"),
             Map.entry("Themed Colors", "Цвета темы"),
             Map.entry("Thickness", "Толщина"),
@@ -300,6 +321,7 @@ public final class MenuText {
             Map.entry("Visible Color", "Цвет подсветки"),
             Map.entry("Vex Spawn Egg", "Яйцо призыва вредины"),
             Map.entry("Water", "Вода"),
+            Map.entry("Watermark Style", "Стиль водяного знака"),
             Map.entry("Wave Effect", "Эффект волны"),
             Map.entry("Wave Radius", "Радиус волны"),
             Map.entry("Wave Strength", "Сила волны"),
@@ -656,6 +678,7 @@ public final class MenuText {
             Map.entry("Plasma", "Плазма"),
             Map.entry("Gyroid", "Gyroid")
             ,Map.entry("Both", "Оба")
+            ,Map.entry("Bar", "Полоса")
             ,Map.entry("Boss Bar", "Полоса босса")
             ,Map.entry("Box", "Полная рамка")
             ,Map.entry("Butterfly", "Butterfly")
@@ -702,6 +725,7 @@ public final class MenuText {
             ,Map.entry("Marker", "Маркер")
             ,Map.entry("Mace", "Булава")
             ,Map.entry("Midnight", "Полночь")
+            ,Map.entry("Mini", "Мини")
             ,Map.entry("MinimalPattern", "Минималистичный узор")
             ,Map.entry("Mobs", "Мобы")
             ,Map.entry("Monsters", "Монстры")
@@ -709,9 +733,11 @@ public final class MenuText {
             ,Map.entry("Motto", "Девиз")
             ,Map.entry("Naked Players", "Игроки без брони")
             ,Map.entry("Nearby Player", "Игрок рядом")
+            ,Map.entry("New", "Новый")
             ,Map.entry("Night", "Ночь")
             ,Map.entry("Normal", "Обычный")
             ,Map.entry("Obsidian", "Обсидиан")
+            ,Map.entry("Old", "Старый")
             ,Map.entry("Outline", "Обводка")
             ,Map.entry("Passive", "Мирные")
             ,Map.entry("Players", "Игроки")

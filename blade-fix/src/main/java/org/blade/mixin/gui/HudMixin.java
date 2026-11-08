@@ -15,6 +15,7 @@ import org.blade.feature.FeatureManager;
 import org.blade.feature.impl.visual.CrosshairFeature;
 import org.blade.feature.impl.visual.HudFeature;
 import org.blade.feature.impl.visual.RemovalsFeature;
+import org.blade.feature.impl.visual.ScoreboardFeature;
 import org.blade.event.EventManager;
 import org.blade.event.Events;
 import org.blade.event.events.render.Render2DEvent;
@@ -38,7 +39,7 @@ public abstract class HudMixin {
 
     @Inject(method = "displayScoreboardSidebar", at = @At("HEAD"), cancellable = true)
     private void onDisplayScoreboardSidebar(GuiGraphicsExtractor guiGraphicsExtractor, Objective objective, CallbackInfo ci) {
-        if (RemovalsFeature.shouldRemoveScoreboard()) {
+        if (RemovalsFeature.shouldRemoveScoreboard() || FeatureManager.INSTANCE.getEnabled(ScoreboardFeature.class) != null) {
             ci.cancel();
         }
     }
