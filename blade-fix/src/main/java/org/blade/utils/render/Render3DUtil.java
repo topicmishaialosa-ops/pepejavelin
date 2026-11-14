@@ -16,6 +16,7 @@ import org.joml.Vector4f;
 
 public final class Render3DUtil {
     private static final Matrix4f LEVEL_PROJECTION = new Matrix4f();
+    private static final Vector4f PROJECTION_SCRATCH = new Vector4f();
     private static boolean levelProjectionCaptured;
     private static GpuBufferSlice capturedLevelProjectionBuffer;
 
@@ -53,10 +54,14 @@ public final class Render3DUtil {
     }
 
     public static Vector4f toViewSpace(Vec3 point, Vec3 cameraPos, Matrix4f pose) {
-        return new Vector4f(
-                (float) (point.x - cameraPos.x),
-                (float) (point.y - cameraPos.y),
-                (float) (point.z - cameraPos.z),
+        return toViewSpace(point.x, point.y, point.z, cameraPos, pose, new Vector4f());
+    }
+
+    public static Vector4f toViewSpace(double x, double y, double z, Vec3 cameraPos, Matrix4f pose, Vector4f dest) {
+        return dest.set(
+                (float) (x - cameraPos.x),
+                (float) (y - cameraPos.y),
+                (float) (z - cameraPos.z),
                 1.0F
         ).mul(pose);
     }
@@ -77,7 +82,11 @@ public final class Render3DUtil {
     }
 
     public static ScreenPoint projectToScreen(Minecraft mc, Vec3 pos) {
-        if (pos == null || mc.getWindow() == null || mc.gameRenderer == null || !levelProjectionCaptured) {
+        return pos == null ? null : projectToScreen(mc, pos.x, pos.y, pos.z);
+    }
+
+    public static ScreenPoint projectToScreen(Minecraft mc, double x, double y, double z) {
+        if (mc.getWindow() == null || mc.gameRenderer == null || !levelProjectionCaptured) {
             return null;
         }
 
@@ -92,10 +101,10 @@ public final class Render3DUtil {
             return null;
         }
 
-        Vector4f clip = new Vector4f(
-                (float) (pos.x - cameraState.pos.x()),
-                (float) (pos.y - cameraState.pos.y()),
-                (float) (pos.z - cameraState.pos.z()),
+        Vector4f clip = PROJECTION_SCRATCH.set(
+                (float) (x - cameraState.pos.x()),
+                (float) (y - cameraState.pos.y()),
+                (float) (z - cameraState.pos.z()),
                 1.0F
         );
         cameraState.viewRotationMatrix.transform(clip);
@@ -116,7 +125,7 @@ public final class Render3DUtil {
     }
 
     public static ScreenBounds includeInBounds(Minecraft mc, ScreenBounds bounds, double x, double y, double z) {
-        ScreenPoint point = projectToScreen(mc, new Vec3(x, y, z));
+        ScreenPoint point = projectToScreen(mc, x, y, z);
         if (point == null) {
             return bounds;
         }

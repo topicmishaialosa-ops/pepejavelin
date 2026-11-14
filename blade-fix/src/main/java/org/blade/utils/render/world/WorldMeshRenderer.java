@@ -32,22 +32,28 @@ import java.util.OptionalDouble;
 public final class WorldMeshRenderer {
     private static final float LINE_HALF_WIDTH = 0.012F;
 
-    private static final RenderPipeline THROUGH_WALLS = buildPipeline("line", CompareOp.ALWAYS_PASS);
-    private static final RenderPipeline DEPTH_TESTED = buildPipeline("line_depth", CompareOp.LESS_THAN_OR_EQUAL);
+    private static final RenderPipeline THROUGH_WALLS = buildPipeline("line", CompareOp.ALWAYS_PASS, BlendFunction.LIGHTNING);
+    private static final RenderPipeline DEPTH_TESTED = buildPipeline("line_depth", CompareOp.GREATER_THAN_OR_EQUAL, BlendFunction.LIGHTNING);
+    private static final RenderPipeline DEPTH_TESTED_TRANSLUCENT = buildPipeline("line_depth_translucent", CompareOp.GREATER_THAN_OR_EQUAL, BlendFunction.TRANSLUCENT);
+    private static final RenderPipeline SOLID_COSMETICS = buildPipeline("cosmetics_solid", CompareOp.GREATER_THAN_OR_EQUAL, BlendFunction.TRANSLUCENT, true);
 
     private static GpuBuffer vertexBuffer;
 
     private WorldMeshRenderer() {
     }
 
-    private static RenderPipeline buildPipeline(String name, CompareOp compareOp) {
+    private static RenderPipeline buildPipeline(String name, CompareOp compareOp, BlendFunction blend) {
+        return buildPipeline(name, compareOp, blend, false);
+    }
+
+    private static RenderPipeline buildPipeline(String name, CompareOp compareOp, BlendFunction blend, boolean writeDepth) {
         return RenderPipeline.builder()
                 .withLocation(Identifier.parse("blade:pipeline/world/" + name))
                 .withVertexShader(Identifier.parse("blade:core/blade_line"))
                 .withFragmentShader(Identifier.parse("blade:core/blade_line"))
                 .withBindGroupLayout(BindGroupLayouts.PROJECTION)
-                .withColorTargetState(new ColorTargetState(BlendFunction.LIGHTNING))
-                .withDepthStencilState(new DepthStencilState(compareOp, false))
+                .withColorTargetState(new ColorTargetState(blend))
+                .withDepthStencilState(new DepthStencilState(compareOp, writeDepth))
                 .withVertexBinding(0, DefaultVertexFormat.POSITION_COLOR)
                 .withPrimitiveTopology(PrimitiveTopology.TRIANGLES)
                 .withCull(false)
@@ -59,6 +65,24 @@ public final class WorldMeshRenderer {
     }
 
     public static void render(WorldMesh mesh, boolean throughWalls) {
+        render(mesh, throughWalls ? THROUGH_WALLS : DEPTH_TESTED);
+    }
+
+    public static void renderTranslucent(WorldMesh mesh) {
+        render(mesh, DEPTH_TESTED_TRANSLUCENT);
+    }
+
+    public static void renderCosmetics(WorldMesh mesh) {
+        List<PlaneRect> solid = new java.util.ArrayList<>();
+        List<PlaneRect> translucent = new java.util.ArrayList<>();
+        for (PlaneRect rect : mesh.planeRects()) {
+            ((rect.color() >>> 24) == 255 ? solid : translucent).add(rect);
+        }
+        render(new WorldMesh(List.of(), List.of(), solid), SOLID_COSMETICS);
+        render(new WorldMesh(mesh.lines(), mesh.rings(), translucent), DEPTH_TESTED_TRANSLUCENT);
+    }
+
+    private static void render(WorldMesh mesh, RenderPipeline pipeline) {
         if (mesh == null || mesh.isEmpty()) {
             return;
         }
@@ -93,7 +117,7 @@ public final class WorldMeshRenderer {
                     : device.createCommandEncoder().createRenderPass(
                     () -> "Blade World Mesh Pass", colorView, Optional.empty());
             try {
-                pass.setPipeline(throughWalls ? THROUGH_WALLS : DEPTH_TESTED);
+                pass.setPipeline(pipeline);
                 pass.setUniform("Projection", Render3DUtil.levelProjectionBuffer());
                 pass.setVertexBuffer(0, vertexBuffer.slice(0, byteSize));
                 pass.draw(built.vertexCount(), 1, 0, 0);
@@ -126,9 +150,11 @@ public final class WorldMeshRenderer {
         Vec3 cameraPos = camera.position();
         Matrix4f pose = Render3DUtil.cameraViewPose(camera);
 
-        int estimatedVertices = mesh.lines().size() * 6
-                + mesh.rings().stream().mapToInt(Ring::segments).sum() * 6
-                + mesh.planeRects().size() * 6;
+        int ringSegments = 0;
+        for (Ring ring : mesh.rings()) {
+            ringSegments += ring.segments();
+        }
+        int estimatedVertices = (mesh.lines().size() + ringSegments + mesh.planeRects().size()) * 6;
         if (estimatedVertices <= 0) {
             return null;
         }
@@ -151,11 +177,17 @@ public final class WorldMeshRenderer {
             vertexCount += ring.segments() * 6;
         }
 
+        Vector4f lineStart = new Vector4f();
+        Vector4f lineEnd = new Vector4f();
         for (Line line : mesh.lines()) {
+            Vec3 start = line.start();
+            Vec3 end = line.end();
+            Render3DUtil.toViewSpace(start.x, start.y, start.z, cameraPos, pose, lineStart);
+            Render3DUtil.toViewSpace(end.x, end.y, end.z, cameraPos, pose, lineEnd);
             addThickLine(
                     builder,
-                    Render3DUtil.toViewSpace(line.start(), cameraPos, pose),
-                    Render3DUtil.toViewSpace(line.end(), cameraPos, pose),
+                    lineStart,
+                    lineEnd,
                     line.startColor(),
                     line.endColor(),
                     line.widthScale()
@@ -207,20 +239,26 @@ public final class WorldMeshRenderer {
     private static void addRing(BufferBuilder builder, Ring ring, Vec3 cameraPos, Matrix4f pose) {
         double innerRadius = Math.max(0.0D, ring.radius() - ring.halfWidth());
         double outerRadius = ring.radius() + ring.halfWidth();
+        Vec3 center = ring.center();
+        Vec3 u = ring.u();
+        Vec3 v = ring.v();
+        Vector4f outerView1 = new Vector4f();
+        Vector4f innerView1 = new Vector4f();
+        Vector4f outerView2 = new Vector4f();
+        Vector4f innerView2 = new Vector4f();
 
         for (int i = 0; i < ring.segments(); i++) {
             double angle1 = i * (Math.PI * 2.0D) / ring.segments();
             double angle2 = (i + 1) * (Math.PI * 2.0D) / ring.segments();
+            double cos1 = Math.cos(angle1);
+            double sin1 = Math.sin(angle1);
+            double cos2 = Math.cos(angle2);
+            double sin2 = Math.sin(angle2);
 
-            Vec3 outer1 = ring.center().add(ring.u().scale(Math.cos(angle1) * outerRadius)).add(ring.v().scale(Math.sin(angle1) * outerRadius));
-            Vec3 inner1 = ring.center().add(ring.u().scale(Math.cos(angle1) * innerRadius)).add(ring.v().scale(Math.sin(angle1) * innerRadius));
-            Vec3 outer2 = ring.center().add(ring.u().scale(Math.cos(angle2) * outerRadius)).add(ring.v().scale(Math.sin(angle2) * outerRadius));
-            Vec3 inner2 = ring.center().add(ring.u().scale(Math.cos(angle2) * innerRadius)).add(ring.v().scale(Math.sin(angle2) * innerRadius));
-
-            Vector4f outerView1 = Render3DUtil.toViewSpace(outer1, cameraPos, pose);
-            Vector4f innerView1 = Render3DUtil.toViewSpace(inner1, cameraPos, pose);
-            Vector4f outerView2 = Render3DUtil.toViewSpace(outer2, cameraPos, pose);
-            Vector4f innerView2 = Render3DUtil.toViewSpace(inner2, cameraPos, pose);
+            ringPoint(center, u, v, cos1, sin1, outerRadius, cameraPos, pose, outerView1);
+            ringPoint(center, u, v, cos1, sin1, innerRadius, cameraPos, pose, innerView1);
+            ringPoint(center, u, v, cos2, sin2, outerRadius, cameraPos, pose, outerView2);
+            ringPoint(center, u, v, cos2, sin2, innerRadius, cameraPos, pose, innerView2);
 
             builder.addVertex(outerView1.x, outerView1.y, outerView1.z).setColor(ring.color());
             builder.addVertex(innerView1.x, innerView1.y, innerView1.z).setColor(ring.color());
@@ -231,16 +269,26 @@ public final class WorldMeshRenderer {
         }
     }
 
-    private static void addPlaneRect(BufferBuilder builder, PlaneRect rect, Vec3 cameraPos, Matrix4f pose) {
-        Vec3 p1 = rect.center().add(rect.axis().scale(rect.halfLength())).add(rect.normal().scale(rect.halfWidth()));
-        Vec3 p2 = rect.center().add(rect.axis().scale(rect.halfLength())).add(rect.normal().scale(-rect.halfWidth()));
-        Vec3 p3 = rect.center().add(rect.axis().scale(-rect.halfLength())).add(rect.normal().scale(-rect.halfWidth()));
-        Vec3 p4 = rect.center().add(rect.axis().scale(-rect.halfLength())).add(rect.normal().scale(rect.halfWidth()));
+    private static void ringPoint(Vec3 center, Vec3 u, Vec3 v, double cos, double sin, double radius,
+                                  Vec3 cameraPos, Matrix4f pose, Vector4f dest) {
+        double x = center.x + u.x * cos * radius + v.x * sin * radius;
+        double y = center.y + u.y * cos * radius + v.y * sin * radius;
+        double z = center.z + u.z * cos * radius + v.z * sin * radius;
+        Render3DUtil.toViewSpace(x, y, z, cameraPos, pose, dest);
+    }
 
-        Vector4f v1 = Render3DUtil.toViewSpace(p1, cameraPos, pose);
-        Vector4f v2 = Render3DUtil.toViewSpace(p2, cameraPos, pose);
-        Vector4f v3 = Render3DUtil.toViewSpace(p3, cameraPos, pose);
-        Vector4f v4 = Render3DUtil.toViewSpace(p4, cameraPos, pose);
+    private static void addPlaneRect(BufferBuilder builder, PlaneRect rect, Vec3 cameraPos, Matrix4f pose) {
+        Vec3 center = rect.center();
+        Vec3 axis = rect.axis();
+        Vec3 normal = rect.normal();
+        Vector4f v1 = new Vector4f();
+        Vector4f v2 = new Vector4f();
+        Vector4f v3 = new Vector4f();
+        Vector4f v4 = new Vector4f();
+        planePoint(center, axis, normal, rect.halfLength(), rect.halfWidth(), cameraPos, pose, v1);
+        planePoint(center, axis, normal, rect.halfLength(), -rect.halfWidth(), cameraPos, pose, v2);
+        planePoint(center, axis, normal, -rect.halfLength(), -rect.halfWidth(), cameraPos, pose, v3);
+        planePoint(center, axis, normal, -rect.halfLength(), rect.halfWidth(), cameraPos, pose, v4);
 
         builder.addVertex(v1.x, v1.y, v1.z).setColor(rect.color());
         builder.addVertex(v2.x, v2.y, v2.z).setColor(rect.color());
@@ -248,6 +296,14 @@ public final class WorldMeshRenderer {
         builder.addVertex(v1.x, v1.y, v1.z).setColor(rect.color());
         builder.addVertex(v3.x, v3.y, v3.z).setColor(rect.color());
         builder.addVertex(v4.x, v4.y, v4.z).setColor(rect.color());
+    }
+
+    private static void planePoint(Vec3 center, Vec3 axis, Vec3 normal, double length, double width,
+                                   Vec3 cameraPos, Matrix4f pose, Vector4f dest) {
+        double x = center.x + axis.x * length + normal.x * width;
+        double y = center.y + axis.y * length + normal.y * width;
+        double z = center.z + axis.z * length + normal.z * width;
+        Render3DUtil.toViewSpace(x, y, z, cameraPos, pose, dest);
     }
 
     public record WorldMesh(List<Line> lines, List<Ring> rings, List<PlaneRect> planeRects) {

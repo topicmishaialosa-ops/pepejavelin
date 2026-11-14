@@ -71,7 +71,8 @@ public final class HudFeature extends Feature {
             WATERMARK, COORDINATES, POTIONS, TARGET, NOTIFICATIONS, HOTBAR, ARMOR_HUD, QUICK_USE
     ));
     public final NumberSetting size = register(new NumberSetting("Size", 100.0, 50.0, 200.0, 1.0, "%"));
-    public final ModeSetting watermarkStyle = register(new ModeSetting("Watermark Style", "New", "New", "Old", "Bar"));
+    public final ModeSetting watermarkStyle = register(new ModeSetting(
+            "Watermark Style", "New", org.blade.hud.WatermarkStyles.OPTIONS));
     public final ModeSetting coordsStyle = register(new ModeSetting("Coordinates Style", "New", "New", "Old"));
     public final ModeSetting hotbarStyle = register(new ModeSetting("Hotbar Style", "Mini", "Mini", "Classic"));
 
@@ -125,6 +126,10 @@ public final class HudFeature extends Feature {
 
     public static boolean barWatermarkEnabled() {
         return instance != null && instance.watermarkStyle.is("Bar");
+    }
+
+    public static String watermarkStyleName() {
+        return instance == null ? "New" : instance.watermarkStyle.getValue();
     }
 
     public static boolean newCoordsEnabled() {

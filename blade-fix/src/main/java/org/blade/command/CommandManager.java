@@ -14,6 +14,7 @@ import org.blade.command.impl.MacroCommand;
 import org.blade.command.impl.NbtParserCommand;
 import org.blade.command.impl.PrefixCommand;
 import org.blade.command.impl.RctCommand;
+import org.blade.command.impl.VclipCommand;
 import org.blade.context.MinecraftContext;
 import org.blade.event.EventManager;
 import org.blade.event.EventTarget;
@@ -60,7 +61,8 @@ public final class CommandManager {
                 new ConfigCommand(),
                 new NbtParserCommand(),
                 new RctCommand(),
-                new BlockEspCommand()
+                new BlockEspCommand(),
+                new VclipCommand()
         ).forEach(this::register);
 
         store.load(this);

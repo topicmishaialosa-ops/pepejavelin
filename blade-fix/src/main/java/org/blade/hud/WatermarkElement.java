@@ -102,6 +102,7 @@ public final class WatermarkElement extends HudElement {
     private String barClient;
     private String barName;
     private String barTime;
+    private WatermarkStyles.Scene customScene;
     private float barClientWidth;
     private float barNameWidth;
     private float barFpsNumWidth;
@@ -121,23 +122,46 @@ public final class WatermarkElement extends HudElement {
 
     @Override
     protected void layout(Minecraft mc, float unit) {
+        String style = HudFeature.watermarkStyleName();
         if (HudFeature.barWatermarkEnabled()) {
             layoutBar(mc, unit);
         } else if (HudFeature.newWatermarkEnabled()) {
             layoutSegment(mc, unit);
-        } else {
+        } else if ("Old".equals(style)) {
             layoutMini(mc, unit);
+        } else {
+            layoutCustom(mc, unit);
         }
     }
 
     @Override
     protected void draw(Minecraft mc, float unit) {
+        String style = HudFeature.watermarkStyleName();
         if (HudFeature.barWatermarkEnabled()) {
             drawBar(mc, unit);
         } else if (HudFeature.newWatermarkEnabled()) {
             drawSegment(mc, unit);
-        } else {
+        } else if ("Old".equals(style)) {
             drawMini(mc, unit);
+        } else {
+            drawCustom(mc, unit);
+        }
+    }
+
+    private void layoutCustom(Minecraft mc, float unit) {
+        WatermarkStyles.Preset preset = WatermarkStyles.byName(HudFeature.watermarkStyleName());
+        if (preset == null) {
+            layoutMini(mc, unit);
+            return;
+        }
+        this.customScene = WatermarkStyles.build(mc, unit, preset);
+        this.width = this.customScene.width;
+        this.height = this.customScene.height;
+    }
+
+    private void drawCustom(Minecraft mc, float unit) {
+        if (this.customScene != null) {
+            this.customScene.draw(this.x, this.y, appearAlpha());
         }
     }
 

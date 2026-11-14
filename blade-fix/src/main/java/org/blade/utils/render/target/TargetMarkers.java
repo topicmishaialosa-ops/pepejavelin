@@ -22,8 +22,9 @@ public final class TargetMarkers {
         boolean ghosts = feature != null && feature.usesGhostTargetEsp();
         boolean circles = feature != null && feature.usesCircleTargetEsp();
         boolean deadheads = feature != null && feature.usesDeadheadTargetEsp();
+        boolean none = feature != null && feature.usesNoneTargetEsp();
         int color = feature != null ? feature.getMarkerColor() : 0xFF00FF88;
-        this.marker.render(ghosts || circles || deadheads ? null : target, tickDelta, color);
+        this.marker.render(none || ghosts || circles || deadheads ? null : target, tickDelta, color);
         this.ghost.render(ghosts ? target : null, tickDelta, color);
         this.circle.render(circles ? target : null, tickDelta, color);
         this.deadhead.render(deadheads ? target : null, tickDelta, color);

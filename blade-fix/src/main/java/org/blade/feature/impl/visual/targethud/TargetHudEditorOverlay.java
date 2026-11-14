@@ -596,6 +596,10 @@ public final class TargetHudEditorOverlay {
                 autoRotate.target = this.feature.headAutoRotate;
                 addRow(panelX, autoRotate, controlX);
 
+                Row redHead = new Row("Красная голова", ROW_TYPE_TOGGLE);
+                redHead.target = this.feature.redOnHurt;
+                addRow(panelX, redHead, controlX);
+
                 Row eyes = new Row("Глаза на голове", ROW_TYPE_TOGGLE);
                 eyes.target = this.feature.showEyes;
                 addRow(panelX, eyes, controlX);

@@ -33,6 +33,8 @@ import org.blade.utils.ColorUtil;
 import org.blade.utils.math.Animation;
 import org.blade.utils.math.MathUtil;
 import org.blade.utils.render.Theme;
+import org.blade.utils.render.Textures;
+import org.blade.utils.render.gui.MsdfFont;
 import org.blade.utils.render.gui.PlayerHead;
 import org.blade.utils.render.gui.Render2DUtil;
 import org.blade.utils.render.gui.TextAlign;
@@ -60,10 +62,11 @@ public final class TargetHudFeature extends Feature {
     public static final String TYPE_BOSS_BAR = "Боссбар";
     public static final String TYPE_MINIMAL = "Минимал";
     public static final String TYPE_CIRCLE = "Кружок";
+    public static final String TYPE_MONOTON = "monoton";
 
     public static final String[] TYPES = {
             TYPE_LARGE, TYPE_SMALL, TYPE_PERCENT, TYPE_BIG_BAR, TYPE_VERTICAL,
-            TYPE_METANOISE, TYPE_MINI, TYPE_GRADIENT, TYPE_BOSS_BAR, TYPE_MINIMAL, TYPE_CIRCLE
+            TYPE_METANOISE, TYPE_MINI, TYPE_GRADIENT, TYPE_BOSS_BAR, TYPE_MINIMAL, TYPE_CIRCLE, TYPE_MONOTON
     };
 
     private static final EquipmentSlot[] ARMOR_ORDER = {
@@ -94,6 +97,7 @@ public final class TargetHudFeature extends Feature {
             .visibleWhen(() -> mode.is(MODE_HUIHUI)));
     public final BooleanSetting headAutoRotate = register(new BooleanSetting("Автоповорот головы", false)
             .visibleWhen(() -> mode.is(MODE_HUIHUI)));
+    public final BooleanSetting redOnHurt = register(new BooleanSetting("Красная голова", true));
     public final ModeSetting displayMode = register(new ModeSetting("Отображение", "Проценты и HP", "Проценты и HP", "Проценты", "HP")
             .visibleWhen(() -> mode.is(MODE_HUIHUI)));
     public final BooleanSetting customColors = register(new BooleanSetting("Свои цвета", false)
@@ -135,6 +139,10 @@ public final class TargetHudFeature extends Feature {
     public final ButtonSetting openEditor = register(new ButtonSetting(
             "Редактор таргетхуда", "Открыть редактор", () -> TargetHudEditorOverlay.open(TargetHudFeature.this)
     ).nonPersistent());
+
+    private static final Map<String, String> UI_NAME_CACHE = new HashMap<>();
+
+    private final ItemStack[] armorScratch = new ItemStack[4];
 
     private LivingEntity target;
     private LivingEntity previous;
@@ -309,6 +317,7 @@ public final class TargetHudFeature extends Feature {
                 case TYPE_BOSS_BAR -> renderBossBar(mc, entity, alpha, pal);
                 case TYPE_MINIMAL -> renderMinimal(mc, entity, alpha, pal);
                 case TYPE_CIRCLE -> renderCircle(mc, entity, alpha, pal);
+                case TYPE_MONOTON -> renderMonoton(mc, entity, alpha, pal);
                 default -> renderLarge(mc, entity, alpha, pal);
             }
             float belowY = y0() + rawHeight() + 2.0F;
@@ -353,7 +362,7 @@ public final class TargetHudFeature extends Feature {
         if (entity == null || entity != this.target) {
             return;
         }
-        String currentName = entity.getName().getString();
+        String currentName = uiSafeName(entity.getName().getString());
         float health = animValue(entity);
         int percent = (int) (animFraction(entity) * 100.0F);
         if (currentName.equals(this.cachedName)
@@ -461,106 +470,96 @@ public final class TargetHudFeature extends Feature {
     private void renderLarge(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
         float x = x0();
         float y = y0();
-        float size = 28.0F * this.headSize.getValue().floatValue();
-        float nameSize = Math.max(5.0F, size * 0.3F);
-        float bigSize = nameSize + 4.0F;
-        float barH = barHeight(4.0F);
-        float width = Math.max(52.0F, size * 1.5F + 12.0F);
-
-        float headY = y + 3.0F;
-        float bigTop = headY + size + 3.0F;
-        float nameTop = bigTop + bigSize + 1.0F;
-        float barY = nameTop + nameSize + 4.0F;
-        float height = barY - y + barH + 4.0F;
+        float head = 28.0F * this.headSize.getValue().floatValue();
+        float width = largeWidth();
+        float height = largeHeight();
+        float barH = barHeight(5.0F);
+        float pad = 6.0F;
+        float nameSize = Math.max(6.0F, head * 0.32F);
+        float valueSize = nameSize + 3.0F;
 
         float corner = this.radius.getValue().floatValue() * 0.6F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
 
-        drawHead(entity, x + width / 2.0F - size / 2.0F, headY, size, alpha);
+        drawHead(entity, x + pad, y + pad, head, alpha);
 
-        String big = displayText(entity);
-        float bigWidth = measure(big, 600, bigSize);
-        if (bigWidth <= width * 0.92F) {
-            Render2DUtil.text(x + width / 2.0F, bigTop, bigSize, big)
-                    .weight(600)
-                    .color(pal.text)
-                    .align(TextAlign.CENTER)
-                    .draw();
-        }
-
-        String name = entityName(entity);
-        float avail = width - 8.0F;
-        if (measure(name, 400, nameSize) > avail) {
-            name = ellipsize(name, 400, nameSize, avail);
-        }
-        Render2DUtil.text(x + width / 2.0F, nameTop, nameSize, name)
-                .weight(400)
-                .color(ColorUtil.multiplyAlpha(pal.text, 0.85F))
-                .align(TextAlign.CENTER)
+        float infoX = x + pad + head + 7.0F;
+        float right = x + width - pad;
+        String value = displayText(entity);
+        float valueW = measure(value, 600, valueSize);
+        Render2DUtil.text(right, y + 4.0F, valueSize, value)
+                .weight(600)
+                .color(pal.text)
+                .align(TextAlign.RIGHT)
+                .draw();
+        Render2DUtil.text(infoX, y + 5.0F, nameSize,
+                        ellipsize(entityName(entity), 500, nameSize, right - infoX - valueW - 6.0F))
+                .weight(500)
+                .color(ColorUtil.multiplyAlpha(pal.text, 0.92F))
                 .draw();
 
-        drawBars(entity, x + 4.0F, barY, width - 8.0F, barH, pal);
+        drawBars(entity, infoX, y + height - pad - barH, right - infoX, barH, pal);
     }
 
     private void renderSmall(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
         float x = x0();
         float y = y0();
-        float size = 18.0F * this.headSize.getValue().floatValue();
-        float nameSize = 6.5F;
+        float head = 18.0F * this.headSize.getValue().floatValue();
+        float width = smallWidth();
+        float height = smallHeight();
         float barH = barHeight(3.5F);
-        float width = Math.max(48.0F, size + 16.0F);
-
-        float headY = y + 3.0F;
-        float barY = headY + size + 4.0F;
-        float nameTop = barY + barH + 2.0F;
-        float height = nameTop - y + nameSize + 3.0F;
+        float pad = 5.0F;
+        float nameSize = 6.5F;
 
         float corner = this.radius.getValue().floatValue() * 0.5F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
 
-        drawHead(entity, x + 3.0F, headY, size, alpha);
-        drawBars(entity, x + 3.0F, barY, width - 6.0F, barH, pal);
+        drawHead(entity, x + pad, y + pad, head, alpha);
 
-        String name = ellipsize(entityName(entity), 400, nameSize, width - 6.0F);
-        Render2DUtil.text(x + width / 2.0F, nameTop, nameSize, name)
+        float infoX = x + pad + head + 6.0F;
+        float right = x + width - pad;
+        Render2DUtil.text(infoX, y + 5.0F, nameSize,
+                        ellipsize(entityName(entity), 400, nameSize, right - infoX))
                 .weight(400)
                 .color(pal.text)
-                .align(TextAlign.CENTER)
                 .draw();
+        Render2DUtil.text(right, y + 5.0F, nameSize, displayPercent(entity))
+                .weight(600)
+                .color(pal.text)
+                .align(TextAlign.RIGHT)
+                .draw();
+
+        drawBars(entity, infoX, y + height - pad - barH, right - infoX, barH, pal);
     }
 
     private void renderPercent(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
         float x = x0();
         float y = y0();
-        float size = 22.0F * this.headSize.getValue().floatValue();
-        float width = Math.max(56.0F, size + 4.0F);
-        float textSize = 5.5F;
+        float head = 22.0F * this.headSize.getValue().floatValue();
+        float width = percentWidth();
+        float height = percentHeight();
         float barH = barHeight(4.0F);
-
-        float headY = y + 2.0F;
-        float percentTop = headY + size + 4.0F;
-        float barY = percentTop + textSize + 2.0F + 4.0F;
-        float nameTop = barY + barH + 3.0F;
-        float nameSize = textSize - 0.5F;
-        float height = nameTop - y + nameSize + 3.0F;
+        float pad = 5.0F;
+        float nameSize = 5.5F;
 
         float corner = this.radius.getValue().floatValue() * 0.55F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
 
-        drawHead(entity, x + 2.0F, headY, size, alpha);
+        drawHead(entity, x + pad, y + pad, head, alpha);
 
-        Render2DUtil.text(x + width / 2.0F, percentTop, textSize + 2.0F, displayPercent(entity))
+        float infoX = x + pad + head + 7.0F;
+        float right = x + width - pad;
+        Render2DUtil.text(infoX, y + 4.0F, 10.0F, displayPercent(entity))
                 .weight(600)
                 .color(pal.text)
-                .align(TextAlign.CENTER)
                 .draw();
-        drawBars(entity, x + 2.0F, barY, width - 4.0F, barH, pal);
-        Render2DUtil.text(x + width / 2.0F, nameTop, nameSize,
-                        ellipsize(entityName(entity), 400, nameSize, width - 4.0F))
+        Render2DUtil.text(infoX, y + 16.0F, nameSize,
+                        ellipsize(entityName(entity), 400, nameSize, right - infoX))
                 .weight(400)
-                .color(pal.text)
-                .align(TextAlign.CENTER)
+                .color(ColorUtil.multiplyAlpha(pal.text, 0.85F))
                 .draw();
+
+        drawBars(entity, infoX, y + height - pad - barH, right - infoX, barH, pal);
     }
 
     private void renderBigBar(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
@@ -643,74 +642,69 @@ public final class TargetHudFeature extends Feature {
     }
 
     private void renderMini(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
-        float x = this.x.getValue().floatValue();
-        float y = this.y.getValue().floatValue();
-        float size = 16.0F * this.headSize.getValue().floatValue();
-        float width = Math.max(40.0F, size + 22.0F);
-        float height = 32.0F;
+        float x = x0();
+        float y = y0();
+        float head = 16.0F * this.headSize.getValue().floatValue();
+        float width = miniWidth();
+        float height = miniHeight();
+        float barH = barHeight(3.0F);
+        float pad = 4.0F;
 
         float corner = this.radius.getValue().floatValue() * 0.4F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
 
-        drawHead(entity, x + 2.0F, y + 2.0F, size, alpha);
+        drawHead(entity, x + pad, y + (height - head) / 2.0F, head, alpha);
 
+        float infoX = x + pad + head + 6.0F;
+        float right = x + width - pad;
         float nameSize = 5.5F;
-        float infoX = x + 2.0F + size + 3.0F;
-        float infoW = width - infoX + x - 2.0F;
-        String name = ellipsize(entityName(entity), 400, nameSize, infoW);
-        Render2DUtil.text(infoX, y + 5.0F, nameSize, name)
+        Render2DUtil.text(infoX, y + 5.0F, nameSize,
+                        ellipsize(entityName(entity), 400, nameSize, right - infoX - 30.0F))
                 .weight(400)
                 .color(pal.text)
                 .draw();
-
-        float hpFrac = animFraction(entity);
-        Render2DUtil.rect(infoX, y + 13.0F, infoW, 2.0F)
-                .color(pal.track)
-                .radius(1.0F)
-                .draw();
-        float fill = infoW * hpFrac;
-        if (fill > 0.0F) {
-            Render2DUtil.rect(infoX, y + 13.0F, fill, 2.0F)
-                    .color(pal.barSecond)
-                    .radius(1.0F)
-                    .draw();
-        }
-
-        String second = secondaryDisplay(entity);
-        Render2DUtil.text(infoX, y + 20.0F, 5.0F, second)
-                .weight(400)
+        Render2DUtil.text(right, y + 5.0F, 5.0F, displayPercent(entity))
+                .weight(600)
                 .color(pal.textSecond)
+                .align(TextAlign.RIGHT)
                 .draw();
+
+        drawBars(entity, infoX, y + height - pad - barH, right - infoX, barH, pal);
     }
 
     private void renderGradient(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
         float x = x0();
         float y = y0();
-        float size = 24.0F * this.headSize.getValue().floatValue();
-        float width = Math.max(58.0F, size + 10.0F);
-        float nameSize = 5.5F;
+        float head = 24.0F * this.headSize.getValue().floatValue();
+        float width = gradientWidth();
+        float height = gradientHeight();
         float barH = barHeight(5.0F);
-
-        float headY = y + 4.0F;
-        float barTop = headY + size + 6.0F;
-        float nameTop = barTop + barH + 4.0F;
-        float height = nameTop - y + nameSize + 4.0F;
+        float pad = 5.0F;
+        float nameSize = 5.5F;
 
         float corner = this.radius.getValue().floatValue() * 0.55F;
         drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
 
-        drawHead(entity, x + 4.0F, headY, size, alpha);
+        drawHead(entity, x + pad, y + pad, head, alpha);
 
-        Render2DUtil.rect(x + 6.0F, barTop, width - 12.0F, barH)
-                .color(pal.bar, pal.barSecond, pal.bar, pal.barSecond)
-                .radius(barH / 2.0F)
-                .draw();
-
-        String name = ellipsize(entityName(entity), 400, nameSize, width - 8.0F);
-        Render2DUtil.text(x + width / 2.0F, nameTop, nameSize, name)
+        float infoX = x + pad + head + 7.0F;
+        float right = x + width - pad;
+        String value = displayText(entity);
+        float valueW = measure(value, 600, nameSize);
+        Render2DUtil.text(infoX, y + 5.0F, nameSize,
+                        ellipsize(entityName(entity), 400, nameSize, right - infoX - valueW - 6.0F))
                 .weight(400)
                 .color(pal.text)
-                .align(TextAlign.CENTER)
+                .draw();
+        Render2DUtil.text(right, y + 5.0F, nameSize, value)
+                .weight(600)
+                .color(pal.text)
+                .align(TextAlign.RIGHT)
+                .draw();
+
+        Render2DUtil.rect(infoX, y + height - pad - barH, right - infoX, barH)
+                .color(pal.bar, pal.barSecond, pal.bar, pal.barSecond)
+                .radius(barH / 2.0F)
                 .draw();
     }
 
@@ -792,14 +786,11 @@ public final class TargetHudFeature extends Feature {
     private void renderMetanoise(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
         float x = x0();
         float y = y0();
-        float size = 28.0F * this.headSize.getValue().floatValue();
-        float width = size + 20.0F;
-        float nameSize = 5.5F;
+        float head = 28.0F * this.headSize.getValue().floatValue();
+        float width = metanoiseWidth();
+        float height = metanoiseHeight();
         float barH = barHeight(4.0F);
-
-        float percentTop = y + 2.0F + size + 4.0F;
-        float barY = percentTop + nameSize + 2.0F + 4.0F;
-        float height = barY - y + barH + 4.0F;
+        float pad = 5.0F;
 
         int baseC = this.customColors.getValue()
                 ? pal.bg
@@ -827,15 +818,21 @@ public final class TargetHudFeature extends Feature {
                 .radius(3.0F)
                 .draw();
 
-        drawHead(entity, x + 2.0F, y + 2.0F, size, alpha);
+        drawHead(entity, x + pad, y + pad, head, alpha);
 
-        Render2DUtil.text(x + width / 2.0F, percentTop, nameSize + 2.0F, displayPercent(entity))
+        float infoX = x + pad + head + 7.0F;
+        float right = x + width - pad;
+        Render2DUtil.text(infoX, y + 4.0F, 8.5F, displayPercent(entity))
                 .weight(600)
                 .color(pal.bar)
-                .align(TextAlign.CENTER)
+                .draw();
+        Render2DUtil.text(infoX, y + 17.0F, 5.5F,
+                        ellipsize(entityName(entity), 400, 5.5F, right - infoX))
+                .weight(400)
+                .color(ColorUtil.multiplyAlpha(pal.text, 0.85F))
                 .draw();
 
-        drawBars(entity, x + 5.0F, barY, width - 10.0F, barH, pal);
+        drawBars(entity, infoX, y + height - pad - barH, right - infoX, barH, pal);
     }
 
     private void renderCircle(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
@@ -880,6 +877,76 @@ public final class TargetHudFeature extends Feature {
                 .color(ColorUtil.multiplyAlpha(pal.text, 0.8F))
                 .align(TextAlign.CENTER)
                 .draw();
+    }
+
+    private void renderMonoton(Minecraft mc, LivingEntity entity, float alpha, Palette pal) {
+        float x = x0();
+        float y = y0();
+        float width = monotonWidth();
+        float height = monotonHeight();
+        float pad = 6.0F;
+        float head = height - pad * 2.0F;
+
+        float corner = this.radius.getValue().floatValue() * 0.8F;
+        drawBackground(mc, x, y, width, height, corner, pal.bg, pal.border, borderThickness.getValue().floatValue(), alpha);
+
+        drawHead(entity, x + pad, y + pad, head, alpha);
+
+        float infoX = x + pad + head + 8.0F;
+        float right = x + width - pad;
+        float nameSize = Math.max(7.0F, head * 0.22F);
+
+        String hpText = (int) Math.ceil(animValue(entity)) + "hp";
+        float hpW = measure(hpText, 600, nameSize);
+        float heartSize = nameSize;
+        float heartGap = 3.0F;
+        Render2DUtil.text(infoX, y + pad + 1.0F, nameSize,
+                        ellipsize(entityName(entity), 700, nameSize, right - infoX - hpW - heartSize - heartGap - 6.0F))
+                .weight(700)
+                .color(pal.text)
+                .draw();
+        Render2DUtil.texture(right - hpW - heartGap - heartSize, y + pad + 1.0F + (nameSize - heartSize) / 2.0F,
+                        heartSize, heartSize, Textures.Icons.SCAN_HEART)
+                .color(pal.text)
+                .draw();
+        Render2DUtil.text(right, y + pad + 1.0F, nameSize, hpText)
+                .weight(600)
+                .color(pal.text)
+                .align(TextAlign.RIGHT)
+                .draw();
+
+        float crossSize = Math.max(5.0F, nameSize * 0.8F);
+        float crossY = y + pad + nameSize + 6.0F;
+        float step = measure("X X ", 500, crossSize);
+        for (int i = 0; i < 5; i++) {
+            Render2DUtil.text(infoX + i * step, crossY, crossSize, "X")
+                    .weight(500)
+                    .color(ColorUtil.multiplyAlpha(pal.textSecond, 0.75F))
+                    .draw();
+        }
+
+        float barH = barHeight(4.0F);
+        float topH = 2.0F;
+        float barW = right - infoX;
+        float bottomY = y + height - pad - barH;
+        float topY = bottomY - topH - 3.0F;
+
+        Render2DUtil.rect(infoX, topY, barW, topH)
+                .color(pal.barSecond)
+                .radius(topH / 2.0F)
+                .draw();
+
+        Render2DUtil.rect(infoX, bottomY, barW, barH)
+                .color(pal.track)
+                .radius(barH / 2.0F)
+                .draw();
+        float fill = barW * animFraction(entity);
+        if (fill > 0.0F) {
+            Render2DUtil.rect(infoX, bottomY, fill, barH)
+                    .color(pal.bar)
+                    .radius(barH / 2.0F)
+                    .draw();
+        }
     }
 
     private void drawRing(float cx, float cy, float radius, float thickness, float from, float to, int color) {
@@ -995,6 +1062,7 @@ public final class TargetHudFeature extends Feature {
                         .color(ColorUtil.multiplyAlpha(ColorUtil.WHITE, alpha))
                         .draw();
             }
+            drawHurtOverlay(entity, x, y, size, alpha);
             return;
         }
         if (entity instanceof AbstractClientPlayer player) {
@@ -1011,6 +1079,18 @@ public final class TargetHudFeature extends Feature {
                     .radius(size * 0.2F)
                     .draw();
         }
+        drawHurtOverlay(entity, x, y, size, alpha);
+    }
+
+    private void drawHurtOverlay(LivingEntity entity, float x, float y, float size, float alpha) {
+        if (!this.redOnHurt.getValue() || entity.hurtTime <= 0) {
+            return;
+        }
+        float hurt = Mth.clamp(entity.hurtTime / 10.0F, 0.0F, 1.0F);
+        Render2DUtil.rect(x, y, size, size)
+                .color(ColorUtil.multiplyAlpha(ColorUtil.rgba(255, 40, 40, 255), alpha * hurt * 0.4F))
+                .radius(size * 0.2F)
+                .draw();
     }
 
     private void drawEyes(float x, float y, float size, float alpha, float yaw, float pitch) {
@@ -1069,7 +1149,7 @@ public final class TargetHudFeature extends Feature {
     }
 
     private void drawArmor(LivingEntity entity, float x, float y, float alpha) {
-        ItemStack[] stacks = new ItemStack[4];
+        ItemStack[] stacks = this.armorScratch;
         int count = 0;
         for (EquipmentSlot slot : ARMOR_ORDER) {
             ItemStack stack = entity.getItemBySlot(slot);
@@ -1257,18 +1337,44 @@ public final class TargetHudFeature extends Feature {
         if (entity == this.lastMathEntity && this.cachedName != null) {
             return this.cachedName;
         }
-        return entity.getName().getString();
+        return uiSafeName(entity.getName().getString());
     }
 
-    private String secondaryDisplay(LivingEntity entity) {
-        if (entity == this.lastMathEntity && this.cachedSecondary != null) {
-            return this.cachedSecondary;
+    private static String uiSafeName(String name) {
+        if (name == null || name.isEmpty()) {
+            return "";
         }
-        String mode = this.displayMode.getValue();
-        if ("Проценты и HP".equals(mode)) {
-            return "HP " + (int) Math.ceil(animValue(entity)) + "/" + (int) Math.ceil(maxHealth(entity));
+        String cached = UI_NAME_CACHE.get(name);
+        if (cached != null) {
+            return cached;
         }
-        return displayText(entity);
+        MsdfFont font = UiFonts.getFontForText(name, 400);
+        String result;
+        if (font.canRender(name)) {
+            result = name;
+        } else {
+            StringBuilder builder = new StringBuilder(name.length());
+            for (int i = 0; i < name.length(); ) {
+                int codePoint = name.codePointAt(i);
+                i += Character.charCount(codePoint);
+                if (Character.isWhitespace(codePoint)) {
+                    if (!builder.isEmpty() && builder.charAt(builder.length() - 1) != ' ') {
+                        builder.append(' ');
+                    }
+                    continue;
+                }
+                if (font.hasGlyph(codePoint)) {
+                    builder.appendCodePoint(codePoint);
+                }
+            }
+            String trimmed = builder.toString().trim();
+            result = trimmed.isEmpty() ? name : trimmed;
+        }
+        if (UI_NAME_CACHE.size() > 1024) {
+            UI_NAME_CACHE.clear();
+        }
+        UI_NAME_CACHE.put(name, result);
+        return result;
     }
 
     private void updateDisplayMath(LivingEntity entity) {
@@ -1312,6 +1418,62 @@ public final class TargetHudFeature extends Feature {
                 300L, Animation.Easing.EASE_OUT_QUAD);
     }
 
+    private float largeWidth() {
+        return Math.max(122.0F, 28.0F * this.headSize.getValue().floatValue() + 98.0F);
+    }
+
+    private float largeHeight() {
+        return Math.max(28.0F * this.headSize.getValue().floatValue() + 14.0F, 26.0F + barHeight(5.0F));
+    }
+
+    private float smallWidth() {
+        return Math.max(98.0F, 18.0F * this.headSize.getValue().floatValue() + 80.0F);
+    }
+
+    private float smallHeight() {
+        return Math.max(18.0F * this.headSize.getValue().floatValue() + 12.0F, 24.0F + barHeight(3.5F));
+    }
+
+    private float percentWidth() {
+        return Math.max(104.0F, 22.0F * this.headSize.getValue().floatValue() + 82.0F);
+    }
+
+    private float percentHeight() {
+        return Math.max(22.0F * this.headSize.getValue().floatValue() + 14.0F, 28.0F + barHeight(4.0F));
+    }
+
+    private float metanoiseWidth() {
+        return Math.max(108.0F, 28.0F * this.headSize.getValue().floatValue() + 80.0F);
+    }
+
+    private float metanoiseHeight() {
+        return Math.max(28.0F * this.headSize.getValue().floatValue() + 14.0F, 28.0F + barHeight(4.0F));
+    }
+
+    private float miniWidth() {
+        return Math.max(96.0F, 16.0F * this.headSize.getValue().floatValue() + 80.0F);
+    }
+
+    private float miniHeight() {
+        return Math.max(16.0F * this.headSize.getValue().floatValue() + 14.0F, 22.0F + barHeight(3.0F));
+    }
+
+    private float gradientWidth() {
+        return Math.max(112.0F, 24.0F * this.headSize.getValue().floatValue() + 88.0F);
+    }
+
+    private float gradientHeight() {
+        return Math.max(24.0F * this.headSize.getValue().floatValue() + 14.0F, 26.0F + barHeight(5.0F));
+    }
+
+    private float monotonWidth() {
+        return Math.max(168.0F, 28.0F * this.headSize.getValue().floatValue() + 122.0F);
+    }
+
+    private float monotonHeight() {
+        return Math.max(58.0F, 28.0F * this.headSize.getValue().floatValue() + 18.0F);
+    }
+
     public float currentWidth() {
         return rawWidth() * this.hudScale.getValue().floatValue();
     }
@@ -1326,17 +1488,18 @@ public final class TargetHudFeature extends Feature {
         }
         float size = this.headSize.getValue().floatValue();
         return switch (this.type.getValue()) {
-            case TYPE_SMALL -> Math.max(48.0F, 18.0F * size + 16.0F);
-            case TYPE_PERCENT -> Math.max(56.0F, 22.0F * size + 4.0F);
+            case TYPE_SMALL -> smallWidth();
+            case TYPE_PERCENT -> percentWidth();
             case TYPE_BIG_BAR -> Math.max(82.0F, 10.0F * size + 40.0F);
             case TYPE_VERTICAL -> 36.0F;
-            case TYPE_METANOISE -> 28.0F * size + 20.0F;
-            case TYPE_MINI -> Math.max(48.0F, 16.0F * size + 22.0F);
-            case TYPE_GRADIENT -> Math.max(58.0F, 24.0F * size + 10.0F);
+            case TYPE_METANOISE -> metanoiseWidth();
+            case TYPE_MINI -> miniWidth();
+            case TYPE_GRADIENT -> gradientWidth();
             case TYPE_BOSS_BAR -> Math.max(110.0F, 30.0F * size + 30.0F);
             case TYPE_MINIMAL -> Math.max(52.0F, 14.0F * size + 26.0F);
             case TYPE_CIRCLE -> 20.0F * size + 10.0F;
-            default -> Math.max(52.0F, 28.0F * size * 1.5F + 12.0F);
+            case TYPE_MONOTON -> monotonWidth();
+            default -> largeWidth();
         };
     }
 
@@ -1347,21 +1510,18 @@ public final class TargetHudFeature extends Feature {
             return 46.0F;
         }
         return switch (this.type.getValue()) {
-            case TYPE_SMALL -> 18.0F * size + 18.5F + 3.5F * thickness;
-            case TYPE_PERCENT -> 22.0F * size + 24.5F + 4.0F * thickness;
+            case TYPE_SMALL -> smallHeight();
+            case TYPE_PERCENT -> percentHeight();
             case TYPE_BIG_BAR -> Math.max(16.0F, 6.0F + 10.0F * size) + 9.0F * thickness + 3.0F;
             case TYPE_VERTICAL -> 20.0F * size + 26.5F;
-            case TYPE_METANOISE -> 28.0F * size + 21.5F + 4.0F * thickness;
-            case TYPE_MINI -> 32.0F;
-            case TYPE_GRADIENT -> 24.0F * size + 23.5F + 5.0F * thickness;
+            case TYPE_METANOISE -> metanoiseHeight();
+            case TYPE_MINI -> miniHeight();
+            case TYPE_GRADIENT -> gradientHeight();
             case TYPE_BOSS_BAR -> Math.max(30.0F * size + 10.0F, 24.0F + 9.0F * thickness);
             case TYPE_MINIMAL -> 32.0F;
             case TYPE_CIRCLE -> 20.0F * size + 28.0F;
-            default -> {
-                float base = 28.0F * size;
-                float nameSize = Math.max(5.0F, base * 0.3F);
-                yield base + 19.0F + 2.0F * nameSize + 4.0F * thickness;
-            }
+            case TYPE_MONOTON -> monotonHeight();
+            default -> largeHeight();
         };
     }
 
@@ -1380,15 +1540,7 @@ public final class TargetHudFeature extends Feature {
         if (text == null || text.isEmpty() || maxWidth <= 1.0F) {
             return "";
         }
-        if (measure(text, weight, size) <= maxWidth) {
-            return text;
-        }
-        String ellipsis = "…";
-        String truncated = text;
-        while (truncated.length() > 1 && measure(truncated + ellipsis, weight, size) > maxWidth) {
-            truncated = truncated.substring(0, truncated.length() - 1);
-        }
-        return truncated + ellipsis;
+        return UiFonts.getFontForText(text, weight).ellipsize(text, size, 0.0F, maxWidth);
     }
 
     private static LoadedImage loadImage(String path) {

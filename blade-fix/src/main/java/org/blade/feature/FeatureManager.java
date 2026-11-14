@@ -69,9 +69,11 @@ import org.blade.feature.impl.player.NoJumpBoostFeature;
 import org.blade.feature.impl.pve.*;
 import org.blade.feature.impl.pve.autowarden.AutoWardenFeature;
 import org.blade.feature.impl.visual.ArrowsFeature;
+import org.blade.feature.impl.visual.AspectRatioFeature;
 import org.blade.feature.impl.visual.BlockESPFeature;
 import org.blade.feature.impl.visual.BlockOutlineFeature;
 import org.blade.feature.impl.visual.ChamsFeature;
+import org.blade.feature.impl.visual.CosmeticsFeature;
 import org.blade.feature.impl.visual.CrosshairFeature;
 import org.blade.feature.impl.visual.EditClickGUI;
 import org.blade.feature.impl.visual.EntityEspFeature;
@@ -169,6 +171,8 @@ public final class FeatureManager {
                 new TargetHudFeature(),
                 new ScoreboardFeature(),
                 new ArrowsFeature(),
+                new AspectRatioFeature(),
+                new CosmeticsFeature(),
                 new EntityEspFeature(),
                 new NameTagsFeature(),
                 new SupplyHologramsFeature(),

@@ -3,6 +3,8 @@ package org.blade.menu.pages.modules;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.blade.feature.Feature;
+import org.blade.feature.impl.visual.CosmeticsFeature;
+import org.blade.feature.impl.visual.CosmeticsScreen;
 import org.blade.feature.setting.Setting;
 import org.blade.menu.i18n.MenuText;
 import org.blade.menu.ui.Component;
@@ -119,7 +121,13 @@ public final class ModuleCard extends Component implements RowHost {
     }
 
     public boolean handleRightClick(int mouseX, int mouseY) {
-        return hit(mouseX, mouseY, this.designX, this.designY, this.designWidth, HEADER_HEIGHT);
+        if (!hit(mouseX, mouseY, this.designX, this.designY, this.designWidth, HEADER_HEIGHT)) {
+            return false;
+        }
+        if (this.feature instanceof CosmeticsFeature) {
+            CosmeticsScreen.open();
+        }
+        return true;
     }
 
     public boolean handleMiddleClick(int mouseX, int mouseY) {

@@ -65,6 +65,8 @@ public final class ZarabotokReallyWorld extends Feature {
     private static final Pattern COOLDOWN_SECONDS = Pattern.compile("(\\d+)\\s*(?:сек|sec)");
     private static final Pattern COOLDOWN_MINUTES = Pattern.compile("(\\d+)\\s*(?:мин|min)");
     private static final Pattern COOLDOWN_AFTER_WAIT = Pattern.compile("подожд\\w*\\s+(\\d+)");
+    private static final int TP_SETTLE_TICKS = 25;
+    private static final int TP_SETTLE_MAX_TICKS = 80;
 
     private enum Stage {
         SHEARS,
@@ -101,6 +103,7 @@ public final class ZarabotokReallyWorld extends Feature {
     private final BladeTimer rtpCooldownTimer = new BladeTimer();
     private int rtpAttempts;
     private Vec3 rtpStartPos;
+    private int tpSettleTicks;
     private int shearsStep;
     private final BladeTimer shearsTimer = new BladeTimer();
     private int craftSubStep;
@@ -149,6 +152,7 @@ public final class ZarabotokReallyWorld extends Feature {
         this.rtpCooldown = false;
         this.rtpAttempts = 0;
         this.rtpStartPos = null;
+        this.tpSettleTicks = 0;
         this.shearsStep = 0;
         this.walkTarget = null;
         this.collectedCount = 0;
@@ -707,6 +711,7 @@ public final class ZarabotokReallyWorld extends Feature {
             this.cmdSent = true;
             this.timer.reset();
             this.rtpStartPos = mc.player.position();
+            this.tpSettleTicks = 0;
             this.send("/rtpdefault");
             this.stage = Stage.WAIT_TP;
         }
@@ -715,6 +720,9 @@ public final class ZarabotokReallyWorld extends Feature {
     private void stageWaitTp() {
         Minecraft mc = Minecraft.getInstance();
         if (this.rtpStartPos != null && mc.player.position().distanceTo(this.rtpStartPos) > 10.0) {
+            if (!this.isTpSettled(mc)) {
+                return;
+            }
             if (this.isNearProtectedSpot()) {
                 this.rtpAttempts++;
                 this.cmdSent = false;
@@ -741,6 +749,25 @@ public final class ZarabotokReallyWorld extends Feature {
                 this.stage = Stage.RTP;
             }
         }
+    }
+
+    private boolean isTpSettled(Minecraft mc) {
+        this.tpSettleTicks++;
+        if (this.tpSettleTicks < TP_SETTLE_TICKS) {
+            return false;
+        }
+        BlockPos feet = mc.player.blockPosition();
+        boolean chunksReady = mc.level != null
+                && mc.level.hasChunkAt(feet)
+                && mc.level.hasChunkAt(feet.below());
+        if (mc.player.onGround() && chunksReady) {
+            return true;
+        }
+        if (this.tpSettleTicks >= TP_SETTLE_MAX_TICKS) {
+            ChatUtil.info("Мир не прогрузился или игрок не на земле — продолжаю");
+            return true;
+        }
+        return false;
     }
 
     private boolean isRtpCooldown(String lower) {

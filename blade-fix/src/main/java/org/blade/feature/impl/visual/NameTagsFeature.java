@@ -32,7 +32,10 @@ import org.blade.utils.render.gui.UiFonts;
 import org.joml.Matrix3x2fStack;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.blade.utils.render.Textures;
 
 public final class NameTagsFeature extends Feature {
@@ -57,6 +60,14 @@ public final class NameTagsFeature extends Feature {
 
     private record Privilege(String name, int color) {
     }
+
+    private record CachedPrivilege(PlayerTeam team, Privilege privilege) {
+    }
+
+    private static final Map<UUID, CachedPrivilege> PRIVILEGE_CACHE = new HashMap<>();
+    private static final Map<String, String> NAME_CACHE = new HashMap<>();
+
+    private final List<ItemStack> equipmentScratch = new ArrayList<>(EQUIPMENT_ORDER.length);
 
     public final ModeSetting style = register(new ModeSetting("Style", "nametags", "nametags", "nametags2"));
     public final NumberSetting scale = register(new NumberSetting("Scale", 1.0, 0.95, 1.2, 0.05, "x"));
@@ -138,7 +149,7 @@ public final class NameTagsFeature extends Feature {
         float gap = GAP * unit;
         float dividerWidth = Math.max(0.5F, 0.5F * unit);
 
-        String name = player.getGameProfile().name();
+        String name = safeName(player.getGameProfile().name());
         Privilege donat = this.privilege.getValue() ? resolvePrivilege(player) : null;
         String healthText = this.health.getValue()
                 ? (int) Math.ceil(player.getHealth() + player.getAbsorptionAmount()) + "HP"
@@ -259,6 +270,7 @@ public final class NameTagsFeature extends Feature {
         boolean bot = this.botTag.getValue()
                 && AntiBotFeature.INSTANCE.isEnabled()
                 && AntiBotFeature.INSTANCE.isBot(player);
+        name = safeName(name);
         String friendText = friend ? "F " : "";
         String botText = bot ? "[BOT] " : "";
         String hpText = this.health.getValue()
@@ -384,8 +396,9 @@ public final class NameTagsFeature extends Feature {
         return cursor + dividerWidth + gap;
     }
 
-    private static List<ItemStack> equipment(AbstractClientPlayer player) {
-        List<ItemStack> stacks = new ArrayList<>(EQUIPMENT_ORDER.length);
+    private List<ItemStack> equipment(AbstractClientPlayer player) {
+        List<ItemStack> stacks = this.equipmentScratch;
+        stacks.clear();
         for (EquipmentSlot slot : EQUIPMENT_ORDER) {
             ItemStack stack = player.getItemBySlot(slot);
             if (!stack.isEmpty()) {
@@ -397,6 +410,17 @@ public final class NameTagsFeature extends Feature {
 
     private static Privilege resolvePrivilege(AbstractClientPlayer player) {
         PlayerTeam team = player.getTeam();
+        UUID id = player.getUUID();
+        CachedPrivilege cached = PRIVILEGE_CACHE.get(id);
+        if (cached != null && cached.team() == team) {
+            return cached.privilege();
+        }
+        Privilege privilege = computePrivilege(team);
+        PRIVILEGE_CACHE.put(id, new CachedPrivilege(team, privilege));
+        return privilege;
+    }
+
+    private static Privilege computePrivilege(PlayerTeam team) {
         if (team == null) {
             return null;
         }
@@ -421,16 +445,62 @@ public final class NameTagsFeature extends Feature {
         return new Privilege(name, rgb);
     }
 
-    private static String cleanName(String text) {
-        String stripped = text.replaceAll("§.", "");
-        StringBuilder clean = new StringBuilder(stripped.length());
-        for (int i = 0; i < stripped.length(); i++) {
-            char character = stripped.charAt(i);
-            if (isBasicLetterOrDigit(character) || character == ' ') {
-                clean.append(character);
-            }
+    private static String safeName(String name) {
+        String cached = NAME_CACHE.get(name);
+        if (cached != null) {
+            return cached;
         }
-        return clean.toString().replaceAll("\\s+", " ").trim();
+        MsdfFont font = UiFonts.sfProDisplay();
+        String result;
+        if (font.canRender(name)) {
+            result = name;
+        } else {
+            StringBuilder builder = new StringBuilder(name.length());
+            for (int i = 0; i < name.length(); ) {
+                int codePoint = name.codePointAt(i);
+                i += Character.charCount(codePoint);
+                if (Character.isWhitespace(codePoint)) {
+                    if (!builder.isEmpty() && builder.charAt(builder.length() - 1) != ' ') {
+                        builder.append(' ');
+                    }
+                    continue;
+                }
+                if (font.hasGlyph(codePoint)) {
+                    builder.appendCodePoint(codePoint);
+                }
+            }
+            String trimmed = builder.toString().trim();
+            result = trimmed.isEmpty() ? name : trimmed;
+        }
+        if (NAME_CACHE.size() > 1024) {
+            NAME_CACHE.clear();
+        }
+        NAME_CACHE.put(name, result);
+        return result;
+    }
+
+    private static String cleanName(String text) {
+        StringBuilder clean = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char character = text.charAt(i);
+            if (character == '§') {
+                i++;
+                continue;
+            }
+            if (!isBasicLetterOrDigit(character) && character != ' ') {
+                continue;
+            }
+            if (character == ' ' && (clean.isEmpty() || clean.charAt(clean.length() - 1) == ' ')) {
+                continue;
+            }
+            clean.append(character);
+        }
+        int end = clean.length();
+        while (end > 0 && clean.charAt(end - 1) == ' ') {
+            end--;
+        }
+        clean.setLength(end);
+        return clean.toString();
     }
 
     private static boolean isBasicLetterOrDigit(char character) {

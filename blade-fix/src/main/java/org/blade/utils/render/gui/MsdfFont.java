@@ -118,6 +118,10 @@ public final class MsdfFont {
         return glyph != null ? glyph : this.fallbackGlyph;
     }
 
+    public boolean hasGlyph(int codePoint) {
+        return this.glyphs.containsKey(codePoint);
+    }
+
     public boolean canRender(String text) {
         return !shape(text).missingGlyphs();
     }

@@ -54,6 +54,7 @@
     "render.ItemEntityRenderStateMixin",
     "render.ItemEntityRendererMixin",
     "render.ItemInHandRendererMixin",
+    "render.ItemModelResolverMixin",
     "render.LevelRendererMixin",
     "render.LightmapRenderStateExtractorMixin",
     "render.MobEffectFogEnvironmentMixin",

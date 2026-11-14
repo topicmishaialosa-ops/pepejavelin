@@ -72,6 +72,7 @@ public final class AuraFeature extends Feature {
     private static final String TARGET_ESP_GHOSTS = "Ghosts";
     private static final String TARGET_ESP_CIRCLE = "Circle";
     private static final String TARGET_ESP_DEADHEADS = "Deadheads";
+    private static final String TARGET_ESP_NONE = "None";
 
     public final ModeSetting targetEsp = register(new ModeSetting(
             "Target ESP",
@@ -79,7 +80,8 @@ public final class AuraFeature extends Feature {
             TARGET_ESP_MARKER,
             TARGET_ESP_GHOSTS,
             TARGET_ESP_CIRCLE,
-            TARGET_ESP_DEADHEADS
+            TARGET_ESP_DEADHEADS,
+            TARGET_ESP_NONE
     ));
 
     public final ModeSetting targetEspColorMode = register(ColorMode.setting());
@@ -249,6 +251,10 @@ public final class AuraFeature extends Feature {
 
     public boolean usesDeadheadTargetEsp() {
         return TARGET_ESP_DEADHEADS.equals(this.targetEsp.getValue());
+    }
+
+    public boolean usesNoneTargetEsp() {
+        return TARGET_ESP_NONE.equals(this.targetEsp.getValue());
     }
 
     public boolean usesRhombusTargetEsp() {

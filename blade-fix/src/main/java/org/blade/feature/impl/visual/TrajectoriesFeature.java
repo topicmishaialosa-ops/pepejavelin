@@ -84,6 +84,11 @@ public final class TrajectoriesFeature extends Feature implements MinecraftConte
 
     private final List<ScreenLine> pendingScreenLines = new ArrayList<>();
     private final List<ImpactPoint> points = new ArrayList<>();
+    private final List<WorldMeshRenderer.Line> worldLines = new ArrayList<>();
+    private final List<WorldMeshRenderer.Ring> worldRings = new ArrayList<>();
+    private final List<WorldMeshRenderer.PlaneRect> worldPlaneRects = new ArrayList<>();
+    private final List<Prediction> predictionsScratch = new ArrayList<>();
+    private final ItemStack[] handStacks = new ItemStack[2];
     private int tpSkipTicks;
 
     public TrajectoriesFeature() {
@@ -143,9 +148,12 @@ public final class TrajectoriesFeature extends Feature implements MinecraftConte
             return;
         }
 
-        List<WorldMeshRenderer.Line> lines = new ArrayList<>();
-        List<WorldMeshRenderer.Ring> rings = new ArrayList<>();
-        List<WorldMeshRenderer.PlaneRect> planeRects = new ArrayList<>();
+        List<WorldMeshRenderer.Line> lines = this.worldLines;
+        List<WorldMeshRenderer.Ring> rings = this.worldRings;
+        List<WorldMeshRenderer.PlaneRect> planeRects = this.worldPlaneRects;
+        lines.clear();
+        rings.clear();
+        planeRects.clear();
 
         if (predictTrajectory.isSelected(TARGET_SELF)) {
             drawPredictionInHand(lines, rings, planeRects);
@@ -248,7 +256,9 @@ public final class TrajectoriesFeature extends Feature implements MinecraftConte
         }
 
         ItemStack activeStack = player.getUseItem();
-        ItemStack[] stacks = {player.getMainHandItem(), player.getOffhandItem()};
+        ItemStack[] stacks = this.handStacks;
+        stacks[0] = player.getMainHandItem();
+        stacks[1] = player.getOffhandItem();
 
         for (ItemStack stack : stacks) {
             if (stack.isEmpty()) {
@@ -259,7 +269,8 @@ public final class TrajectoriesFeature extends Feature implements MinecraftConte
             float pitch = Mth.lerp(partialTicks, player.xRotO, player.getXRot());
             float yaw = Mth.lerp(partialTicks, player.yRotO, player.getYRot());
 
-            List<Prediction> predictions = new ArrayList<>();
+            List<Prediction> predictions = this.predictionsScratch;
+            predictions.clear();
             var item = stack.getItem();
             if (item instanceof ExperienceBottleItem) {
                 addPrediction(predictions, checkTrajectory(player, new ThrownExperienceBottle(mc.level, player, stack), 0.7D, pitch, yaw, -20.0F, screenAnchored));

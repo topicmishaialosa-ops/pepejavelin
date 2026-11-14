@@ -4,6 +4,7 @@ import org.blade.feature.impl.combat.AuraFeature;
 import org.blade.feature.impl.player.FullBrightFeature;
 import org.blade.feature.impl.visual.BlockOutlineFeature;
 import org.blade.feature.impl.visual.ChamsFeature;
+import org.blade.feature.impl.visual.CosmeticsFeature;
 import org.blade.feature.impl.visual.HitParticlesFeature;
 import org.blade.feature.impl.visual.JumpCirclesFeature;
 import org.blade.feature.impl.visual.PopChamsFeature;
@@ -12,6 +13,7 @@ import org.blade.feature.impl.visual.WorldParticlesFeature;
 import org.blade.feature.impl.visual.WorldTweaksFeature;
 import org.blade.utils.render.chams.ChamsPipeline;
 import org.blade.utils.render.chams.PopChamsRenderer;
+import org.blade.utils.render.cosmetics.CosmeticsRenderer;
 import org.blade.utils.render.target.TargetMarkers;
 
 import java.util.ArrayList;
@@ -64,6 +66,11 @@ public final class WorldEffects {
         register(WorldEffect.direct(
                 TrajectoriesFeature::getEnabled,
                 (feature, context) -> feature.renderWorld()
+        ));
+
+        register(WorldEffect.direct(
+                CosmeticsFeature::getEnabled,
+                (feature, context) -> CosmeticsRenderer.render(feature, context.tickDelta())
         ));
 
         register(WorldEffect.direct(

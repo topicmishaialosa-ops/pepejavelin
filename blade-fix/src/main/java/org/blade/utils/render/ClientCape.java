@@ -6,6 +6,7 @@ import net.minecraft.world.entity.player.PlayerSkin;
 import org.blade.context.MinecraftContext;
 import org.blade.feature.FeatureManager;
 import org.blade.feature.impl.visual.CapeFeature;
+import org.blade.feature.impl.visual.CosmeticsFeature;
 
 import java.util.UUID;
 
@@ -19,17 +20,29 @@ public final class ClientCape {
             return false;
         }
 
-        CapeFeature feature = getFeature();
-        if (feature == null || !feature.isEnabled()) {
+        if (!MinecraftContext.mc.player.getUUID().equals(playerUuid)) {
             return false;
         }
 
-        return MinecraftContext.mc.player.getUUID().equals(playerUuid);
+        CosmeticsFeature cosmetics = getCosmetics();
+        if (cosmetics != null && cosmetics.capeFile() != null) {
+            return true;
+        }
+
+        CapeFeature feature = getFeature();
+        return feature != null && feature.isEnabled();
     }
 
     public static PlayerSkin apply(PlayerSkin skin) {
-        CapeFeature feature = getFeature();
-        String fileName = (feature != null) ? feature.currentStyle().getFileName() : "glass.png";
+        String fileName = null;
+        CosmeticsFeature cosmetics = getCosmetics();
+        if (cosmetics != null) {
+            fileName = cosmetics.capeFile();
+        }
+        if (fileName == null) {
+            CapeFeature feature = getFeature();
+            fileName = (feature != null) ? feature.currentStyle().getFileName() : "glass.png";
+        }
 
         Identifier dynamicTextureId = Identifier.fromNamespaceAndPath("blade", "textures/cape/" + fileName);
 
@@ -50,5 +63,9 @@ public final class ClientCape {
 
     private static CapeFeature getFeature() {
         return FeatureManager.INSTANCE.getFeature(CapeFeature.class);
+    }
+
+    private static CosmeticsFeature getCosmetics() {
+        return FeatureManager.INSTANCE.getEnabled(CosmeticsFeature.class);
     }
 }

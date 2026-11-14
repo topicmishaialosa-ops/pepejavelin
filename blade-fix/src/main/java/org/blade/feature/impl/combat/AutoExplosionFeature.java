@@ -4,19 +4,20 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.protocol.game.ServerboundAttackPacket;
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
-import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
-
 import org.blade.context.RotationContext;
 import org.blade.event.EventTarget;
 import org.blade.event.events.game.GameTickEvent;
@@ -28,14 +29,17 @@ import org.blade.feature.setting.BooleanSetting;
 import org.blade.feature.setting.NumberSetting;
 import org.blade.utils.render.world.WorldMeshRenderer;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
 public final class AutoExplosionFeature extends Feature {
     public static final AutoExplosionFeature INSTANCE = new AutoExplosionFeature();
 
     private static final float PLACE_REACH = 4.5F;
+    private static final long MIN_REACTION_MS = 200L;
 
     public final NumberSetting range = register(new NumberSetting(
             "Дистанция", 5.0D, 1.0D, 8.0D, 0.5D, "блоков"
@@ -57,23 +61,21 @@ public final class AutoExplosionFeature extends Feature {
     private final Map<BlockPos, Long> candidates = new HashMap<>();
     private final Map<BlockPos, Integer> explodeCountdown = new HashMap<>();
     private final Map<BlockPos, Integer> retries = new HashMap<>();
-    private BlockPos lastScanPos;
-    private int scanCooldown;
 
     public AutoExplosionFeature() {
         super("AutoExplosion", "Если игрок поставил обсидиан — ставит кристалл из хотбара и взрывает его", FeatureCategory.COMBAT, BindSetting.UNBOUND);
     }
 
+    @Override
     public void onEnable() {
         snapshot.clear();
         candidates.clear();
         explodeCountdown.clear();
         retries.clear();
-        lastScanPos = null;
-        scanCooldown = 0;
         scan();
     }
 
+    @Override
     public void onDisable() {
         snapshot.clear();
         candidates.clear();
@@ -90,28 +92,9 @@ public final class AutoExplosionFeature extends Feature {
             return;
         }
 
-        if (shouldScan(player)) {
-            scan();
-        }
-
+        scan();
         processCandidates(player);
         processExplosions(player);
-    }
-
-    private boolean shouldScan(LocalPlayer player) {
-        BlockPos current = player.getBlockPosBelowThatAffectsMyMovement();
-        if (lastScanPos == null || !lastScanPos.equals(current)) {
-            lastScanPos = current;
-            scanCooldown = 0;
-            return true;
-        }
-
-        if (scanCooldown-- <= 0) {
-            scanCooldown = 10;
-            return true;
-        }
-
-        return false;
     }
 
     private void scan() {
@@ -122,17 +105,31 @@ public final class AutoExplosionFeature extends Feature {
         }
 
         int radius = Math.max(1, (int) Math.ceil(range.getValue()));
-        BlockPos playerPos = player.getBlockPosBelowThatAffectsMyMovement();
+        BlockPos center = player.getBlockPosBelowThatAffectsMyMovement();
         Map<BlockPos, Block> current = new HashMap<>();
-        for (int x = playerPos.getX() - radius; x <= playerPos.getX() + radius; ++x) {
-            for (int y = playerPos.getY() - 2; y <= playerPos.getY() + 2; ++y) {
-                for (int z = playerPos.getZ() - radius; z <= playerPos.getZ() + radius; ++z) {
+        long now = System.currentTimeMillis();
+
+        for (int x = center.getX() - radius; x <= center.getX() + radius; ++x) {
+            for (int y = center.getY() - 2; y <= center.getY() + 2; ++y) {
+                for (int z = center.getZ() - radius; z <= center.getZ() + radius; ++z) {
                     BlockPos pos = new BlockPos(x, y, z);
                     Block block = mc.level.getBlockState(pos).getBlock();
                     current.put(pos, block);
-                    if (block == Blocks.OBSIDIAN && snapshot.get(pos) != Blocks.OBSIDIAN) {
-                        candidates.put(pos.immutable(), System.currentTimeMillis());
+                    if (block != Blocks.OBSIDIAN) {
+                        continue;
                     }
+
+                    Block previous = snapshot.get(pos);
+                    if (previous == null || previous == Blocks.OBSIDIAN) {
+                        continue;
+                    }
+                    if (!mc.level.getBlockState(pos.above()).isAir()) {
+                        continue;
+                    }
+                    if (explodeCountdown.containsKey(pos) || candidates.containsKey(pos)) {
+                        continue;
+                    }
+                    candidates.put(pos.immutable(), now);
                 }
             }
         }
@@ -148,13 +145,12 @@ public final class AutoExplosionFeature extends Feature {
         }
 
         long now = System.currentTimeMillis();
+        long maxAge = Math.max(MIN_REACTION_MS, (long) (double) reactionTime.getValue());
         Vec3 eye = player.getEyePosition();
-        double rangeDbl = range.getValue();
-        float maxDist = (float) rangeDbl;
-        long maxAge = (long) (double) reactionTime.getValue();
 
         for (BlockPos pos : new HashSet<>(candidates.keySet())) {
-            if (explodeCountdown.containsKey(pos) || retries.containsKey(pos)) {
+            if (!mc.level.getBlockState(pos).is(Blocks.OBSIDIAN)
+                    || !mc.level.getBlockState(pos.above()).isAir()) {
                 candidates.remove(pos);
                 continue;
             }
@@ -164,62 +160,15 @@ public final class AutoExplosionFeature extends Feature {
                 continue;
             }
 
-            double distance = eye.distanceTo(Vec3.atCenterOf(pos));
-            if (distance > Math.max(maxDist, PLACE_REACH)) {
+            if (eye.distanceTo(Vec3.atCenterOf(pos.above())) > PLACE_REACH) {
+                continue;
+            }
+
+            if (placeCrystalAt(player, pos)) {
                 candidates.remove(pos);
-                continue;
+                explodeCountdown.put(pos.immutable(), Math.max(1, (int) (double) explodeDelay.getValue()));
             }
-
-            BlockPos above = pos.above();
-            if (!mc.level.getBlockState(above).isAir()) {
-                candidates.remove(pos);
-                continue;
-            }
-
-            int crystalSlot = findHotbar(Items.END_CRYSTAL, player);
-            if (crystalSlot == -1) {
-                continue;
-            }
-
-            Vec3 placePos = new Vec3(pos.getX() + 0.5D, pos.getY() + 1.0D, pos.getZ() + 0.5D);
-            if (eye.distanceTo(placePos) > PLACE_REACH) {
-                continue;
-            }
-
-            placeCrystal(player, pos, above, placePos, crystalSlot);
         }
-    }
-
-    private void placeCrystal(LocalPlayer player, BlockPos pos, BlockPos above, Vec3 placePos, int crystalSlot) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.gameMode == null) {
-            return;
-        }
-
-        Vec3 eye = player.getEyePosition();
-        Vec3 diff = placePos.subtract(eye);
-        double horizontal = Math.sqrt(diff.x * diff.x + diff.z * diff.z);
-        float yaw = (float) (Math.toDegrees(Math.atan2(diff.z, diff.x)) - 90.0F);
-        float pitch = (float) -Math.toDegrees(Math.atan2(diff.y, horizontal));
-        RotationContext.setRotation(yaw, pitch);
-
-        int prevSlot = player.getInventory().getSelectedSlot();
-        if (crystalSlot != prevSlot) {
-            player.getInventory().setSelectedSlot(crystalSlot);
-            player.connection.send(new ServerboundSetCarriedItemPacket(crystalSlot));
-        }
-
-        BlockHitResult hit = new BlockHitResult(placePos, Direction.UP, pos, false);
-        boolean accepted = mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit).consumesAction();
-        if (prevSlot != crystalSlot && player.getInventory().getSelectedSlot() == crystalSlot) {
-            player.getInventory().setSelectedSlot(prevSlot);
-            player.connection.send(new ServerboundSetCarriedItemPacket(prevSlot));
-        }
-
-            if (accepted) {
-                explodeCountdown.put(pos.immutable(), (int) (double) explodeDelay.getValue());
-                candidates.remove(pos);
-            }
     }
 
     private void processExplosions(LocalPlayer player) {
@@ -235,23 +184,84 @@ public final class AutoExplosionFeature extends Feature {
                 continue;
             }
 
-            explodeCountdown.remove(pos);
             EndCrystal crystal = findCrystal(pos);
-            if (crystal == null) {
-                int attempts = retries.getOrDefault(pos, 0) + 1;
-                if (attempts < (int) (double) breakRetries.getValue()) {
-                    retries.put(pos, attempts);
-                    explodeCountdown.put(pos, 1);
-                } else {
-                    retries.remove(pos);
-                }
+            if (crystal != null) {
+                attackCrystal(player, crystal);
+                explodeCountdown.remove(pos);
+                retries.remove(pos);
                 continue;
             }
 
-            mc.gameMode.attack(player, crystal);
-            player.swing(InteractionHand.MAIN_HAND);
-            retries.remove(pos);
+            int attempts = retries.getOrDefault(pos, 0);
+            if (attempts >= (int) (double) breakRetries.getValue()) {
+                explodeCountdown.remove(pos);
+                retries.remove(pos);
+                continue;
+            }
+            retries.put(pos, attempts + 1);
+
+            if (placeCrystalAt(player, pos)) {
+                explodeCountdown.put(pos, Math.max(2, (int) (double) explodeDelay.getValue() / 2));
+            } else {
+                explodeCountdown.put(pos, 2);
+            }
         }
+    }
+
+    private boolean placeCrystalAt(LocalPlayer player, BlockPos pos) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.gameMode == null) {
+            return false;
+        }
+
+        Vec3 placePos = new Vec3(pos.getX() + 0.5D, pos.getY() + 1.0D, pos.getZ() + 0.5D);
+        if (player.getEyePosition().distanceTo(placePos) > PLACE_REACH) {
+            return false;
+        }
+
+        InteractionHand hand;
+        int switchTo = -1;
+        int previousSlot = player.getInventory().getSelectedSlot();
+
+        if (player.getMainHandItem().is(Items.END_CRYSTAL)) {
+            hand = InteractionHand.MAIN_HAND;
+        } else if (player.getOffhandItem().is(Items.END_CRYSTAL)) {
+            hand = InteractionHand.OFF_HAND;
+        } else {
+            switchTo = findHotbar(Items.END_CRYSTAL, player);
+            if (switchTo == -1) {
+                return false;
+            }
+            hand = InteractionHand.MAIN_HAND;
+            player.getInventory().setSelectedSlot(switchTo);
+            player.connection.send(new ServerboundSetCarriedItemPacket(switchTo));
+        }
+
+        rotateTo(player, placePos);
+        BlockHitResult hit = new BlockHitResult(placePos, Direction.UP, pos, false);
+        InteractionResult result = mc.gameMode.useItemOn(player, hand, hit);
+
+        if (switchTo != -1) {
+            player.getInventory().setSelectedSlot(previousSlot);
+            player.connection.send(new ServerboundSetCarriedItemPacket(previousSlot));
+        }
+
+        return result.consumesAction();
+    }
+
+    private void attackCrystal(LocalPlayer player, EndCrystal crystal) {
+        Vec3 center = crystal.getBoundingBox().getCenter();
+        rotateTo(player, center);
+        player.connection.send(new ServerboundAttackPacket(crystal.getId()));
+        player.swing(InteractionHand.MAIN_HAND);
+    }
+
+    private void rotateTo(LocalPlayer player, Vec3 target) {
+        Vec3 diff = target.subtract(player.getEyePosition());
+        double horizontal = Math.sqrt(diff.x * diff.x + diff.z * diff.z);
+        float yaw = (float) (Math.toDegrees(Math.atan2(diff.z, diff.x)) - 90.0F);
+        float pitch = (float) -Math.toDegrees(Math.atan2(diff.y, horizontal));
+        RotationContext.setRotation(yaw, pitch);
     }
 
     private EndCrystal findCrystal(BlockPos pos) {
@@ -259,14 +269,23 @@ public final class AutoExplosionFeature extends Feature {
         if (mc.level == null) {
             return null;
         }
-        AABB box = new AABB(pos.above()).inflate(0.5D);
+
+        Vec3 center = Vec3.atCenterOf(pos.above());
+        AABB box = new AABB(center.add(-2.0D, -2.0D, -2.0D), center.add(2.0D, 2.0D, 2.0D));
+        EndCrystal best = null;
+        double bestDistance = Double.MAX_VALUE;
+
         for (EndCrystal crystal : mc.level.getEntities(
                 EntityTypeTest.forClass(EndCrystal.class),
                 box,
                 e -> e.isAlive() && !e.isRemoved())) {
-            return crystal;
+            double distance = crystal.getBoundingBox().getCenter().distanceToSqr(center);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = crystal;
+            }
         }
-        return null;
+        return best;
     }
 
     @EventTarget
@@ -280,38 +299,44 @@ public final class AutoExplosionFeature extends Feature {
         int cyan = 0xFF00E5FF;
         int fill = 0x5500E5FF;
         long now = System.currentTimeMillis();
-        long maxAge = (long) (double) reactionTime.getValue();
+        long maxAge = Math.max(MIN_REACTION_MS, (long) (double) reactionTime.getValue());
 
-        java.util.List<WorldMeshRenderer.Line> lines = new java.util.ArrayList<>();
-        java.util.List<WorldMeshRenderer.PlaneRect> quads = new java.util.ArrayList<>();
+        List<WorldMeshRenderer.Line> lines = new ArrayList<>();
+        List<WorldMeshRenderer.PlaneRect> quads = new ArrayList<>();
 
         for (Map.Entry<BlockPos, Long> entry : candidates.entrySet()) {
             if (now - entry.getValue() > maxAge) {
                 continue;
             }
-
-            BlockPos pos = entry.getKey();
-            Vec3 c1 = new Vec3(pos.getX() + 0.0D, pos.getY() + 1.0D, pos.getZ() + 0.0D);
-            Vec3 c2 = new Vec3(pos.getX() + 1.0D, pos.getY() + 1.0D, pos.getZ() + 0.0D);
-            Vec3 c3 = new Vec3(pos.getX() + 1.0D, pos.getY() + 1.0D, pos.getZ() + 1.0D);
-            Vec3 c4 = new Vec3(pos.getX() + 0.0D, pos.getY() + 1.0D, pos.getZ() + 1.0D);
-            Vec3 center = new Vec3(pos.getX() + 0.5D, pos.getY() + 1.0D, pos.getZ() + 0.5D);
-            quads.add(new WorldMeshRenderer.PlaneRect(
-                    center, new Vec3(1.0D, 0.0D, 0.0D), new Vec3(0.0D, 0.0D, 1.0D), 0.5D, 0.5D, fill
-            ));
-            lines.add(new WorldMeshRenderer.Line(c1, c2, cyan));
-            lines.add(new WorldMeshRenderer.Line(c2, c3, cyan));
-            lines.add(new WorldMeshRenderer.Line(c3, c4, cyan));
-            lines.add(new WorldMeshRenderer.Line(c4, c1, cyan));
+            addBox(lines, quads, entry.getKey(), cyan, fill);
+        }
+        for (BlockPos pos : explodeCountdown.keySet()) {
+            addBox(lines, quads, pos, cyan, fill);
         }
 
-        WorldMeshRenderer.render(new WorldMeshRenderer.WorldMesh(lines, java.util.List.of(), quads));
+        WorldMeshRenderer.render(new WorldMeshRenderer.WorldMesh(lines, List.of(), quads));
     }
 
-    private int findHotbar(net.minecraft.world.item.Item item, LocalPlayer player) {
+    private void addBox(List<WorldMeshRenderer.Line> lines, List<WorldMeshRenderer.PlaneRect> quads,
+                        BlockPos pos, int color, int fill) {
+        Vec3 c1 = new Vec3(pos.getX(), pos.getY() + 1.0D, pos.getZ());
+        Vec3 c2 = new Vec3(pos.getX() + 1.0D, pos.getY() + 1.0D, pos.getZ());
+        Vec3 c3 = new Vec3(pos.getX() + 1.0D, pos.getY() + 1.0D, pos.getZ() + 1.0D);
+        Vec3 c4 = new Vec3(pos.getX(), pos.getY() + 1.0D, pos.getZ() + 1.0D);
+        Vec3 center = new Vec3(pos.getX() + 0.5D, pos.getY() + 1.0D, pos.getZ() + 0.5D);
+        quads.add(new WorldMeshRenderer.PlaneRect(
+                center, new Vec3(1.0D, 0.0D, 0.0D), new Vec3(0.0D, 0.0D, 1.0D), 0.5D, 0.5D, fill
+        ));
+        lines.add(new WorldMeshRenderer.Line(c1, c2, color));
+        lines.add(new WorldMeshRenderer.Line(c2, c3, color));
+        lines.add(new WorldMeshRenderer.Line(c3, c4, color));
+        lines.add(new WorldMeshRenderer.Line(c4, c1, color));
+    }
+
+    private int findHotbar(Item item, LocalPlayer player) {
         for (int i = 0; i < 9; i++) {
             ItemStack stack = player.getInventory().getItem(i);
-            if (stack.getItem() == item) {
+            if (stack.is(item)) {
                 return i;
             }
         }
